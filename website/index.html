@@ -1,0 +1,1739 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoTrack — Universal Animal Welfare Ecosystem</title>
+  <meta name="description" content="EcoTrack is the universal animal welfare platform — AI-powered species training, motion scanning, marketplace, and community for wildlife professionals.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css?v=2">
+
+  <!-- html2canvas, jsPDF, html2pdf & QRCode.js for Client-Side Pass & PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     LOGIN PAGE (shown first, hidden after auth)
+══════════════════════════════════════════════════════ -->
+<div id="loginPage">
+  <button class="btn btn-secondary login-theme-toggle" onclick="toggleTheme()" style="position:absolute;top:24px;right:24px;z-index:100;width:44px;height:44px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;" title="Toggle Theme">
+    <i id="loginThemeIcon" class="fas fa-moon" style="font-size:16px;"></i>
+  </button>
+  <div class="login-bg-orb"></div>
+  <div class="login-bg-orb"></div>
+  <div class="login-bg-orb"></div>
+
+  <div class="login-split-container">
+    <!-- LEFT SIDE: CLEAN BRANDING + SIMPLE KEYWORD DETAILS -->
+    <div class="login-hero-side">
+      <div class="login-logo-icon">🌿</div>
+      <h1 class="login-brand-title">EcoTrack</h1>
+      <p class="login-brand-subtitle">Universal Animal Welfare Ecosystem</p>
+
+      <div class="login-tag-pills">
+        <span class="login-pill"><i class="fas fa-shield-halved"></i> Pet Vault</span>
+        <span class="login-pill"><i class="fas fa-lock"></i> Offline AI Privacy</span>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDE: SIGN IN / CREATE ACCOUNT CARD -->
+    <div class="login-card-side">
+      <div class="login-card">
+        <!-- Tabs -->
+        <div class="login-tabs">
+          <button class="login-tab active" id="tab-signin" onclick="switchLoginTab('signin')">Sign In</button>
+          <button class="login-tab" id="tab-signup" onclick="switchLoginTab('signup')">Create Account</button>
+        </div>
+
+        <!-- Sign In Form -->
+        <form class="login-form" id="signinForm" onsubmit="handleSignIn(event)">
+          <div class="login-field">
+            <label class="login-label">Email Address</label>
+            <div class="login-input-wrap">
+              <i class="fas fa-envelope login-input-icon"></i>
+              <input type="email" id="loginEmail" class="login-input" placeholder="you@example.com" required autocomplete="email">
+            </div>
+          </div>
+          <div class="login-field">
+            <div class="login-label-row">
+              <label class="login-label">Password</label>
+              <a href="javascript:void(0)" class="forgot-pass-link" onclick="switchLoginTab('forgot')">Forgot Password?</a>
+            </div>
+            <div class="login-input-wrap">
+              <i class="fas fa-lock login-input-icon"></i>
+              <input type="password" id="loginPassword" class="login-input" placeholder="••••••••" autocomplete="current-password" required>
+            </div>
+          </div>
+          <button type="submit" class="login-btn" id="signInBtn">
+            <i class="fas fa-arrow-right-to-bracket"></i>
+            <span id="signInBtnText">Sign In to EcoTrack</span>
+          </button>
+        </form>
+
+        <!-- Sign Up Form -->
+        <form class="login-form hidden" id="signupForm" onsubmit="handleSignUp(event)">
+          <div class="login-field">
+            <label class="login-label">Full Name</label>
+            <div class="login-input-wrap">
+              <i class="fas fa-user login-input-icon"></i>
+              <input type="text" id="signupName" class="login-input" placeholder="e.g. Alex Johnson">
+            </div>
+          </div>
+          <div class="login-field">
+            <label class="login-label">Email Address</label>
+            <div class="login-input-wrap">
+              <i class="fas fa-envelope login-input-icon"></i>
+              <input type="email" id="signupEmail" class="login-input" placeholder="you@example.com" required>
+            </div>
+          </div>
+          <div class="login-field">
+            <label class="login-label">Password</label>
+            <div class="login-input-wrap">
+              <i class="fas fa-lock login-input-icon"></i>
+              <input type="password" id="signupPassword" class="login-input" placeholder="Min. 6 characters" required>
+            </div>
+          </div>
+          <button type="submit" class="login-btn" id="signUpBtn">
+            <i class="fas fa-leaf"></i>
+            <span id="signUpBtnText">Create My Account</span>
+          </button>
+        </form>
+
+        <!-- Forgot Password Form: Step 1 Email -->
+        <form class="login-form hidden" id="forgotForm" onsubmit="handleSendOtp(event)">
+          <div class="form-header-box">
+            <h3 class="auth-subhead"><i class="fas fa-key"></i> Forgot Password</h3>
+            <p class="auth-desc">Enter your registered email address to receive a 5-minute verification OTP code.</p>
+          </div>
+          <div class="login-field">
+            <label class="login-label">Registered Email Address</label>
+            <div class="login-input-wrap">
+              <i class="fas fa-envelope login-input-icon"></i>
+              <input type="email" id="forgotEmail" class="login-input" placeholder="e.g. user@ecotrack.org" required autocomplete="email">
+            </div>
+          </div>
+          <button type="submit" class="login-btn" id="sendOtpBtn">
+            <i class="fas fa-paper-plane"></i>
+            <span id="sendOtpBtnText">Send Verification OTP</span>
+          </button>
+          <div class="auth-back-link">
+            <a href="javascript:void(0)" onclick="switchLoginTab('signin')"><i class="fas fa-arrow-left"></i> Back to Sign In</a>
+          </div>
+        </form>
+
+        <!-- Forgot Password Form: Step 2 OTP Verification -->
+        <form class="login-form hidden" id="otpForm" onsubmit="handleVerifyOtp(event)">
+          <div class="form-header-box">
+            <h3 class="auth-subhead"><i class="fas fa-shield-halved"></i> OTP Verification</h3>
+            <p class="auth-desc">We sent a 6-digit OTP code to <strong id="otpTargetEmail">user@ecotrack.org</strong></p>
+          </div>
+
+          <div class="otp-timer-card" id="otpTimerCard">
+            <i class="fas fa-clock"></i>
+            <span>OTP expires in: <strong id="otpCountdownTimer">05:00</strong></span>
+          </div>
+
+          <div class="login-field">
+            <label class="login-label">6-Digit Verification Code</label>
+            <div class="login-input-wrap">
+              <i class="fas fa-shield-cat login-input-icon"></i>
+              <input type="text" id="otpCodeInput" class="login-input otp-input-code" placeholder="123456" maxlength="6" pattern="[0-9]{6}" required autocomplete="one-time-code">
+            </div>
+          </div>
+
+          <button type="submit" class="login-btn" id="verifyOtpBtn">
+            <i class="fas fa-check-circle"></i>
+            <span id="verifyOtpBtnText">Verify OTP & Continue</span>
+          </button>
+
+          <div class="otp-actions-row">
+            <button type="button" class="btn-text-link" id="resendOtpBtn" onclick="handleResendOtp()">
+              <i class="fas fa-rotate-right"></i> Resend OTP
+            </button>
+            <a href="javascript:void(0)" class="auth-back-link-sm" onclick="switchLoginTab('forgot')">
+              Change Email
+            </a>
+          </div>
+        </form>
+
+        <!-- Forgot Password Form: Step 3 Reset Password -->
+        <form class="login-form hidden" id="resetPasswordForm" onsubmit="handleResetPassword(event)">
+          <div class="form-header-box">
+            <h3 class="auth-subhead"><i class="fas fa-lock-open"></i> Reset Password</h3>
+            <p class="auth-desc">Enter your new password to update your account credentials.</p>
+          </div>
+
+          <div class="login-field">
+            <label class="login-label">New Password</label>
+            <div class="login-input-wrap">
+              <i class="fas fa-lock login-input-icon"></i>
+              <input type="password" id="newPasswordInput" class="login-input" placeholder="Min. 6 characters" required minlength="6">
+            </div>
+          </div>
+
+          <div class="login-field">
+            <label class="login-label">Confirm New Password</label>
+            <div class="login-input-wrap">
+              <i class="fas fa-lock login-input-icon"></i>
+              <input type="password" id="confirmPasswordInput" class="login-input" placeholder="Repeat new password" required minlength="6">
+            </div>
+          </div>
+
+          <button type="submit" class="login-btn" id="resetPasswordBtn">
+            <i class="fas fa-check"></i>
+            <span id="resetPasswordBtnText">Update Password & Sign In</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     MAIN APP (hidden until logged in)
+══════════════════════════════════════════════════════ -->
+<div class="app-container" id="mainApp" style="display:none;">
+
+  <!-- ── SIDEBAR NAVIGATION ── -->
+  <aside class="sidebar">
+    <!-- Brand -->
+    <div class="brand-logo">
+      <div class="brand-icon">🌿</div>
+      <div>
+        <div class="brand-title">EcoTrack</div>
+        <div class="brand-tag">Welfare Engine</div>
+      </div>
+    </div>
+
+    <!-- User Badge -->
+    <div class="sidebar-user" onclick="switchTab('profile')" title="View Profile">
+      <div class="sidebar-avatar" id="sidebarAvatar">E</div>
+      <div>
+        <div class="sidebar-user-name" id="sidebarUserName">Eco Explorer</div>
+        <div class="sidebar-user-email" id="sidebarUserEmail">user@ecotrack.org</div>
+      </div>
+    </div>
+
+    <span class="nav-section-label">Main</span>
+    <ul class="nav-list">
+      <li class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
+        <i class="fas fa-chart-line"></i> <span>Dashboard</span>
+      </li>
+      <li class="nav-item" data-tab="training" onclick="switchTab('training')">
+        <i class="fas fa-dumbbell"></i> <span>Species Trainer</span>
+      </li>
+      <li class="nav-item" onclick="window.location.href='aiscanner.html'">
+        <i class="fas fa-camera"></i> <span>AI Scanner</span>
+      </li>
+    </ul>
+
+    <span class="nav-section-label">Commerce</span>
+    <ul class="nav-list">
+      <li class="nav-item" data-tab="marketplace" onclick="switchTab('marketplace')">
+        <i class="fas fa-store"></i> <span>Marketplace</span>
+      </li>
+      <li class="nav-item" data-tab="events" onclick="switchTab('events')">
+        <i class="fas fa-calendar-alt"></i> <span>Events & Rescue</span>
+      </li>
+    </ul>
+
+    <span class="nav-section-label">Social</span>
+    <ul class="nav-list">
+      <li class="nav-item" data-tab="community" onclick="switchTab('community')">
+        <i class="fas fa-users"></i> <span>Community Feed</span>
+      </li>
+      <li class="nav-item" data-tab="maps" onclick="switchTab('maps')">
+        <i class="fas fa-map-location-dot"></i> <span>Find Services</span>
+      </li>
+      <li class="nav-item" data-tab="profile" onclick="switchTab('profile')">
+        <i class="fas fa-user-circle"></i> <span>My Profile</span>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <button class="theme-toggle-btn" onclick="toggleTheme()">
+        <span id="themeText">Dark Mode</span>
+        <i id="themeIcon" class="fas fa-moon"></i>
+      </button>
+      <button class="logout-btn" onclick="handleLogout()">
+        <i class="fas fa-right-from-bracket"></i>
+        <span>Sign Out</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── MAIN CONTENT ── -->
+  <main class="main-content">
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+      <div class="page-heading">
+        <h1 id="topPageTitle">Dashboard</h1>
+        <p id="topPageSub">Real-time animal welfare management & offline AI engine</p>
+      </div>
+      <div class="top-actions">
+        <button class="top-action-btn active-user" id="topUserBtn" onclick="switchTab('profile')">
+          <i class="fas fa-user-circle" style="color:var(--primary)"></i>
+          <span id="topUserName">Profile</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── 1. DASHBOARD ── -->
+    <section id="dashboard" class="tab-section active">
+      <div class="hero-card">
+        <div class="hero-content">
+          <div class="hero-badge"><i class="fas fa-bolt"></i> 100% Offline AI Engine Active</div>
+          <h2 class="hero-title">Universal Animal Species & Welfare Ecosystem</h2>
+          <p class="hero-desc">Train animal species & breeds. Analyze movement patterns, check posture health, and manage verified adoption listings — all powered by offline AI.</p>
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="switchTab('training')">🚀 Species Trainer</button>
+            <button class="btn btn-secondary" style="background:rgba(255,255,255,0.2);color:#fff;border:none;" onclick="switchTab('marketplace')">🛍️ Marketplace</button>
+          </div>
+        </div>
+        <img src="https://images.unsplash.com/photo-1517849845537-4d257902454a?w=480" alt="Animal welfare" class="hero-img">
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon-box"><i class="fas fa-shield-halved"></i></div>
+          <div><div class="stat-num">100%</div><div class="stat-label">Offline Data Privacy</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon-box"><i class="fas fa-users"></i></div>
+          <div><div class="stat-num">50K+</div><div class="stat-label">Active Welfare Trainers</div></div>
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="card">
+        <div class="card-title"><i class="fas fa-rocket" style="color:var(--primary)"></i> Quick Actions</div>
+        <div class="quick-actions-grid" style="display:grid !important; grid-template-columns:repeat(3, 1fr) !important; gap:14px !important; width:100% !important;">
+          <button class="btn btn-secondary" style="padding:18px 10px;flex-direction:column;gap:8px;height:auto;width:100%!important;box-sizing:border-box!important;" onclick="switchTab('training')">
+            <i class="fas fa-dumbbell" style="font-size:22px;color:#8b5cf6"></i>
+            <span>Species Trainer</span>
+          </button>
+          <button class="btn btn-secondary" style="padding:18px 10px;flex-direction:column;gap:8px;height:auto;width:100%!important;box-sizing:border-box!important;" onclick="switchTab('marketplace')">
+            <i class="fas fa-store" style="font-size:22px;color:#f97316"></i>
+            <span>Marketplace</span>
+          </button>
+          <button class="btn btn-secondary" style="padding:18px 10px;flex-direction:column;gap:8px;height:auto;width:100%!important;box-sizing:border-box!important;" onclick="switchTab('events')">
+            <i class="fas fa-calendar-check" style="font-size:22px;color:#f59e0b"></i>
+            <span>Events &amp; Rescue</span>
+          </button>
+          <button class="btn btn-secondary" style="padding:18px 10px;flex-direction:column;gap:8px;height:auto;width:100%!important;box-sizing:border-box!important;" onclick="switchTab('community')">
+            <i class="fas fa-comments" style="font-size:22px;color:var(--purple)"></i>
+            <span>Community Feed</span>
+          </button>
+          <button class="btn btn-secondary" style="padding:18px 10px;flex-direction:column;gap:8px;height:auto;width:100%!important;box-sizing:border-box!important;" onclick="switchTab('maps')">
+            <i class="fas fa-map-location-dot" style="font-size:22px;color:var(--warning)"></i>
+            <span>Find Vet Services</span>
+          </button>
+          <button class="btn btn-secondary" style="padding:18px 10px;flex-direction:column;gap:8px;height:auto;width:100%!important;box-sizing:border-box!important;" onclick="switchTab('profile')">
+            <i class="fas fa-user-circle" style="font-size:22px;color:#10b981"></i>
+            <span>My Profile</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+
+
+    <!-- ── 3. SPECIES TRAINER ── -->
+    <section id="training" class="tab-section">
+      <div class="card">
+        <div class="card-title"><i class="fas fa-brain" style="color:var(--primary)"></i> Species AI Trainer</div>
+        <div class="card-subtitle">Generate custom, weight & age-scaled training modules for any animal species or human fitness routine.</div>
+
+        <form action="javascript:void(0);" onsubmit="generateWebTrainingPlan(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Animal Species Name</label>
+              <input type="text" id="trainSpecies" class="form-input" placeholder="e.g. Human, Dog, Cat, Horse" value="">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Breed / Variant (Optional)</label>
+              <input type="text" id="trainBreed" class="form-input" placeholder="e.g. Standard / Variant" value="">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Age (Years)</label>
+              <input type="number" id="trainAge" class="form-input" placeholder="e.g. 20" value="20" min="0" max="100">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Weight (kg)</label>
+              <input type="number" id="trainWeight" class="form-input" placeholder="e.g. 65" value="65" min="1">
+            </div>
+            <div class="form-group" style="grid-column:span 2;">
+              <label class="form-label">Plan Duration (Days) — Default: 7 Days</label>
+              <input type="number" id="trainDays" class="form-input" placeholder="Type plan duration (e.g. 7, 10, 12, 30, 365) — Default: 7 Days" value="" min="1">
+            </div>
+            <div class="form-group" style="grid-column:span 2;">
+              <label class="form-label">Training Goal (Optional)</label>
+              <input type="text" id="trainGoal" class="form-input" placeholder="e.g. Weight Loss, Muscle Building, Agility, General Health" value="">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-bolt"></i> Generate AI Training Plan
+          </button>
+        </form>
+      </div>
+      <div id="trainingResultContainer"></div>
+    </section>
+
+
+    <!-- ── 5. MARKETPLACE ── -->
+    <section id="marketplace" class="tab-section">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:18px;">
+          <div>
+            <div class="card-title" style="margin-bottom:2px;"><i class="fas fa-store" style="color:var(--primary)"></i> Boutique Marketplace</div>
+            <div class="card-subtitle" style="margin-bottom:0;">Verified listings, medical supplies & community adoptions.</div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button class="btn btn-secondary" id="nearbyFilterBtn" style="padding:10px 18px; font-size:13px; border-radius:var(--radius-full);" onclick="toggleNearbyMarket()">
+              <i class="fas fa-location-arrow"></i> Nearby
+            </button>
+            <button class="btn btn-primary" style="padding:10px 18px; font-size:13px; border-radius:var(--radius-full);" onclick="openAddListingModal()">
+              <i class="fas fa-plus"></i> New Listing
+            </button>
+            <button class="btn btn-secondary" style="padding:10px 18px; font-size:13px; border-radius:var(--radius-full); position:relative;" onclick="showCartModal()">
+              <i class="fas fa-shopping-cart"></i> Cart (<span id="cartCountBadgeInner">0</span>)
+            </button>
+            <button class="btn btn-primary" style="padding:10px 18px; font-size:13px; border-radius:var(--radius-full); background:var(--danger); border:none;" onclick="switchMarketTab('saved')">
+              <i class="fas fa-heart"></i> Saved (<span id="favCountBadge">0</span>)
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+           <div style="position:relative;">
+             <i class="fas fa-search" style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--text-muted);"></i>
+             <input type="text" id="marketplaceSearch" class="form-input" style="padding-left:44px; border-radius:var(--radius-full); height:50px; font-size:15px;" placeholder="Search breeds, species, supplies, or locations..." oninput="filterMarketplace(this.value)">
+           </div>
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <button class="btn btn-primary market-tab-btn" id="mtab-animals" style="border-radius:var(--radius-full); padding:10px 22px;" onclick="switchMarketTab('animals')">🐾 Animals & Adoption</button>
+          <button class="btn btn-secondary market-tab-btn" id="mtab-products" style="border-radius:var(--radius-full); padding:10px 22px;" onclick="switchMarketTab('products')">🛍️ Products & Supplies</button>
+        </div>
+      </div>
+      <div id="marketplaceGrid" class="catalog-grid" style="margin-top:16px;"></div>
+    </section>
+
+    <!-- ── 6. WILDLIFE EVENTS & DIGITAL TICKET VAULT ── -->
+    <section id="events" class="tab-section">
+      <!-- Unified Events Header & Filter Card -->
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:18px;">
+          <div>
+            <div class="card-title" style="margin-bottom:2px;"><i class="fas fa-calendar-alt" style="color:var(--primary)"></i> Wildlife Events & Digital Ticket Vault</div>
+            <div class="card-subtitle" style="margin-bottom:0;">Explore adoption drives, rescue workshops, exhibitions, and access digital entry passes.</div>
+          </div>
+          <button class="btn btn-primary" onclick="openHostEventModal()">
+            <i class="fas fa-plus-circle"></i> + Host Community Event
+          </button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <input type="text" id="eventsSearchInput" class="form-input" placeholder="🔍 Search events, venue location, organizer..." oninput="filterEventsQuery(this.value)">
+          
+          <div style="display:flex; gap:8px; flex-wrap:wrap;" id="eventsCategoryBtns">
+            <button class="btn btn-primary event-cat-btn" id="ecat-All" onclick="filterEventCategory('All')">All Categories</button>
+            <button class="btn btn-secondary event-nav-btn" id="enav-tickets" onclick="switchEventsTab('tickets')">
+              🎟️ My Pass Vault (<span id="ticketsCountBadge">0</span>)
+            </button>
+            <button class="btn btn-secondary event-cat-btn" id="ecat-Rescue" onclick="filterEventCategory('Rescue')">🚨 Rescue</button>
+            <button class="btn btn-secondary event-cat-btn" id="ecat-Exhibition" onclick="filterEventCategory('Exhibition')">🏆 Exhibition</button>
+            <button class="btn btn-secondary event-cat-btn" id="ecat-Adoption" onclick="filterEventCategory('Adoption')">🐾 Adoption</button>
+            <button class="btn btn-secondary event-cat-btn" id="ecat-Training" onclick="filterEventCategory('Training')">🎓 Training</button>
+            <button class="btn btn-secondary event-cat-btn" id="ecat-Conservation" onclick="filterEventCategory('Conservation')">🌿 Conservation</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Events / Services / Passes Grid -->
+      <div id="eventsGrid" class="catalog-grid" style="grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:22px;"></div>
+    </section>
+
+    <!-- ── 7. COMMUNITY FEED ── -->
+    <section id="community" class="tab-section">
+      <div class="card" style="margin-bottom:20px; border-radius:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+          <div>
+            <div class="card-title" style="display:flex; align-items:center; gap:10px;">
+              <i class="fas fa-comments" style="color:var(--primary)"></i> Community Feed
+              <span class="badge" style="background:var(--primary-light,#10b98115); color:var(--primary); font-size:12px; font-weight:800;">Instagram & LinkedIn Style</span>
+            </div>
+            <div class="card-subtitle" style="margin-bottom:0;">Professional animal welfare network for veterinarians, trainers, rescues & pet parents worldwide.</div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-secondary" onclick="openMessagingDrawer()">
+              <i class="fas fa-paper-plane"></i> Messages
+            </button>
+            <button class="btn btn-primary" onclick="openCreatePostModal()">
+              <i class="fas fa-plus-circle"></i> Create Post
+            </button>
+          </div>
+        </div>
+
+        <!-- Global Social Search & Filter Bar -->
+        <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
+          <input type="text" id="socialSearchInput" class="form-input" placeholder="🔍 Search people, pets, species, posts, hashtags, locations..." oninput="onSocialSearchInput(this.value)" style="flex:1; min-width:260px; border-radius:24px;">
+        </div>
+
+        <!-- Feed Filter Tabs -->
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;" id="socialFilterBar">
+          <button class="btn btn-primary feed-filter-btn active" onclick="setFeedFilter('All', this)">✨ Latest Feed</button>
+          <button class="btn btn-secondary feed-filter-btn" onclick="setFeedFilter('Trending', this)">🔥 Trending</button>
+          <button class="btn btn-secondary feed-filter-btn" onclick="setFeedFilter('Veterinary', this)">🩺 Veterinary</button>
+          <button class="btn btn-secondary feed-filter-btn" onclick="setFeedFilter('Training', this)">🏋️ Training</button>
+          <button class="btn btn-secondary feed-filter-btn" onclick="setFeedFilter('Marketplace', this)">🛒 Marketplace</button>
+          <button class="btn btn-secondary feed-filter-btn" onclick="setFeedFilter('Rescue', this)">🛡️ Rescue</button>
+          <button class="btn btn-secondary feed-filter-btn" onclick="setFeedFilter('Following', this)">👥 Following</button>
+        </div>
+      </div>
+
+      <!-- Top Widgets Grid (Recommended Experts & Trending Topics ABOVE Posts) -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;" id="socialTopWidgetsGrid">
+        <!-- Recommended Experts -->
+        <div class="card" style="border-radius:16px; padding:16px;">
+          <div class="card-title" style="font-size:14px; margin-bottom:12px;"><i class="fas fa-user-plus" style="color:var(--primary);"></i> Recommended Experts</div>
+          <div id="suggestedUsersList" style="display:flex; gap:16px; overflow-x:auto; padding-bottom:4px;"></div>
+        </div>
+
+        <!-- Trending Topics -->
+        <div class="card" style="border-radius:16px; padding:16px;">
+          <div class="card-title" style="font-size:14px; margin-bottom:12px;"><i class="fas fa-hashtag" style="color:var(--primary);"></i> Trending Topics</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <span class="hashtag-pill" onclick="filterByHashtag('VetCare')" style="background:var(--primary-light,#10b98115); color:var(--primary); font-weight:700; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">#VetCare (142)</span>
+            <span class="hashtag-pill" onclick="filterByHashtag('WildlifeRescue')" style="background:var(--primary-light,#10b98115); color:var(--primary); font-weight:700; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">#WildlifeRescue (98)</span>
+            <span class="hashtag-pill" onclick="filterByHashtag('AgilityCoach')" style="background:var(--primary-light,#10b98115); color:var(--primary); font-weight:700; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">#AgilityCoach (64)</span>
+            <span class="hashtag-pill" onclick="filterByHashtag('BioShield')" style="background:var(--primary-light,#10b98115); color:var(--primary); font-weight:700; padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer;">#BioShield (45)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2-Column Post View Grid (Left post, Right post side-by-side) -->
+      <div id="communityPostsContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:20px; width:100%;"></div>
+    </section>
+
+    <!-- ── 8. FIND SERVICES (MAPS) ── -->
+    <section id="maps" class="tab-section">
+      <div class="hero-card" style="padding:36px;">
+        <div class="hero-content">
+          <div class="hero-badge"><i class="fas fa-map-location-dot"></i> Live Location Services</div>
+          <h2 class="hero-title">Find Animal Care Services Near You</h2>
+          <p class="hero-desc">Locate verified veterinary clinics, animal shelters, grooming centers, and wildlife rehabilitation facilities in your area.</p>
+          <button class="btn btn-primary" onclick="requestLocationServices()">
+            <i class="fas fa-location-crosshairs"></i> Use My Location
+          </button>
+        </div>
+        <img src="https://images.unsplash.com/photo-1530281700549-e82e7bf110d6?w=400" alt="Veterinary care" class="hero-img">
+      </div>
+
+      <!-- Professional Search & Filter Controls -->
+      <div class="card" style="margin-bottom:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:16px;">
+          <div>
+            <div class="card-title" style="margin-bottom:2px;"><i class="fas fa-stethoscope" style="color:var(--primary)"></i> Verified Animal Care Directory</div>
+            <div class="card-subtitle" style="margin-bottom:0;">Filter by medical specialty, emergency availability, or search by facility name.</div>
+          </div>
+          <div style="font-size:13px; font-weight:700; color:var(--primary); background:var(--primary-light,#10b98115); padding:6px 14px; border-radius:20px;">
+            <i class="fas fa-shield-halved"></i> 100% Verified Partners
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <input type="text" id="serviceSearchInput" class="form-input" placeholder="🔍 Search clinic name, specialty, location..." oninput="filterServicesData(this.value)">
+        </div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap;" id="serviceFilterBtns">
+          <button class="btn btn-primary service-filter-btn" id="sfilter-All" onclick="filterServicesByType('All')">All Facilities</button>
+          <button class="btn btn-secondary service-filter-btn" id="sfilter-Appointments" onclick="filterServicesByType('Appointments')">
+            📅 My Appointments <span id="appointmentsBadgeCount" style="background:#10b981;color:#fff;font-size:11px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:4px;display:none;">0</span>
+          </button>
+          <button class="btn btn-secondary service-filter-btn" id="sfilter-Veterinary" onclick="filterServicesByType('Veterinary')">🏥 Vet Clinics</button>
+          <button class="btn btn-secondary service-filter-btn" id="sfilter-Grooming" onclick="filterServicesByType('Grooming')">✂️ Grooming</button>
+          <button class="btn btn-secondary service-filter-btn" id="sfilter-Shelter" onclick="filterServicesByType('Shelter')">🏠 Shelters</button>
+          <button class="btn btn-secondary service-filter-btn" id="sfilter-Emergency" onclick="filterServicesByType('Emergency')">🚨 24×7 Emergency</button>
+          <button class="btn btn-secondary service-filter-btn" id="sfilter-Rehab" onclick="filterServicesByType('Rehab')">🌿 Wildlife Rehab</button>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:22px;" id="servicesGrid">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+    <!-- ── 9. ECOTRACK ANIMAL WELFARE PROFILE ── -->
+    <section id="profile" class="tab-section">
+
+      <!-- Streamlined EcoTrack Hero -->
+      <div class="card profile-hero-card" style="padding:28px; border-radius:24px; border:1px solid var(--border-color); margin-bottom:24px; box-shadow:var(--shadow-sm);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:20px;">
+          <div style="display:flex; align-items:center; gap:22px; flex-wrap:wrap;">
+            <div class="profile-avatar-wrap" style="position:relative;">
+              <div class="profile-avatar" id="profileAvatarDisplay" style="width:110px; height:110px; border-radius:50%; border:3px solid var(--primary); overflow:hidden; background:var(--primary); color:#fff; font-size:44px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(16,185,129,0.2);">
+                <span id="profileAvatarInitial">E</span>
+              </div>
+              <div class="profile-online-dot" title="Online Now" style="width:18px; height:18px; border-radius:50%; background:#10b981; border:3px solid var(--card-bg); position:absolute; bottom:4px; right:4px;"></div>
+            </div>
+            <div>
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <h2 id="profileHeroName" style="font-size:26px; font-weight:900; margin:0; color:var(--text-main);">Eco Explorer</h2>
+                <span id="profileHeroEcoId" class="badge" style="background:var(--primary-light, #10b98115); color:var(--primary); font-size:12.5px; font-weight:800; border:1px solid rgba(16,185,129,0.2); padding:4px 10px; border-radius:20px;">@ECO-948123</span>
+                <span id="profileHeroBadges"></span>
+              </div>
+              <p id="profileHeroBio" style="color:var(--text-muted); font-size:14px; margin:6px 0 8px; max-width:600px; line-height:1.4;">Nature enthusiast • Wildlife Protection Advocate • EcoTrack Certified Explorer</p>
+              <div style="font-size:13px; color:var(--text-muted); display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                <span><i class="fas fa-location-dot" style="color:var(--primary);"></i> <span id="profileHeroLoc">Bengaluru, India</span></span>
+                <span><i class="fas fa-calendar-alt" style="color:var(--primary);"></i> <span id="profileHeroJoined">Joined August 2025</span></span>
+              </div>
+            </div>
+          </div>
+
+          <div id="profileHeroActions" style="display:flex; gap:10px; align-items:center;">
+            <button class="btn btn-primary" onclick="openEditProfileModal()" style="padding:9px 20px; font-weight:800;">
+              <i class="fas fa-pen"></i> Edit Profile
+            </button>
+            <button class="btn btn-secondary" onclick="openAddPetModal()" style="padding:9px 16px; font-weight:700;">
+              <i class="fas fa-plus-circle"></i> Add Pet
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Core EcoTrack Animal Welfare Stats -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:14px; margin-top:24px; padding-top:20px; border-top:1px solid var(--border-color);">
+          <div class="profile-stat-box" onclick="switchProfileTabSection('pets')" style="cursor:pointer; text-align:center; padding:14px; background:var(--card-bg-subtle, rgba(255,255,255,0.03)); border-radius:16px; border:1px solid var(--border-color);">
+            <div style="font-size:24px; font-weight:900; color:var(--primary);" id="statRescuesCount">0</div>
+            <div style="font-size:11.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-top:2px;">Rescues</div>
+          </div>
+          <div class="profile-stat-box" onclick="switchProfileTabSection('posts')" style="cursor:pointer; text-align:center; padding:14px; background:var(--card-bg-subtle, rgba(255,255,255,0.03)); border-radius:16px; border:1px solid var(--border-color);">
+            <div style="font-size:24px; font-weight:900; color:#3b82f6;" id="statScansCount">0</div>
+            <div style="font-size:11.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-top:2px;">AI Species Scans</div>
+          </div>
+          <div class="profile-stat-box" onclick="switchProfileTabSection('posts')" style="cursor:pointer; text-align:center; padding:14px; background:var(--card-bg-subtle, rgba(255,255,255,0.03)); border-radius:16px; border:1px solid var(--border-color);">
+            <div style="font-size:24px; font-weight:900; color:#f59e0b;" id="statTrainerHours">0</div>
+            <div style="font-size:11.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-top:2px;">Trainings</div>
+          </div>
+          <div class="profile-stat-box" onclick="switchProfileTabSection('pets')" style="cursor:pointer; text-align:center; padding:14px; background:var(--card-bg-subtle, rgba(255,255,255,0.03)); border-radius:16px; border:1px solid var(--border-color);">
+            <div style="font-size:24px; font-weight:900; color:#8b5cf6;" id="statPetsCount">0</div>
+            <div style="font-size:11.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-top:2px;">My Registered Pets</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Private Profile Restriction Banner -->
+      <div id="privateProfileBanner" class="card hidden" style="display:none; text-align:center; padding:50px 20px; border-radius:20px; border:1px solid var(--border-color);">
+        <div style="width:60px; height:60px; border-radius:50%; background:var(--primary-light, #10b98115); color:var(--primary); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; font-size:26px;">
+          <i class="fas fa-lock"></i>
+        </div>
+        <h3 style="font-weight:900; font-size:20px; margin-bottom:6px;">This Profile is Private</h3>
+        <p style="color:var(--text-muted); max-width:400px; margin:0 auto 18px; font-size:13.5px;">Follow this user to view their animal vault, rescues, and community updates.</p>
+        <button id="privateRequestFollowBtn" class="btn btn-primary" style="padding:10px 22px; font-weight:800;">
+          <i class="fas fa-user-plus"></i> Request to Follow
+        </button>
+      </div>
+
+      <!-- Main Profile Content Area -->
+      <div id="profilePortfolioMain">
+        <!-- 6 Purpose-Built EcoTrack Tabs -->
+        <div class="card" style="margin-bottom:20px; border-radius:20px; padding:10px 16px;">
+          <div style="display:flex; gap:10px; overflow-x:auto;" id="profileSubTabBar">
+            <button class="btn btn-primary profile-subtab-btn active" onclick="switchProfileTabSection('pets', this)"><i class="fas fa-paw"></i> My Pets Vault</button>
+            <button class="btn btn-secondary profile-subtab-btn" onclick="switchProfileTabSection('posts', this)"><i class="fas fa-newspaper"></i> Activity & Posts</button>
+            <button class="btn btn-secondary profile-subtab-btn" onclick="switchProfileTabSection('training', this)"><i class="fas fa-bolt"></i> Training Progress</button>
+            <button class="btn btn-secondary profile-subtab-btn" onclick="switchProfileTabSection('achievements', this)"><i class="fas fa-trophy"></i> Achievements</button>
+            <button class="btn btn-secondary profile-subtab-btn" onclick="switchProfileTabSection('followers', this)"><i class="fas fa-users"></i> Connections</button>
+          </div>
+        </div>
+
+        <!-- Sub-Tab Content Viewport -->
+        <div id="profileTabContentArea"></div>
+      </div>
+
+    </section>
+
+  </main>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     TOAST CONTAINER
+══════════════════════════════════════════════════════ -->
+<div id="toastContainer"></div>
+
+<!-- ══════════════════════════════════════════════════════
+     MODALS
+══════════════════════════════════════════════════════ -->
+
+<!-- CART MODAL -->
+<div id="cartModal" class="modal-backdrop" onclick="closeModalOnBg(event,'cartModal')">
+  <div class="modal-card" id="cartModalCard">
+    <div class="modal-header">
+      <h3 class="modal-title">🛒 Shopping Cart</h3>
+      <div class="modal-actions">
+        <button class="modal-expand-btn" onclick="toggleFullscreenModal('cartModal')" title="Toggle Fullscreen Mode">
+          <i class="fas fa-expand"></i>
+        </button>
+        <button class="modal-close" onclick="closeCartModal()">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;max-height:80vh;">
+      <div id="cartItemsList" style="flex:1;overflow-y:auto;max-height:55vh;padding-right:4px;"></div>
+      <div style="border-top:1px solid var(--border-color);padding-top:16px;margin-top:16px;display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:18px;">
+        <span>Total:</span><span id="cartTotalPrice" style="color:var(--primary);font-size:22px;">₹0</span>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:16px;height:48px;font-size:15px;font-weight:700;" onclick="checkoutCart()">
+        <i class="fas fa-arrow-right"></i> Proceed to Checkout & Payment
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE POST MODAL -->
+<div id="createPostModal" class="modal-backdrop" onclick="closeModalOnBg(event,'createPostModal')">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title">📝 Create Post</h3>
+      <button class="modal-close" onclick="closeCreatePostModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Post Caption</label>
+        <textarea id="newPostCaption" class="form-input" rows="4" placeholder="Share training tips, health advice or wildlife updates..."></textarea>
+      </div>
+      <div class="form-group" style="margin-top:14px;">
+        <label class="form-label">Image URL (Optional)</label>
+        <input type="url" id="newPostImage" class="form-input" placeholder="https://images.unsplash.com/...">
+      </div>
+      <div class="form-group" style="margin-top:14px;">
+        <label class="form-label">Attach Photo or Video File</label>
+        <input type="file" id="newPostMediaFile" class="form-input" accept="image/*,video/*" onchange="previewMediaUpload(this, 'newPostMediaPreview')">
+        <div id="newPostMediaPreview" style="margin-top:8px;display:none;"></div>
+      </div>
+      <button type="button" class="btn btn-primary" style="width:100%;margin-top:18px;" onclick="submitNewPost()">
+        <i class="fas fa-paper-plane"></i> Publish Post
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- CHAT / MESSAGE MODAL -->
+<div id="chatModal" class="modal-backdrop" onclick="closeModalOnBg(event,'chatModal')">
+  <div class="modal-card" id="chatModalCard">
+    <div class="modal-header">
+      <h3 class="modal-title" id="chatSellerTitle">💬 User Messaging</h3>
+      <div class="modal-actions">
+        <button class="modal-expand-btn" onclick="toggleFullscreenModal('chatModal')" title="Toggle Fullscreen View">
+          <i class="fas fa-expand"></i>
+        </button>
+        <button class="modal-close" onclick="closeChatModal()">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;height:calc(100% - 60px);">
+      <div id="chatMessagesBox" style="flex:1;min-height:300px;max-height:60vh;overflow-y:auto;background:var(--bg-main);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:14px;display:flex;flex-direction:column;gap:10px;"></div>
+      <div id="chatMediaPreview" style="display:none;margin-top:8px;padding:6px;background:var(--bg-main);border-radius:var(--radius-sm);font-size:12px;color:var(--primary);"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;align-items:center;position:relative;">
+        <button class="btn btn-secondary" style="padding:12px;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;" onclick="toggleEmojiPicker()" title="Insert Emoji">
+          <i class="far fa-face-smile" style="font-size:18px;"></i>
+        </button>
+        <div id="emojiPicker" style="display:none;position:absolute;bottom:55px;left:0;background:#fff;border:1px solid var(--border-color);border-radius:16px;padding:12px;box-shadow:var(--shadow-lg);z-index:100;grid-template-columns:repeat(5, 1fr);gap:8px;">
+           <span onclick="insertEmoji('😊')" style="cursor:pointer;font-size:22px;transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">😊</span>
+           <span onclick="insertEmoji('🐾')" style="cursor:pointer;font-size:22px;transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🐾</span>
+           <span onclick="insertEmoji('🐕')" style="cursor:pointer;font-size:22px;transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🐕</span>
+           <span onclick="insertEmoji('🐈')" style="cursor:pointer;font-size:22px;transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🐈</span>
+           <span onclick="insertEmoji('❤️')" style="cursor:pointer;font-size:22px;transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">❤️</span>
+           <span onclick="insertEmoji('👍')" style="cursor:pointer;font-size:22px;transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">👍</span>
+           <span onclick="insertEmoji('🙏')" style="cursor:pointer;font-size:22px;transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🙏</span>
+           <span onclick="insertEmoji('🏥')" style="cursor:pointer;font-size:22px;transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🏥</span>
+           <span onclick="insertEmoji('📦')" style="cursor:pointer;font-size:22px;transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">📦</span>
+           <span onclick="insertEmoji('✨')" style="cursor:pointer;font-size:22px;transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">✨</span>
+        </div>
+        <label class="btn btn-secondary" style="padding:12px;cursor:pointer;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;" title="Attach Image or Video">
+          <i class="fas fa-paperclip" style="font-size:16px;"></i>
+          <input type="file" id="chatMediaFile" accept="image/*,video/*" style="display:none;" onchange="previewChatMedia(this)">
+        </label>
+        <input type="text" id="chatInput" class="form-input" style="border-radius:var(--radius-full);padding-left:20px;height:44px;" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+        <button class="btn btn-primary" style="width:44px;height:44px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;" onclick="sendChatMessage()"><i class="fas fa-paper-plane"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STREAMLINED EDIT PROFILE MODAL -->
+<div id="editProfileModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'editProfileModal')">
+  <div class="modal-card" style="max-width:520px; width:95%; border-radius:24px; padding:0; overflow:hidden;">
+    <div class="modal-header" style="padding:18px 24px; border-bottom:1px solid var(--border-color); background:var(--card-bg);">
+      <h3 class="modal-title" style="font-weight:900;"><i class="fas fa-user-pen" style="color:var(--primary);"></i> Edit Profile</h3>
+      <button class="modal-close" onclick="closeEditProfileModal()">✕</button>
+    </div>
+
+    <form onsubmit="handleEditProfileSubmit(event)">
+      <div class="modal-body" style="padding:24px; display:flex; flex-direction:column; gap:16px;">
+        
+        <div class="form-group">
+          <label class="form-label">Display Name *</label>
+          <input type="text" id="editProfileName" class="form-input" required placeholder="e.g. Dr. Alex Vance">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Bio / Motto</label>
+          <textarea id="editProfileBio" class="form-input" rows="3" placeholder="Share your animal welfare journey, passions, or expertise..."></textarea>
+        </div>
+
+        <div class="form-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div class="form-group">
+            <label class="form-label">Location</label>
+            <input type="text" id="editProfileCity" class="form-input" placeholder="e.g. Bengaluru, India">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role / Vet Status</label>
+            <select id="editProfileVetStatus" class="form-select">
+              <option value="0">🌿 Eco Explorer</option>
+              <option value="1">🩺 Licensed Vet Surgeon</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Avatar Photo URL</label>
+          <input type="url" id="editProfileAvatarUrl" class="form-input" placeholder="https://images.unsplash.com/...">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label"><i class="fas fa-user-lock" style="color:var(--primary);"></i> Account Privacy</label>
+          <select id="editProfilePrivacy" class="form-select">
+            <option value="Public">🌍 Public Profile (Everyone can view your pets & activity)</option>
+            <option value="Private">🔒 Private Profile (Only approved followers can view)</option>
+          </select>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="padding:16px 24px; border-top:1px solid var(--border-color); background:var(--card-bg); display:flex; justify-content:flex-end; gap:12px;">
+        <button type="button" class="btn btn-secondary" onclick="closeEditProfileModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="padding:10px 24px; font-weight:800;">
+          <i class="fas fa-check-circle"></i> Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- FOLLOWERS & FOLLOWING LIST MODAL -->
+<div id="followersListModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'followersListModal')">
+  <div class="modal-card" style="max-width:550px; width:95%; max-height:85vh; display:flex; flex-direction:column; padding:0; border-radius:24px; overflow:hidden;">
+    <div class="modal-header" style="padding:16px 24px; border-bottom:1px solid var(--border-color);">
+      <h3 class="modal-title" id="followersModalTitle" style="font-weight:900;">👥 Community Connections</h3>
+      <button class="modal-close" onclick="closeFollowersModal()">✕</button>
+    </div>
+
+    <div style="display:flex; border-bottom:1px solid var(--border-color); padding:0 24px; background:var(--card-bg-subtle, rgba(255,255,255,0.02)); gap:16px;">
+      <button class="tab-btn active" id="followersTabBtn" onclick="switchFollowersTab('followers')" style="padding:12px 4px; font-weight:800; border-bottom:3px solid var(--primary); background:none; border:none; color:var(--primary); cursor:pointer;">Followers</button>
+      <button class="tab-btn" id="followingTabBtn" onclick="switchFollowersTab('following')" style="padding:12px 4px; font-weight:800; border-bottom:3px solid transparent; background:none; border:none; color:var(--text-muted); cursor:pointer;">Following</button>
+    </div>
+
+    <div style="padding:12px 24px; border-bottom:1px solid var(--border-color);">
+      <input type="text" id="followersSearchInput" class="form-input" placeholder="🔍 Search connection by name or EcoTrack ID..." oninput="filterFollowersList(this.value)">
+    </div>
+
+    <div class="modal-body" id="followersListBody" style="flex:1; overflow-y:auto; padding:16px 24px; display:flex; flex-direction:column; gap:12px;">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- ADD PORTFOLIO ITEM MODAL -->
+<div id="addPortfolioModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'addPortfolioModal')">
+  <div class="modal-card" style="max-width:550px; width:95%; border-radius:24px;">
+    <div class="modal-header">
+      <h3 class="modal-title" style="font-weight:900;"><i class="fas fa-certificate" style="color:var(--primary);"></i> Add Portfolio Item</h3>
+      <button class="modal-close" onclick="closeAddPortfolioModal()">✕</button>
+    </div>
+    <form onsubmit="handleAddPortfolioSubmit(event)">
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
+        <div class="form-group">
+          <label class="form-label">Category *</label>
+          <select id="portfolioItemType" class="form-select">
+            <option value="certification">📜 Professional Certification</option>
+            <option value="license">🏥 Veterinary / Field License</option>
+            <option value="membership">🤝 NGO / Organization Membership</option>
+            <option value="project">🌿 Wildlife Conservation Project</option>
+            <option value="paper">📚 Scientific Paper / Publication</option>
+            <option value="award">🏆 Environmental Award</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Title / Name *</label>
+          <input type="text" id="portfolioItemTitle" class="form-input" required placeholder="e.g. Certified Avian Emergency Specialist">
+        </div>
+
+        <div class="form-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div class="form-group">
+            <label class="form-label">Issuing Organization</label>
+            <input type="text" id="portfolioItemOrg" class="form-input" placeholder="e.g. Wildlife Protection Board">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Issue Date</label>
+            <input type="text" id="portfolioItemDate" class="form-input" placeholder="e.g. Jan 2025">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Credential ID / License No.</label>
+          <input type="text" id="portfolioItemCredId" class="form-input" placeholder="e.g. LIC-99812-VET">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea id="portfolioItemDesc" class="form-input" rows="3" placeholder="Summary of achievements, coursework, or scope..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeAddPortfolioModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="font-weight:800;"><i class="fas fa-plus"></i> Add to Portfolio</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ADD PET MODAL -->
+<div id="addPetModal" class="modal-backdrop" onclick="closeModalOnBg(event,'addPetModal')">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title">🐾 Add Pet to Vault</h3>
+      <button class="modal-close" onclick="closeAddPetModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Pet Name *</label>
+          <input type="text" id="petName" class="form-input" placeholder="e.g. Max">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Species *</label>
+          <input type="text" id="petSpecies" class="form-input" placeholder="e.g. Dog, Cat, Parrot">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Breed</label>
+          <input type="text" id="petBreed" class="form-input" placeholder="e.g. German Shepherd">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Age</label>
+          <input type="text" id="petAge" class="form-input" placeholder="e.g. 2 Years">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Weight</label>
+          <input type="text" id="petWeight" class="form-input" placeholder="e.g. 25 kg">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Photo / Video File</label>
+          <input type="file" id="petPhotoFile" class="form-input" accept="image/*,video/*">
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="submitAddPet()">
+        <i class="fas fa-paw"></i> Add to Vault
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD LISTING MODAL -->
+<div id="addListingModal" class="modal-backdrop" onclick="closeModalOnBg(event,'addListingModal')">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title">➕ Post Marketplace Listing</h3>
+      <button class="modal-close" onclick="closeAddListingModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form action="javascript:void(0);" onsubmit="submitNewListing(event)">
+        <div class="form-grid">
+          <div class="form-group" style="grid-column:span 2;">
+            <label class="form-label">Listing Title / Item Name *</label>
+            <input type="text" id="listingTitle" class="form-input" placeholder="e.g. Milo (Persian Kitten) or Ergonomic Harness" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Listing Category *</label>
+            <select id="listingCategory" class="form-select" onchange="toggleListingFields()">
+              <option value="animal_adoption">🐾 Animal for Adoption</option>
+              <option value="animal_sale">🏷️ Animal for Sale</option>
+              <option value="product">🛍️ Supplies & Gear</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Price / Tag *</label>
+            <input type="text" id="listingPrice" class="form-input" placeholder="e.g. Free Adoption or ₹1,299" required>
+          </div>
+          <!-- Animal-specific fields (hidden for product category) -->
+          <div class="form-group" id="listingSpeciesGroup">
+            <label class="form-label">Species</label>
+            <select id="listingSpecies" class="form-select">
+              <option value="">-- Select Species --</option>
+              <option value="Dog">Dog</option>
+              <option value="Cat">Cat</option>
+              <option value="Bird">Bird</option>
+              <option value="Rabbit">Rabbit</option>
+              <option value="Hamster">Hamster</option>
+              <option value="Fish">Fish</option>
+              <option value="Reptile">Reptile</option>
+              <option value="Horse">Horse</option>
+              <option value="Cow">Cow / Farm Animal</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" id="listingBreedGroup">
+            <label class="form-label">Breed</label>
+            <input type="text" id="listingBreed" class="form-input" placeholder="e.g. Labrador, Persian, Budgerigar">
+          </div>
+          <div class="form-group" id="listingGenderGroup">
+            <label class="form-label">Gender</label>
+            <select id="listingGender" class="form-select">
+              <option value="Unknown">Unknown</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+          <div class="form-group" id="listingAgeGroup">
+            <label class="form-label">Age</label>
+            <input type="text" id="listingSubInfo" class="form-input" placeholder="e.g. 6 Months or 10kg pack">
+          </div>
+          <div class="form-group" style="grid-column:span 2;">
+            <label class="form-label">Location</label>
+            <input type="text" id="listingLocation" class="form-input" placeholder="e.g. Bengaluru, KA">
+          </div>
+                    <div class="form-group" style="grid-column:span 2;" id="listingImgGroup">
+            <label class="form-label">Photo / Video</label>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <button type="button" id="imgTabFile" onclick="switchListingImgTab('file')" style="flex:1;padding:7px;border-radius:8px;font-size:12px;font-weight:700;border:2px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer;">📁 Upload File</button>
+              <button type="button" id="imgTabUrl" onclick="switchListingImgTab('url')" style="flex:1;padding:7px;border-radius:8px;font-size:12px;font-weight:700;border:2px solid var(--primary);background:var(--bg-main);color:var(--primary);cursor:pointer;">🔗 Image URL</button>
+            </div>
+            <div id="listingImgFileDiv">
+              <input type="file" id="listingMediaFile" class="form-input" accept="image/*,video/*">
+            </div>
+            <div id="listingImgUrlDiv" style="display:none;">
+              <input type="text" id="listingImageUrl" class="form-input" placeholder="https://example.com/photo.jpg">
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:16px;">
+          <i class="fas fa-paper-plane"></i> Publish Listing
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- SPECIES DETAIL MODAL -->
+<div id="speciesDetailModal" class="modal-backdrop" onclick="closeModalOnBg(event,'speciesDetailModal')">
+  <div class="modal-card" style="max-width:680px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="speciesDetailTitle">🧬 Species Taxonomy Record</h3>
+      <button class="modal-close" onclick="closeSpeciesDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="speciesDetailBody">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- ITEM DETAIL MODAL -->
+<div id="itemDetailModal" class="modal-backdrop" onclick="closeModalOnBg(event,'itemDetailModal')">
+  <div class="modal-card" style="max-width:640px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="itemDetailTitle">🐾 Listing Details</h3>
+      <button class="modal-close" onclick="closeItemDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="itemDetailBody">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- CHECKOUT MODAL -->
+<div id="checkoutModal" class="modal-backdrop" onclick="closeModalOnBg(event,'checkoutModal')">
+  <div class="modal-card" id="checkoutModalCard" style="max-width:580px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="checkoutModalTitle">💳 Secure Payment & Checkout</h3>
+      <div class="modal-actions">
+        <button class="modal-expand-btn" onclick="toggleFullscreenModal('checkoutModal')" title="Toggle Fullscreen Mode">
+          <i class="fas fa-expand"></i>
+        </button>
+        <button class="modal-close" onclick="closeCheckoutModal()">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="checkoutModalBody">
+      <!-- Step 1: Shipping & Delivery Form -->
+      <div id="checkoutStep1">
+        <div style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;">Grand Total</div>
+            <div style="font-size:22px;font-weight:900;color:var(--primary);" id="checkoutTotalDisplay">Total: ₹0</div>
+          </div>
+          <span style="font-size:12px;background:var(--primary-light);color:var(--primary);font-weight:800;padding:4px 10px;border-radius:20px;">Step 1 of 2</span>
+        </div>
+
+        <form action="javascript:void(0);" onsubmit="goToPaymentPlace(event)">
+          <div class="form-group" style="margin-bottom:14px;">
+            <label class="form-label">Full Name *</label>
+            <input type="text" id="checkoutName" class="form-input" placeholder="e.g. Rahul Sharma" required>
+          </div>
+          <div class="form-group" style="margin-bottom:14px;">
+            <label class="form-label">Delivery Address *</label>
+            <input type="text" id="checkoutAddress" class="form-input" placeholder="House No, Street, City, Pincode" required>
+          </div>
+          <div class="form-group" style="margin-bottom:18px;">
+            <label class="form-label">Phone Number *</label>
+            <input type="tel" id="checkoutPhone" class="form-input" placeholder="+91 98400 00000" oninput="filterPhoneInput(this)" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;height:48px;font-size:15px;font-weight:700;">
+            <i class="fas fa-credit-card"></i> Proceed to Paying Place <i class="fas fa-arrow-right"></i>
+          </button>
+        </form>
+      </div>
+
+      <!-- Step 2: Paying Place (Interactive Payment Gateway) -->
+      <div id="checkoutStep2" style="display:none;">
+        <div style="background:linear-gradient(135deg, #059669, #10b981);color:#fff;border-radius:14px;padding:16px;margin-bottom:18px;">
+          <div style="font-size:12px;opacity:0.9;font-weight:700;text-transform:uppercase;">EcoTrack Paying Place</div>
+          <div style="font-size:24px;font-weight:900;margin-top:2px;" id="payingPlaceAmount">₹0</div>
+          <div style="font-size:11px;opacity:0.8;margin-top:4px;">🔒 256-Bit SSL Encrypted Payment Gateway</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label">Select Payment Method *</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+            <button type="button" class="btn btn-secondary pay-method-btn active" id="payBtnUpi" onclick="selectPaymentMethod('upi')" style="padding:12px;text-align:left;border:2px solid var(--primary);background:var(--primary-light);">
+              <i class="fas fa-qrcode" style="color:var(--primary);font-size:18px;"></i>
+              <div style="font-size:13px;font-weight:800;margin-top:4px;">UPI / QR</div>
+            </button>
+            <button type="button" class="btn btn-secondary pay-method-btn" id="payBtnCard" onclick="selectPaymentMethod('card')" style="padding:12px;text-align:left;border:1px solid var(--border-color);">
+              <i class="fas fa-credit-card" style="color:#0284c7;font-size:18px;"></i>
+              <div style="font-size:13px;font-weight:800;margin-top:4px;">Card</div>
+            </button>
+            <button type="button" class="btn btn-secondary pay-method-btn" id="payBtnNetbanking" onclick="selectPaymentMethod('netbanking')" style="padding:12px;text-align:left;border:1px solid var(--border-color);">
+              <i class="fas fa-university" style="color:#8b5cf6;font-size:18px;"></i>
+              <div style="font-size:13px;font-weight:800;margin-top:4px;">NetBanking</div>
+            </button>
+            <button type="button" class="btn btn-secondary pay-method-btn" id="payBtnCod" onclick="selectPaymentMethod('cod')" style="padding:12px;text-align:left;border:1px solid var(--border-color);">
+              <i class="fas fa-money-bill-wave" style="color:#16a34a;font-size:18px;"></i>
+              <div style="font-size:13px;font-weight:800;margin-top:4px;">COD</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Payment Method Details Views -->
+        <div id="payDetailsUpi" style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:12px;padding:16px;text-align:center;margin-bottom:18px;">
+          <div style="font-weight:800;font-size:14px;color:var(--text-primary);">Scan UPI QR or Open Payment App</div>
+          <div style="background:#fff;padding:12px;display:inline-block;border-radius:12px;margin:12px 0;box-shadow:var(--shadow-sm);">
+            <img id="upiQrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=ecotrack@upi" alt="UPI QR" style="width:140px;height:140px;">
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);font-weight:600;">Scan with GPay, PhonePe, Paytm, or BHIM</div>
+        </div>
+
+        <div id="payDetailsCard" style="display:none;background:var(--bg-main);border:1px solid var(--border-color);border-radius:12px;padding:16px;margin-bottom:18px;">
+          <div class="form-group" style="margin-bottom:10px;">
+            <label class="form-label" style="font-size:12px;">Card Number</label>
+            <input type="text" id="cardNumInput" class="form-input" placeholder="4532 •••• •••• 8921" maxlength="19">
+          </div>
+          <div style="display:flex;gap:10px;">
+            <div class="form-group" style="flex:1;">
+              <label class="form-label" style="font-size:12px;">Expiry (MM/YY)</label>
+              <input type="text" id="cardExpiryInput" class="form-input" placeholder="08/28" maxlength="5">
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label class="form-label" style="font-size:12px;">CVV / CVC</label>
+              <input type="password" id="cardCvvInput" class="form-input" placeholder="•••" maxlength="4">
+            </div>
+          </div>
+        </div>
+
+        <div id="payDetailsNetbanking" style="display:none;background:var(--bg-main);border:1px solid var(--border-color);border-radius:12px;padding:16px;margin-bottom:18px;">
+          <label class="form-label" style="font-size:12px;">Choose Your Bank</label>
+          <select id="netbankSelect" class="form-select">
+            <option value="sbi">State Bank of India (SBI)</option>
+            <option value="hdfc">HDFC Bank</option>
+            <option value="icici">ICICI Bank</option>
+            <option value="axis">Axis Bank</option>
+            <option value="kotak">Kotak Mahindra Bank</option>
+          </select>
+        </div>
+
+        <div id="payDetailsCod" style="display:none;background:var(--bg-main);border:1px solid var(--border-color);border-radius:12px;padding:16px;margin-bottom:18px;">
+          <div style="font-size:13px;font-weight:700;color:var(--text-primary);"><i class="fas fa-truck"></i> Pay Cash upon Delivery</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Please keep exact change ready when your shipment arrives.</div>
+        </div>
+
+        <div style="display:flex;gap:10px;">
+          <button type="button" class="btn btn-secondary" style="flex:1;height:48px;" onclick="backToStep1()">
+            <i class="fas fa-arrow-left"></i> Back
+          </button>
+          <button type="button" class="btn btn-primary" style="flex:2;height:48px;font-size:15px;font-weight:800;" onclick="confirmAndPayOrder()">
+            <i class="fas fa-lock"></i> Verify & Pay <span id="payBtnAmount">₹0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Professional Invoice View Container -->
+      <div id="checkoutStep3" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- BOOK APPOINTMENT MODAL (MAPS & VET SERVICES) -->
+<div id="bookAppointmentModal" class="modal-backdrop" onclick="closeModalOnBg(event,'bookAppointmentModal')">
+  <div class="modal-card" style="max-width:540px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="bookingCenterTitle">📅 Book Vet / Grooming Appointment</h3>
+      <button class="modal-close" onclick="closeBookingModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form action="javascript:void(0);" onsubmit="submitAppointmentBooking(event)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+          <div class="form-group">
+            <label class="form-label">Name of the Owner *</label>
+            <input type="text" id="bookingOwnerName" class="form-input" placeholder="e.g. Alex Morgan" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pet Name (Optional)</label>
+            <input type="text" id="bookingPetInfo" class="form-input" placeholder="e.g. Max (German Shepherd)">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+          <div class="form-group">
+            <label class="form-label">Contact Phone Number *</label>
+            <input type="tel" id="bookingPhone" class="form-input" placeholder="e.g. 9876543210" oninput="filterPhoneInput(this)" required>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+          <div class="form-group">
+            <label class="form-label">Preferred Date *</label>
+            <input type="date" id="bookingDate" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Preferred Time *</label>
+            <input type="time" id="bookingTime" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">Urgency Level</label>
+          <select id="bookingUrgency" class="form-select">
+            <option value="Routine">🟢 Routine Checkup / Wellness</option>
+            <option value="Urgent">🟡 Urgent Consultation / Injury</option>
+            <option value="Emergency">🔴 24×7 Emergency Critical Care</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:18px;">
+          <label class="form-label">Symptoms / Notes for Doctor</label>
+          <textarea id="bookingNotes" class="form-input" rows="3" placeholder="Describe symptoms, requested vaccinations, or grooming preferences..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;">
+          <i class="fas fa-calendar-check"></i> Confirm Appointment Booking
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- HOST COMMUNITY EVENT MODAL -->
+<div id="hostEventModal" class="modal-backdrop" onclick="closeModalOnBg(event,'hostEventModal')">
+  <div class="modal-card" style="max-width:580px;">
+    <div class="modal-header">
+      <h3 class="modal-title">🎪 Host Community Event</h3>
+      <button class="modal-close" onclick="closeHostEventModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form action="javascript:void(0);" onsubmit="submitHostEvent(event)">
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">Event Title *</label>
+          <input type="text" id="hostEventTitle" class="form-input" placeholder="e.g. Community Pet Adoption Drive" required>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+          <div class="form-group">
+            <label class="form-label">Event Date *</label>
+            <input type="text" id="hostEventDate" class="form-input" placeholder="e.g. 15 August 2026" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Category *</label>
+            <select id="hostEventCategory" class="form-select">
+              <option value="Rescue">🚨 Rescue</option>
+              <option value="Exhibition">🏆 Exhibition</option>
+              <option value="Adoption">🐾 Adoption</option>
+              <option value="Training">🎓 Training</option>
+              <option value="Conservation">🌿 Conservation</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">Location / Venue *</label>
+          <input type="text" id="hostEventLocation" class="form-input" placeholder="e.g. Chennai SPCA Grounds" required>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">Cover Image URL</label>
+          <input type="url" id="hostEventImage" class="form-input" placeholder="https://images.unsplash.com/...">
+        </div>
+        <div class="form-group" style="margin-bottom:18px;">
+          <label class="form-label">Detailed Event Description</label>
+          <textarea id="hostEventDesc" class="form-input" rows="3" placeholder="Describe workshop topics, schedule, requirements..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;">
+          <i class="fas fa-paper-plane"></i> Publish Event to Community
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- EVENT DETAIL & DETAILS MODAL -->
+<div id="eventDetailModal" class="modal-backdrop" onclick="closeModalOnBg(event,'eventDetailModal')">
+  <div class="modal-card" style="max-width:640px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="eventDetailModalTitle">🎪 Event Details</h3>
+      <button class="modal-close" onclick="closeEventDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="eventDetailModalBody">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- EVENT PAYMENT GATEWAY MODAL -->
+<div id="eventPaymentModal" class="modal-backdrop" onclick="closeModalOnBg(event,'eventPaymentModal')">
+  <div class="modal-card" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">💳 Secure Ticket Payment Gateway</h3>
+      <button class="modal-close" onclick="closeEventPaymentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form action="javascript:void(0);" onsubmit="submitEventPayment(event)">
+        <div style="background:var(--bg-main,#f8fafc);border:1px solid var(--border-color,#e2e8f0);border-radius:14px;padding:16px;margin-bottom:18px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;" id="payModalEventTitle">EVENT TICKET RESERVATION</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:24px;font-weight:900;color:var(--primary,#10b981);" id="payModalAmount">₹0</div>
+            <span style="font-size:11.5px;font-weight:800;color:#10b981;background:#10b98115;padding:4px 10px;border-radius:20px;">Instant Verified Pass</span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">Full Name *</label>
+          <input type="text" id="payModalName" class="form-input" placeholder="e.g. Rahul Sharma" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">Contact Phone Number *</label>
+          <input type="tel" id="payModalPhone" class="form-input" placeholder="e.g. +91 98765 43210" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom:18px;">
+          <label class="form-label">Select Payment Method *</label>
+          <select id="payModalMethod" class="form-select" onchange="togglePayMethodFields(this.value)">
+            <option value="upi">⚡ Instant UPI (Google Pay, PhonePe, Paytm, BHIM)</option>
+            <option value="card">💳 Credit / Debit Card</option>
+            <option value="netbanking">🏦 Net Banking</option>
+          </select>
+        </div>
+
+        <div id="payUpiSection" style="background:#10b9810d;border:1px solid #10b98130;padding:14px;border-radius:12px;margin-bottom:18px;text-align:center;">
+          <div style="font-size:12.5px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">Scan UPI QR Code or Enter VPA / UPI ID:</div>
+          <img id="payUpiQr" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=ecotrack@upi&pn=EcoTrackWelfare" style="width:130px;height:130px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;padding:6px;margin:0 auto 10px auto;display:block;">
+          <input type="text" id="payModalUpiId" class="form-input" placeholder="e.g. rahul@okaxis or 9876543210@paytm" style="font-size:13px;text-align:center;">
+        </div>
+
+        <div id="payCardSection" style="display:none;margin-bottom:18px;">
+          <div class="form-group" style="margin-bottom:10px;">
+            <input type="text" class="form-input" placeholder="Card Number (4532 •••• •••• 8890)" maxlength="19">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <input type="text" class="form-input" placeholder="MM/YY">
+            <input type="password" class="form-input" placeholder="CVV" maxlength="4">
+          </div>
+        </div>
+
+        <button type="submit" id="payModalSubmitBtn" class="btn btn-primary" style="width:100%;font-size:15px;padding:12px;font-weight:800;border-radius:12px;">
+          <i class="fas fa-lock"></i> Pay & Generate Verified Entry Pass
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- DIGITAL TICKET PASS VAULT MODAL -->
+<div id="ticketPassModal" class="modal-backdrop" onclick="closeModalOnBg(event,'ticketPassModal')">
+  <div class="modal-card" style="max-width:540px;">
+    <div class="modal-header">
+      <h3 class="modal-title">🎟️ Digital Entry Pass</h3>
+      <button class="modal-close" onclick="closeTicketPassModal()">✕</button>
+    </div>
+    <div class="modal-body" id="ticketPassModalBody">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- CREATE POST MODAL -->
+<div id="createPostModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'createPostModal')">
+  <div class="modal-card" style="max-width:600px;">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fas fa-plus-circle" style="color:var(--primary);"></i> Create Community Post</h3>
+      <button class="modal-close" onclick="closeCreatePostModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form onsubmit="handleCreatePostSubmit(event)">
+        <div class="form-group" style="margin-bottom:14px;">
+          <textarea id="createPostText" class="form-input" rows="4" placeholder="Share veterinary insights, training tip, rescue update, or ask the community..." required style="resize:vertical;"></textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+          <div>
+            <label style="font-size:12px; font-weight:700; color:var(--text-muted);">Post Category</label>
+            <select id="createPostType" class="form-input">
+              <option value="general">✨ General Update</option>
+              <option value="veterinary">🩺 Veterinary Advice</option>
+              <option value="training">🏋️ Pet Training</option>
+              <option value="rescue">🛡️ Rescue & Welfare</option>
+              <option value="marketplace">🛒 Marketplace Item</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:700; color:var(--text-muted);">Visibility Privacy</label>
+            <select id="createPostVisibility" class="form-input">
+              <option value="Public">🌍 Public (Everyone)</option>
+              <option value="Followers Only">👥 Followers Only</option>
+              <option value="Friends Only">🤝 Friends Only</option>
+              <option value="Private">🔒 Private (Only Me)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+          <input type="text" id="createPostLocation" class="form-input" placeholder="📍 Location tag (e.g. Austin Grounds)">
+          <input type="text" id="createPostAnimal" class="form-input" placeholder="🐾 Species / Animal tag (e.g. German Shepherd)">
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <input type="text" id="createPostHashtags" class="form-input" placeholder="#Hashtags (e.g. #VetCare #AgilityCoach)">
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px;">
+          <input type="url" id="createPostMediaUrl" class="form-input" placeholder="🖼️ Image or Video URL (Optional)">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%; padding:12px; font-size:15px; font-weight:800; border-radius:12px;">
+          <i class="fas fa-paper-plane"></i> Publish to Community Feed
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT PROFILE MODAL -->
+<div id="editProfileModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'editProfileModal')">
+  <div class="modal-card" style="max-width:650px;">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fas fa-user-pen" style="color:var(--primary);"></i> Edit EcoTrack Portfolio Profile</h3>
+      <button class="modal-close" onclick="closeEditProfileModal()">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:80vh; overflow-y:auto;">
+      <form onsubmit="handleEditProfileSubmit(event)">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+          <div>
+            <label style="font-size:12px; font-weight:700;">Display Name</label>
+            <input type="text" id="editProfileName" class="form-input" required>
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:700;">Profile Privacy</label>
+            <select id="editProfilePrivacy" class="form-input">
+              <option value="Public">🌍 Public Profile</option>
+              <option value="Followers Only">👥 Followers Only</option>
+              <option value="Friends Only">🤝 Friends Only</option>
+              <option value="Private">🔒 Private Profile</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px;">
+          <label style="font-size:12px; font-weight:700;">Bio & Professional Tagline</label>
+          <textarea id="editProfileBio" class="form-input" rows="2"></textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+          <input type="text" id="editProfileCity" class="form-input" placeholder="City (e.g. Mumbai)">
+          <input type="text" id="editProfileCountry" class="form-input" placeholder="Country (e.g. India)">
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+          <input type="text" id="editProfileLanguages" class="form-input" placeholder="Languages (e.g. English, Hindi)">
+          <input type="text" id="editProfileInterests" class="form-input" placeholder="Interests & Specialties">
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+          <input type="text" id="editProfileFavSpecies" class="form-input" placeholder="Favorite Species">
+          <select id="editProfileVetStatus" class="form-input">
+            <option value="0">User / Pet Owner</option>
+            <option value="1">🩺 Verified Veterinarian</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%; padding:12px; font-size:15px; font-weight:800; border-radius:12px;">
+          <i class="fas fa-check-circle"></i> Save Portfolio Updates
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ADD PET MODAL -->
+<div id="addPetModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'addPetModal')">
+  <div class="modal-card" style="max-width:550px;">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fas fa-paw" style="color:var(--primary);"></i> Add Pet to Vault</h3>
+      <button class="modal-close" onclick="closeAddPetModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form onsubmit="handleAddPetSubmit(event)">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+          <input type="text" id="addPetName" class="form-input" placeholder="Pet Name" required>
+          <input type="text" id="addPetSpecies" class="form-input" placeholder="Species (e.g. Canis lupus)" required>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+          <input type="text" id="addPetBreed" class="form-input" placeholder="Breed">
+          <input type="text" id="addPetAge" class="form-input" placeholder="Age (e.g. 3 Yrs)">
+          <input type="text" id="addPetWeight" class="form-input" placeholder="Weight (e.g. 32 kg)">
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <input type="text" id="addPetDiet" class="form-input" placeholder="Dietary Plan / Kibble Formula">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; padding:12px; font-size:15px; font-weight:800; border-radius:12px;">
+          <i class="fas fa-save"></i> Register Pet in Vault
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- MESSAGING DRAWER MODAL -->
+<div id="messagingDrawerModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'messagingDrawerModal')">
+  <div class="modal-card" style="max-width:800px; height:80vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+    <div class="modal-header" style="padding:16px 20px; border-bottom:1px solid var(--border-color);">
+      <h3 class="modal-title"><i class="fas fa-paper-plane" style="color:var(--primary);"></i> EcoTrack Direct Messages</h3>
+      <button class="modal-close" onclick="closeMessagingDrawer()">✕</button>
+    </div>
+    <div style="display:flex; flex:1; overflow:hidden;">
+      <!-- Conversations Sidebar -->
+      <div style="width:280px; border-right:1px solid var(--border-color); padding:12px; overflow-y:auto;" id="chatConversationsList">
+      </div>
+      <!-- Messages Thread View -->
+      <div style="flex:1; display:flex; flex-direction:column; background:var(--card-bg-subtle, rgba(255,255,255,0.01));">
+        <div style="padding:12px 16px; border-bottom:1px solid var(--border-color); font-weight:800; font-size:14px;" id="chatHeaderName">
+          Select a Conversation
+        </div>
+        <div style="flex:1; padding:16px; overflow-y:auto;" id="chatMessagesHistory">
+          <div style="text-align:center; color:var(--text-muted); margin-top:40px;">Select a conversation to start chatting.</div>
+        </div>
+        <div style="padding:12px; border-top:1px solid var(--border-color); display:flex; gap:8px;">
+          <input type="text" id="chatInputText" class="form-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+          <button class="btn btn-primary" onclick="sendChatMessage()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- VIEW PROFILE MODAL -->
+<div id="viewProfileModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'viewProfileModal')">
+  <div class="modal-card" style="max-width: 650px; overflow-y: auto; max-height: 90vh; border-radius: 24px; padding: 0;">
+    <!-- Hero Header Background -->
+    <div id="viewProfileCover" style="height: 160px; background: linear-gradient(135deg, var(--primary), #0d9488); background-size: cover; position: relative;">
+      <button class="btn btn-secondary" onclick="closeViewProfileModal()" style="position: absolute; top: 15px; right: 15px; width: 36px; height: 36px; border-radius: 50%; border: none; background: rgba(0,0,0,0.5); color: #fff; font-size: 14px; display: flex; align-items: center; justify-content: center; z-index: 10;">✕</button>
+    </div>
+    
+    <div style="padding: 0 24px 24px; position: relative; margin-top: -60px;">
+      <!-- Avatar & Basic Details -->
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+        <div id="viewProfileAvatarContainer" style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid var(--card-bg, #fff); background: var(--card-bg-subtle, #f3f4f6); overflow: hidden; display: flex; align-items: center; justify-content: center;">
+          <!-- Image will be inserted dynamically -->
+        </div>
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+          <button id="viewProfileFollowBtn" class="btn btn-primary" style="padding: 8px 18px; font-weight: 800; border-radius: 20px;"></button>
+          <button id="viewProfileMessageBtn" class="btn btn-secondary" style="padding: 8px 18px; font-weight: 800; border-radius: 20px;"><i class="fas fa-comments"></i> Chat</button>
+        </div>
+      </div>
+      
+      <div style="margin-top: 14px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h2 id="viewProfileName" style="font-size: 22px; font-weight: 900; color: var(--text-main); margin: 0;"></h2>
+          <div id="viewProfileBadges" style="display: flex; gap: 6px;"></div>
+        </div>
+        <div id="viewProfileEcoId" style="font-size: 13px; color: var(--text-muted); font-weight: 700; margin-top: 2px;"></div>
+        <p id="viewProfileBio" style="margin-top: 10px; color: var(--text-main); font-size: 13.5px; line-height: 1.5; font-style: italic;"></p>
+        
+        <div style="display: flex; gap: 14px; margin-top: 12px; font-size: 12.5px; color: var(--text-muted);">
+          <span id="viewProfileLoc"><i class="fas fa-map-marker-alt"></i> </span>
+          <span id="viewProfileJoined"><i class="fas fa-calendar-alt"></i> </span>
+        </div>
+      </div>
+      
+      <!-- Stats Container -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; text-align: center;">
+        <div style="background: var(--card-bg-subtle, rgba(255,255,255,0.03)); padding: 10px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Rescues</div>
+          <div id="viewStatRescues" style="font-size: 18px; font-weight: 900; color: var(--primary);">0</div>
+        </div>
+        <div style="background: var(--card-bg-subtle, rgba(255,255,255,0.03)); padding: 10px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Trainings</div>
+          <div id="viewStatTrainings" style="font-size: 18px; font-weight: 900; color: var(--primary);">0</div>
+        </div>
+        <div style="background: var(--card-bg-subtle, rgba(255,255,255,0.03)); padding: 10px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Followers</div>
+          <div id="viewStatConnections" style="font-size: 18px; font-weight: 900; color: var(--primary);">0</div>
+        </div>
+      </div>
+      
+      <!-- Content Section (Pets & Achievements) -->
+      <div id="viewProfileRestrictedNotice" style="display: none; text-align: center; padding: 40px 20px; background: rgba(255,255,255,0.03); border-radius: 16px; border: 1px dashed var(--border-color); margin-top: 24px;">
+        <i class="fas fa-lock" style="font-size: 32px; color: var(--text-muted); margin-bottom: 12px;"></i>
+        <h4 style="font-weight: 800; margin-bottom: 4px;">Private Account</h4>
+        <p style="color: var(--text-muted); font-size: 12.5px;" id="viewProfilePrivateMessage">Follow this user to view their pets vault, progress cards, and achievements.</p>
+      </div>
+      
+      <div id="viewProfilePublicContent" style="margin-top: 24px;">
+        <!-- Pets catalog list -->
+        <h3 style="font-size: 15px; font-weight: 900; color: var(--text-main); margin-bottom: 10px;"><i class="fas fa-shield-cat" style="color: var(--primary);"></i> Registered Pets Vault</h3>
+        <div id="viewProfilePetsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px;"></div>
+        
+        <!-- Achievements badges -->
+        <h3 style="font-size: 15px; font-weight: 900; color: var(--text-main); margin-top: 24px; margin-bottom: 10px;"><i class="fas fa-trophy" style="color: #eab308;"></i> Conservation Badges</h3>
+        <div id="viewProfileBadgesGrid" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+<script src="social_db.js"></script>
+<script src="community.js"></script>
+<script src="profile.js"></script>
+<script src="messaging.js"></script>
+<script src="cv_engine.js"></script>
+<script src="app.js?v=10003"></script>
+
+<!-- AI SCANNER MODAL -->
+<div id="aiScannerModal" class="modal-backdrop" style="display:none;z-index:9999;background:rgba(10,15,30,0.92);align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;backdrop-filter:blur(8px);">
+  <div class="modal-card" style="width:95%;max-width:1050px;background:#0d1527;border:1px solid rgba(99,102,241,0.25);border-radius:24px;overflow:hidden;padding:0;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);display:flex;flex-direction:column;">
+    
+    <!-- Modal Header -->
+    <div class="modal-header" style="background:#090d16;border-bottom:1px solid rgba(255,255,255,0.08);padding:18px 24px;display:flex;justify-content:space-between;align-items:center;z-index:10;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(16,185,129,0.15);display:flex;align-items:center;justify-content:center;border:1px solid rgba(16,185,129,0.3);">
+          <i class="fas fa-camera-viewfinder" style="color:#10b981;font-size:16px;"></i>
+        </div>
+        <div>
+          <h3 id="aiScannerTitle" style="color:#f8fafc;margin:0;font-size:17px;font-weight:900;letter-spacing:-0.2px;">AI Pose Scanner</h3>
+          <p style="color:#64748b;margin:0;font-size:11px;font-weight:500;">EcoTrack Computer Vision Module v2.0</p>
+        </div>
+      </div>
+      <button onclick="closeAiScannerModal()" style="background:rgba(255,255,255,0.06);border:none;color:#94a3b8;font-size:18px;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.15)';this.style.color='#ef4444';" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='#94a3b8';">&times;</button>
+    </div>
+
+    <!-- Main Content Split (Camera + Telemetry Side Panel) -->
+    <div style="display:flex;flex-direction:row;background:#05070c;min-height:540px;flex-wrap:wrap;">
+      
+      <!-- Left Side: Camera Box -->
+      <div style="flex:2;min-width:320px;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;border-right:1px solid rgba(255,255,255,0.08);">
+        <video id="aiScannerVideo" autoplay playsinline style="width:100%;height:100%;max-height:560px;object-fit:cover;display:none;transform:scaleX(-1);"></video>
+        <canvas id="aiScannerCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;pointer-events:none;z-index:5;"></canvas>
+        
+        <!-- Live HUD Info overlay -->
+        <div style="position:absolute;top:20px;left:20px;z-index:8;display:flex;gap:8px;">
+          <div style="background:rgba(15,23,42,0.85);backdrop-filter:blur(6px);padding:6px 12px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;gap:6px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:#10b981;animation:pulse 1.5s infinite;"></div>
+            <span id="webFpsLabel" style="color:#10b981;font-size:11px;font-weight:800;letter-spacing:0.5px;">LIVE</span>
+          </div>
+          <div style="background:rgba(15,23,42,0.85);backdrop-filter:blur(6px);padding:6px 12px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);">
+            <span style="color:#94a3b8;font-size:11px;font-weight:700;">LATENCY: <strong id="webLatencyVal" style="color:#f8fafc;">0ms</strong></span>
+          </div>
+        </div>
+
+        <!-- Scanning Status overlay -->
+        <div id="aiScannerOverlay" style="position:absolute;z-index:10;text-align:center;background:rgba(5,7,12,0.85);backdrop-filter:blur(8px);top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+          <div id="aiScannerStatusMsg" style="color:#10b981;font-size:18px;font-weight:800;margin-bottom:20px;max-width:400px;line-height:1.4;">Initializing camera access...</div>
+          <button id="aiScannerStartBtn" class="btn btn-primary" style="display:none;padding:12px 30px;font-size:14px;font-weight:800;border-radius:30px;box-shadow:0 0 20px rgba(16,185,129,0.4);" onclick="startAiScannerInference()"><i class="fas fa-play" style="margin-right:8px;"></i> Start AI Scan</button>
+        </div>
+      </div>
+
+      <!-- Right Side: Telemetry Panel -->
+      <div style="flex:1;min-width:280px;background:#090d16;padding:24px;display:flex;flex-direction:column;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.08);">
+        
+        <!-- Upper Part: Specs + Live Metrics -->
+        <div>
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Inference Target</div>
+            <div style="display:flex;align-items:center;justify-content:between;">
+              <span id="aiScannerTargetLabel" style="color:#f8fafc;font-size:20px;font-weight:900;">Human</span>
+              <span id="webActiveModelBadge" style="background:rgba(99,102,241,0.15);color:#818cf8;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid rgba(99,102,241,0.3);text-transform:uppercase;">YOLOv8</span>
+            </div>
+          </div>
+
+          <!-- Progress bar -->
+          <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);padding:14px;border-radius:14px;margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;color:#94a3b8;font-size:12px;margin-bottom:6px;font-weight:700;">
+              <span>Scan Progress</span>
+              <span id="aiScannerProgressLabel" style="color:#f8fafc;font-weight:800;">0%</span>
+            </div>
+            <div style="height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+              <div id="aiScannerProgressBar" style="height:100%;width:0%;background:linear-gradient(90deg, #10b981, #3b82f6);transition:width 0.3s ease;"></div>
+            </div>
+          </div>
+
+          <!-- Metrical Grid (Form, Posture, Balance, Reps) -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+            
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:14px;padding:12px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">Form Score</div>
+              <div id="webFormScoreVal" style="font-size:28px;font-weight:900;color:#10b981;transition:all 0.3s;">0%</div>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:14px;padding:12px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">Rep Count</div>
+              <div id="webRepCountVal" style="font-size:28px;font-weight:900;color:#f8fafc;transition:transform 0.3s;">0</div>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:14px;padding:12px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">Posture</div>
+              <div id="webPostureScoreVal" style="font-size:28px;font-weight:900;color:#3b82f6;">0%</div>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:14px;padding:12px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">Balance</div>
+              <div id="webBalanceScoreVal" style="font-size:28px;font-weight:900;color:#a855f7;">0%</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Lower Part: Interactive stop actions -->
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <button onclick="closeAiScannerModal()" class="btn btn-secondary" style="width:100%;padding:12px;font-size:13px;font-weight:700;border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);"><i class="fas fa-circle-stop" style="margin-right:6px;color:#ef4444;"></i> Stop & Close</button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+
+</body>
+</html>

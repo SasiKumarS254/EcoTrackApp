@@ -1,0 +1,227 @@
+{
+  "users": [
+    {
+      "id": "usr_admin_001",
+      "email": "user@ecotrack.org",
+      "password_hash": "demo",
+      "name": "Eco Explorer",
+      "bio": "Nature enthusiast • Wildlife Photographer • Conservationist",
+      "location": "Chennai, India",
+      "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
+      "role": "admin",
+      "created_at": "2026-07-28T04:11:53.864Z",
+      "stats": {
+        "rescues": 124,
+        "xp": 4800,
+        "plans": 12
+      }
+    }
+  ],
+  "profiles": {},
+  "animals_itis": [
+    {
+      "tsn": 180092,
+      "common_name": "African Elephant",
+      "scientific_name": "Loxodonta africana",
+      "class_name": "Mammalia",
+      "family": "Elephantidae",
+      "habitat": "Savanna, Forest",
+      "diet": "Herbivore",
+      "lifespan": "60-70 yrs",
+      "status": "Vulnerable",
+      "description": "The largest land mammal on Earth. Highly social herbivores led by a matriarch."
+    },
+    {
+      "tsn": 183803,
+      "common_name": "Bengal Tiger",
+      "scientific_name": "Panthera tigris tigris",
+      "class_name": "Mammalia",
+      "family": "Felidae",
+      "habitat": "Tropical Forest, Mangroves",
+      "diet": "Carnivore",
+      "lifespan": "10-15 yrs",
+      "status": "Endangered",
+      "description": "Powerful apex predator of Asian forests, known for exceptional swimming ability and solitary hunting."
+    },
+    {
+      "tsn": 180596,
+      "common_name": "German Shepherd Dog",
+      "scientific_name": "Canis lupus familiaris",
+      "class_name": "Mammalia",
+      "family": "Canidae",
+      "habitat": "Domestic / Working",
+      "diet": "Omnivore",
+      "lifespan": "9-13 yrs",
+      "status": "Least Concern",
+      "description": "Highly intelligent working dog breed known for agility, obedience, police work, and companionship."
+    },
+    {
+      "tsn": 180587,
+      "common_name": "Gray Wolf",
+      "scientific_name": "Canis lupus",
+      "class_name": "Mammalia",
+      "family": "Canidae",
+      "habitat": "Forests, Tundra, Grasslands",
+      "diet": "Carnivore",
+      "lifespan": "6-8 yrs",
+      "status": "Least Concern",
+      "description": "Ancestor of the domestic dog, social predator hunting in structured packs."
+    },
+    {
+      "tsn": 180543,
+      "common_name": "Persian Cat",
+      "scientific_name": "Felis catus",
+      "class_name": "Mammalia",
+      "family": "Felidae",
+      "habitat": "Domestic",
+      "diet": "Carnivore",
+      "lifespan": "12-17 yrs",
+      "status": "Domesticated",
+      "description": "Long-haired breed of cat characterized by its round face and short muzzle."
+    },
+    {
+      "tsn": 175404,
+      "common_name": "Peregrine Falcon",
+      "scientific_name": "Falco peregrinus",
+      "class_name": "Aves",
+      "family": "Falconidae",
+      "habitat": "Cliffs, Urban Highrises",
+      "diet": "Carnivore",
+      "lifespan": "15-20 yrs",
+      "status": "Least Concern",
+      "description": "Fastest living creature on Earth, capable of reaching diving speeds over 300 km/h."
+    },
+    {
+      "tsn": 175005,
+      "common_name": "Bald Eagle",
+      "scientific_name": "Haliaeetus leucocephalus",
+      "class_name": "Aves",
+      "family": "Accipitridae",
+      "habitat": "Coastal Regions, Lakes",
+      "diet": "Piscivore",
+      "lifespan": "20-30 yrs",
+      "status": "Least Concern",
+      "description": "North American sea eagle recognized for its white head, yellow beak, and massive wingspan."
+    },
+    {
+      "tsn": 173802,
+      "common_name": "Green Sea Turtle",
+      "scientific_name": "Chelonia mydas",
+      "class_name": "Reptilia",
+      "family": "Cheloniidae",
+      "habitat": "Tropical Oceans, Reefs",
+      "diet": "Herbivore",
+      "lifespan": "70-80 yrs",
+      "status": "Endangered",
+      "description": "Large sea turtle migrating across vast oceanic distances between feeding grounds and nesting beaches."
+    },
+    {
+      "tsn": 173812,
+      "common_name": "Komodo Dragon",
+      "scientific_name": "Varanus komodoensis",
+      "class_name": "Reptilia",
+      "family": "Varanidae",
+      "habitat": "Savanna, Tropical Forest",
+      "diet": "Carnivore",
+      "lifespan": "30-50 yrs",
+      "status": "Endangered",
+      "description": "Largest living species of lizard, endemic to the Indonesian islands of Komodo and Rinca."
+    },
+    {
+      "tsn": 173825,
+      "common_name": "Axolotl",
+      "scientific_name": "Ambystoma mexicanum",
+      "class_name": "Amphibia",
+      "family": "Ambystomatidae",
+      "habitat": "Freshwater Lakes",
+      "diet": "Carnivore",
+      "lifespan": "10-15 yrs",
+      "status": "Critically Endangered",
+      "description": "Neotenic salamander famous for retaining juvenile features and miraculous organ regeneration capacity."
+    }
+  ],
+  "scans": [],
+  "training_analytics": [
+    {
+      "id": 1,
+      "user_id": "usr_admin_001",
+      "exercise": "Sit & Stay Hold",
+      "score": 95,
+      "reps": 10,
+      "duration": 60,
+      "obedience": 88,
+      "focus": 92,
+      "date": "2026-07-28T04:11:53.864Z"
+    }
+  ],
+  "marketplace_items": [
+    {
+      "id": 101,
+      "title": "Purebred German Shepherd Pup",
+      "category": "Pets",
+      "species": "Dog",
+      "breed": "German Shepherd",
+      "gender": "Male",
+      "age": "8 weeks",
+      "price": 15000,
+      "location": "Chennai",
+      "image_url": "https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?w=600",
+      "type": "sale"
+    },
+    {
+      "id": 102,
+      "title": "Orthopedic Memory Foam Pet Bed",
+      "category": "Accessories",
+      "price": 1499,
+      "location": "Bangalore",
+      "image_url": "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=400",
+      "type": "accessory"
+    }
+  ],
+  "orders": [],
+  "carts": {},
+  "community_posts": [
+    {
+      "id": 1,
+      "user_id": "usr_admin_001",
+      "user": "Dr. Aris Vance",
+      "avatar": "https://randomuser.me/api/portraits/men/32.jpg",
+      "content": "Successful rehabilitation of an injured Black Kite today! Skeleton joint alignment looks solid.",
+      "likes": 24,
+      "liked_by": [],
+      "comments": [],
+      "timestamp": "2026-07-28T04:11:53.864Z"
+    }
+  ],
+  "messages": [],
+  "events": [
+    {
+      "id": 1,
+      "title": "Annual Wildlife Conservation Summit 2026",
+      "category": "Exhibition",
+      "date_str": "Aug 15, 2026",
+      "location": "Eco Park Convention Center",
+      "description": "Global summit on species tracking and habitat restoration.",
+      "attendees": 142
+    },
+    {
+      "id": 2,
+      "title": "City Rabies & Vaccination Drive",
+      "category": "Health",
+      "date_str": "Aug 3, 2026",
+      "location": "Central Park Community Hub",
+      "description": "Free vaccination for pets and stray animals.",
+      "attendees": 88
+    },
+    {
+      "id": 3,
+      "title": "Canine Agility Workshop",
+      "category": "Training",
+      "date_str": "Aug 10, 2026",
+      "location": "EcoTrack Welfare Grounds",
+      "description": "Professional agility and obedience training workshop.",
+      "attendees": 65
+    }
+  ],
+  "pets": {}
+}

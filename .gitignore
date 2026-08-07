@@ -1,0 +1,80 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+website/node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Local Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Large AI Models & Data
+*.pt
+*.pth
+*.h5
+*.onnx
+*.task
+**/models/
+**/datasets/
+**/itis/
+**/reports/
+**/species_images/
+**/encyclopedia/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.pdf
+**/*.tmp
+
+# Image safety (except app icons)
+**/*.jpg
+**/*.jpeg
+**/*.png
+!frontend/assets/images/*.png
+
+# Artifacts
+.artifacts/
+
+# Build outputs
+frontend/android/
+frontend/ios/
+frontend/dist/
+website/dist/

@@ -1,0 +1,23 @@
+{
+  "name": "ecotrack-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "nodemailer": "^9.0.3",
+    "sharp": "^0.35.3"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "generate:encyclopedia": "node ../scripts/generate_encyclopedia_dataset.js",
+    "generate:encyclopedia:seed": "node ../scripts/generate_encyclopedia_dataset.js --seed-only",
+    "generate:encyclopedia:incremental": "node ../scripts/generate_encyclopedia_dataset.js --incremental",
+    "generate:encyclopedia:test": "node ../scripts/generate_encyclopedia_dataset.js --seed-only --limit 20",
+    "generate:encyclopedia:dry": "node ../scripts/generate_encyclopedia_dataset.js --seed-only --dry-run"
+  }
+}

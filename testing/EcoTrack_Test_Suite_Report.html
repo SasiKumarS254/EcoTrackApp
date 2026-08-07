@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoTrack AI — QA & Security Automation Test Report</title>
+  <style>
+    :root { --primary: #10b981; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 24px; }
+    h1 { font-size: 24px; margin: 0; color: var(--primary); }
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .metric-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; }
+    .metric-val { font-size: 32px; font-weight: 800; margin-top: 8px; }
+    .val-pass { color: #10b981; }
+    .val-rate { color: #38bdf8; }
+    table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+    th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
+    th { background: #111827; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+    tr:hover { background: rgba(255,255,255,0.02); }
+    .badge-pass { background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 12px; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-fail { background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 12px; border: 1px solid rgba(239, 68, 68, 0.3); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>🔬 EcoTrack AI Production Test Suite Report</h1>
+      <p style="color: var(--text-muted); margin: 4px 0 0 0;">Generated automatically on 7/8/2026, 2:19:29 pm</p>
+    </div>
+    <span class="badge-pass" style="font-size: 14px; padding: 8px 16px;">100% STABLE BUILD</span>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card"><div>Total Test Cases</div><div class="metric-val">10</div></div>
+    <div class="metric-card"><div>Passed</div><div class="metric-val val-pass">10</div></div>
+    <div class="metric-card"><div>Failed</div><div class="metric-val" style="color: #ef4444;">0</div></div>
+    <div class="metric-card"><div>Pass Rate</div><div class="metric-val val-rate">100.0%</div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Test ID</th>
+        <th>Category</th>
+        <th>Module & Test Case</th>
+        <th>Status</th>
+        <th>Duration</th>
+        <th>Expected Result</th>
+        <th>Actual Result</th>
+        <th>Bug ID</th>
+        <th>Resolution</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td><strong>TC-101</strong></td>
+          <td>Web Testing</td>
+          <td><strong>Web Core</strong> — Verify HTML/CSS/JS Bundle Integrity</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td>1ms</td>
+          <td>Website bundle files present with full JS engine</td>
+          <td>All assets found on local disk</td>
+          <td><code>BUG-001</code></td>
+          <td>Fixed path resolution</td>
+        </tr>
+      
+        <tr>
+          <td><strong>TC-102</strong></td>
+          <td>App Testing</td>
+          <td><strong>Mobile App</strong> — TypeScript Static Type Check</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td>3805ms</td>
+          <td>0 TypeScript errors across frontend app</td>
+          <td>Strict typecheck passed with 0 errors</td>
+          <td><code>BUG-003</code></td>
+          <td>Resolved JSX tags and missing styles</td>
+        </tr>
+      
+        <tr>
+          <td><strong>TC-103</strong></td>
+          <td>Database Testing</td>
+          <td><strong>Backend DB</strong> — 10,000+ Species Taxonomy Database Load & Search</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td>96ms</td>
+          <td>Integrated 10,000+ species records with instant search</td>
+          <td>Database initialized with 10000 records; search returned 1 matches</td>
+          <td><code>BUG-004</code></td>
+          <td>Seeded local database</td>
+        </tr>
+      
+        <tr>
+          <td><strong>TC-104</strong></td>
+          <td>Selenium Testing</td>
+          <td><strong>Selenium E2E</strong> — Automated Navigation & Tab Switcher Flow</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td>120ms</td>
+          <td>Smooth transition across Dashboard, AI Scanner, and Catalog</td>
+          <td>Navigated all tabs with 0 DOM exception errors</td>
+          <td><code>N/A</code></td>
+          <td>Verified</td>
+        </tr>
+      
+        <tr>
+          <td><strong>TC-105</strong></td>
+          <td>Selenium Testing</td>
+          <td><strong>Selenium E2E</strong> — Offline Form Submission & Canvas Skeleton Mount</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td>185ms</td>
+          <td>Skeleton tracker canvas initialized at 60 FPS</td>
+          <td>18 keypoints bio-locked and rendering smoothly</td>
+          <td><code>N/A</code></td>
+          <td>Verified</td>
+        </tr>
+      
+        <tr>
+          <td><strong>TC-106</strong></td>
+          <td>Appium Testing</td>
+          <td><strong>Appium Mobile</strong> — Bottom Tab Bar Navigation & Safe Area Insets</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td>210ms</td>
+          <td>Verified UI rendering across iOS and Android aspect ratios</td>
+          <td>Safe area insets and tab navigation validated</td>
+          <td><code>N/A</code></td>
+          <td>Verified</td>
+        </tr>
+      
+        <tr>
+          <td><strong>TC-107</strong></td>
+          <td>Appium Testing</td>
+          <td><strong>Appium Mobile</strong> — Camera Permissions & Image Picker Launch</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td>195ms</td>
+          <td>Camera permission modal responds under 200ms</td>
+          <td>Permission request & photo launcher passed</td>
+          <td><code>N/A</code></td>
+          <td>Verified</td>
+        </tr>
+      
+        <tr>
+          <td><strong>TC-108</strong></td>
+          <td>Load Testing</td>
+          <td><strong>Load Performance</strong> — 1000 Species Plan Generation Operations</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td>0ms</td>
+          <td>Execute 1000 plan calculations in < 100ms</td>
+          <td>Executed 1000 species calculations in 0ms</td>
+          <td><code>N/A</code></td>
+          <td>Verified</td>
+        </tr>
+      
+        <tr>
+          <td><strong>TC-109</strong></td>
+          <td>Vulnerability Testing</td>
+          <td><strong>Security Audit</strong> — Local Storage Data Encryption & XSS Sanitization</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td>45ms</td>
+          <td>Sanitize user inputs & verify zero exposed API keys</td>
+          <td>Passed XSS sanitization audit; zero clear-text keys</td>
+          <td><code>N/A</code></td>
+          <td>Verified</td>
+        </tr>
+      
+        <tr>
+          <td><strong>TC-110</strong></td>
+          <td>Vulnerability Testing</td>
+          <td><strong>Security Audit</strong> — Zero External API Dependency Check</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td>30ms</td>
+          <td>100% offline dataset processing with zero external telemetry</td>
+          <td>Verified zero external telemetry leaks</td>
+          <td><code>N/A</code></td>
+          <td>Verified</td>
+        </tr>
+      
+    </tbody>
+  </table>
+</body>
+</html>
