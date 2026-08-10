@@ -6,5 +6,5 @@
   "status": "AWAITING_REAL_DATASET",
   "action": "Download AP-10K images from https://github.com/AlexTheBad/AP-10K",
   "interim_model": "yolov8m-pose.pt (general animal detection + AP10K keypoint mapping)",
-  "generated_at": "2026-08-07T20:01:39.169687"
+  "generated_at": "2026-08-09T21:18:14.762745"
 }

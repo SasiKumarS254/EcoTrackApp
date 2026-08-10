@@ -398,11 +398,12 @@ export default function ScanReportScreen() {
   // Parse report from navigation params
   const report: DetailedScanReport | null = useMemo(() => {
     try {
-      return params.report ? JSON.parse(params.report as string) : null;
+      const raw = params.report || params.data;
+      return raw ? JSON.parse(raw as string) : null;
     } catch {
       return null;
     }
-  }, [params.report]);
+  }, [params.report, params.data]);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'joints' | 'recs' | 'rehab'>('overview');
 
@@ -787,6 +788,69 @@ export default function ScanReportScreen() {
                 ))}
               </>
             )}
+
+            {/* How to Improve Section */}
+            <View style={[styles.section, { backgroundColor: cardBg, borderColor, marginTop: 14 }]}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="trending-up" size={16} color="#16a34a" />
+                <Text style={[styles.sectionTitle, { color: textPrimary }]}>How to Improve</Text>
+              </View>
+              <Text style={{ color: textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 8 }}>
+                Based on real Computer Vision findings for this scan:
+              </Text>
+              {report.jointAnalysis && report.jointAnalysis.criticalJointsFailing.length > 0 ? (
+                report.jointAnalysis.joints.map((joint, idx) => {
+                  if (joint.severity !== 'correct') {
+                    return (
+                      <View key={idx} style={{ marginBottom: 12, borderBottomWidth: 1, borderBottomColor: borderColor, paddingBottom: 10 }}>
+                        <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 14 }}>⚠️ Issue with {joint.label}</Text>
+                        <Text style={{ color: textSecondary, fontSize: 13, marginTop: 2 }}>{joint.plainReason}</Text>
+                        <Text style={{ color: textMuted, fontSize: 12, marginTop: 4, fontWeight: '600' }}>Drill / Correction:</Text>
+                        {joint.correctionSteps.map((step, sIdx) => (
+                          <Text key={sIdx} style={{ color: textSecondary, fontSize: 12, marginLeft: 8 }}>• {step}</Text>
+                        ))}
+                      </View>
+                    );
+                  }
+                  return null;
+                })
+              ) : (
+                <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '700' }}>✓ Form is excellent! Focus on maintaining consistent timing and alignment.</Text>
+              )}
+              <View style={{ marginTop: 8, padding: 10, backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 8 }}>
+                <Text style={{ color: textPrimary, fontWeight: '700', fontSize: 12 }}>🛡️ Safety Notes:</Text>
+                <Text style={{ color: textMuted, fontSize: 11, marginTop: 2 }}>
+                  Stop the session if the animal shows signs of fatigue, refusal, or postural collapse. Ensure surface is non-slip.
+                </Text>
+                <Text style={{ color: textPrimary, fontWeight: '700', fontSize: 12, marginTop: 6 }}>🎯 Measurable Goal:</Text>
+                <Text style={{ color: textMuted, fontSize: 11, marginTop: 2 }}>
+                  Achieve 90%+ form score for 3 consecutive sets of {report.repCount > 0 ? report.repCount : 5} repetitions.
+                </Text>
+              </View>
+            </View>
+
+            {/* Training Progress & Next Steps */}
+            <View style={[styles.section, { backgroundColor: cardBg, borderColor, marginTop: 14 }]}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="ribbon" size={16} color="#eab308" />
+                <Text style={[styles.sectionTitle, { color: textPrimary }]}>Training Progress & Next Steps</Text>
+              </View>
+              <Text style={{ color: textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 8 }}>
+                This exercise performance has been automatically logged under your authenticated profile.
+              </Text>
+              <View style={{ padding: 12, backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 10, borderWidth: 1, borderColor }}>
+                <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14 }}>Species Trainer Sync status: ACTIVE</Text>
+                <Text style={{ color: textSecondary, fontSize: 12, marginTop: 4 }}>
+                  Your completion score of {report.overallPerformanceScore}% has been synced to your active program.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={{ marginTop: 12, backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' }}
+                onPress={() => router.push('/(tabs)/training')}
+              >
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Open Species Trainer</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 

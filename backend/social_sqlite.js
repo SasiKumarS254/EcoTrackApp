@@ -11,9 +11,44 @@ function getSocialDB() {
   db = new Database(DB_PATH);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+
+  // Programmatic migration check: check if foreign keys are active on Pets
+  try {
+    const fkList = db.prepare("PRAGMA foreign_key_list(Pets)").all();
+    if (fkList.length === 0) {
+      console.log("⚠️ Old schema detected (missing foreign keys on Pets). Dropping tables to rebuild...");
+      const tables = [
+        'Pets', 'Followers', 'Messages', 'Conversations', 'Notifications', 
+        'SavedPosts', 'Achievements', 'EnvironmentalImpact', 'ActivityHistory', 
+        'PortfolioItems', 'UserAnalytics', 'AIScannerReports', 'AITrainerLogs', 
+        'BlockedUsers', 'CartItems', 'MarketplaceOrders', 'MarketplaceListings', 
+        'EncyclopediaBookmarks', 'EventRegistrations', 'AITrainerPrograms', 
+        'UserSettings', 'SearchHistory', 'UploadedMedia', 'Appointments', 
+        'Services', 'FullScans', 'Profiles', 'Posts', 'Likes', 'Comments', 
+        'Replies', 'CommentLikes', 'Users'
+      ];
+      for (const table of tables) {
+        db.exec(`DROP TABLE IF EXISTS ${table}`);
+      }
+      console.log("✅ Outdated tables dropped successfully.");
+    }
+  } catch (err) {
+    console.warn("⚠️ Schema migration check error:", err.message);
+  }
+
   initTables(db);
   seedInitialData(db);
   ensureUsersInSQLite(db);
+
+  // Enforce role constraints and fix passwords for demo accounts
+  try {
+    db.prepare(`UPDATE Users SET role = 'admin', password_hash = 'demo' WHERE email = 'user@ecotrack.org'`).run();
+    db.prepare(`UPDATE Users SET role = 'user', password_hash = 'password123' WHERE email != 'user@ecotrack.org'`).run();
+    console.log("🔒 SQLite User roles and passwords sanitized successfully.");
+  } catch (err) {
+    console.error("⚠️ Failed to sanitize users in SQLite:", err.message);
+  }
+
   return db;
 }
 
@@ -128,7 +163,8 @@ function initTables(db) {
       target_type TEXT NOT NULL, -- 'comment' or 'reply'
       target_id INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, target_type, target_id)
+      UNIQUE(user_id, target_type, target_id),
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS Followers (
@@ -137,7 +173,9 @@ function initTables(db) {
       following_id TEXT NOT NULL,
       status TEXT DEFAULT 'Approved', -- 'Approved' or 'Pending'
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(follower_id, following_id)
+      UNIQUE(follower_id, following_id),
+      FOREIGN KEY(follower_id) REFERENCES Users(id) ON DELETE CASCADE,
+      FOREIGN KEY(following_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS Messages (
@@ -152,7 +190,9 @@ function initTables(db) {
       is_delivered INTEGER DEFAULT 1,
       is_seen INTEGER DEFAULT 0,
       is_deleted INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(sender_id) REFERENCES Users(id) ON DELETE CASCADE,
+      FOREIGN KEY(receiver_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS Conversations (
@@ -162,7 +202,9 @@ function initTables(db) {
       is_pinned INTEGER DEFAULT 0,
       is_archived INTEGER DEFAULT 0,
       last_message_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, partner_id)
+      UNIQUE(user_id, partner_id),
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE,
+      FOREIGN KEY(partner_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS Notifications (
@@ -174,7 +216,9 @@ function initTables(db) {
       target_type TEXT,
       message TEXT NOT NULL,
       is_read INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(recipient_id) REFERENCES Users(id) ON DELETE CASCADE,
+      FOREIGN KEY(actor_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS SavedPosts (
@@ -183,7 +227,9 @@ function initTables(db) {
       post_id INTEGER NOT NULL,
       collection_name TEXT DEFAULT 'Default',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, post_id)
+      UNIQUE(user_id, post_id),
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE,
+      FOREIGN KEY(post_id) REFERENCES Posts(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS Achievements (
@@ -195,7 +241,8 @@ function initTables(db) {
       category TEXT NOT NULL,
       description TEXT NOT NULL,
       unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, badge_code)
+      UNIQUE(user_id, badge_code),
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS EnvironmentalImpact (
@@ -207,7 +254,8 @@ function initTables(db) {
       unit TEXT NOT NULL,
       metric_category TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      reference_id TEXT
+      reference_id TEXT,
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS ActivityHistory (
@@ -216,7 +264,8 @@ function initTables(db) {
       activity_type TEXT NOT NULL,
       description TEXT NOT NULL,
       metadata TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS Pets (
@@ -235,7 +284,8 @@ function initTables(db) {
       training_progress TEXT,
       achievements TEXT,
       milestones TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(owner_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS PortfolioItems (
@@ -249,7 +299,8 @@ function initTables(db) {
       credential_url TEXT,
       description TEXT,
       media_url TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS UserAnalytics (
@@ -258,7 +309,8 @@ function initTables(db) {
       metric_key TEXT NOT NULL,
       metric_value REAL NOT NULL,
       recorded_date TEXT DEFAULT CURRENT_DATE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS AIScannerReports (
@@ -270,7 +322,8 @@ function initTables(db) {
       injuries_notes TEXT,
       posture_analysis TEXT,
       recommendations TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS AITrainerLogs (
@@ -281,7 +334,8 @@ function initTables(db) {
       duration_minutes INTEGER DEFAULT 0,
       xp_earned INTEGER DEFAULT 0,
       notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS BlockedUsers (
@@ -290,7 +344,9 @@ function initTables(db) {
       blocked_id TEXT NOT NULL,
       reason TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(blocker_id, blocked_id)
+      UNIQUE(blocker_id, blocked_id),
+      FOREIGN KEY(blocker_id) REFERENCES Users(id) ON DELETE CASCADE,
+      FOREIGN KEY(blocked_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS CartItems (
@@ -468,6 +524,10 @@ function initTables(db) {
     CREATE INDEX IF NOT EXISTS idx_services_user ON Services(user_id);
     CREATE INDEX IF NOT EXISTS idx_full_scans_user ON FullScans(user_id);
   `);
+
+  // Add profession/organization columns if not present (non-destructive migration)
+  try { db.exec(`ALTER TABLE Profiles ADD COLUMN profession TEXT`); } catch (_) {}
+  try { db.exec(`ALTER TABLE Profiles ADD COLUMN organization TEXT`); } catch (_) {}
 }
 
 function seedInitialData(db) {
@@ -549,7 +609,7 @@ function seedInitialData(db) {
       ecotrack_id: 'VET-882104',
       email: 'user1@ecotrack.org',
       name: 'Alice Green',
-      role: 'veterinarian',
+      role: 'user',
       avatar: 'https://randomuser.me/api/portraits/women/45.jpg',
       cover: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=1200',
       bio: 'Professional Veterinarian & Pet Welfare Volunteer',
@@ -597,7 +657,7 @@ function seedInitialData(db) {
       ecotrack_id: 'TRN-441209',
       email: 'user3@ecotrack.org',
       name: 'Charlie Eco',
-      role: 'trainer',
+      role: 'user',
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200',
       cover: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=1200',
       bio: 'Master Canine Agility Coach & Behaviorist',
@@ -619,7 +679,8 @@ function seedInitialData(db) {
   ];
 
   for (const u of users) {
-    insertUser.run(u.id, u.ecotrack_id, u.email, u.name, 'hashed_pass_placeholder', u.role);
+    const pass = u.email === 'user@ecotrack.org' ? 'demo' : 'password123';
+    insertUser.run(u.id, u.ecotrack_id, u.email, u.name, pass, u.role);
     insertProfile.run(
       u.id, u.name, u.ecotrack_id, u.avatar, u.cover, u.bio, u.country, u.city,
       u.languages, u.interests, u.favSpecies, u.vetStatus, u.vetVerif, u.trainerCerts,
@@ -661,6 +722,32 @@ function seedInitialData(db) {
     JSON.stringify([{ title: 'Mastered Scratching Post Use', date: '2025-12-01' }])
   );
 
+  // Seed Pets for usr_user3 (Charlie Eco)
+  insertPet.run(
+    'usr_user3', 'Rocky', 'Canis lupus familiaris', 'German Shepherd', '2 Years', '30 kg',
+    'Premium Dry Kibble + Salmon Oil',
+    JSON.stringify(['https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=600']),
+    JSON.stringify([{ date: '2026-05-12', title: 'Vaccination Appointment', notes: 'Administered Rabies and DHPP boosters.' }]),
+    JSON.stringify([{ vaccine: 'DHPP Booster', date: '2026-05-12', nextDue: '2027-05-12', clinic: 'Chennai Vet Center' }]),
+    JSON.stringify([]),
+    JSON.stringify({ agilityScore: '85%' }),
+    JSON.stringify(['🏆 Beginner Agility Award']),
+    JSON.stringify([])
+  );
+
+  // Seed Pets for usr_user1 (Alice Green)
+  insertPet.run(
+    'usr_user1', 'Bella', 'Felis catus', 'Siamese Cat', '1 Year', '3.5 kg',
+    'High-protein wet food',
+    JSON.stringify(['https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600']),
+    JSON.stringify([]),
+    JSON.stringify([]),
+    JSON.stringify([]),
+    JSON.stringify({}),
+    JSON.stringify([]),
+    JSON.stringify([])
+  );
+
   // Seed Dynamic Environmental Impact Records (Zero hardcoded values!)
   insertImpact.run('usr1', 'co2_saved', 'CO2 Reduction via Eco Recycled Purchases', 120.5, 'kg', 'Environmental', '2026-04-01');
   insertImpact.run('usr1', 'trees_planted', 'Trees Planted via EcoTrack Campaign', 15.0, 'trees', 'Conservation', '2026-05-10');
@@ -669,11 +756,30 @@ function seedInitialData(db) {
   insertImpact.run('usr1', 'scanner', 'Verified AI Scanner Detections', 45.0, 'analyses', 'AI Technology', '2026-07-15');
   insertImpact.run('usr1', 'volunteer', 'Community Animal Shelter Hours', 38.0, 'hours', 'Volunteer Work', '2026-08-01');
 
+  // Seed Dynamic Environmental Impact Records for usr_user1 (Alice Green)
+  insertImpact.run('usr_user1', 'rescues', 'Rescued Animals Assisted', 24.0, 'animals', 'Animal Welfare', '2026-06-12');
+  insertImpact.run('usr_user1', 'trainings', 'Completed Pet Training Sessions', 3.0, 'sessions', 'Training', '2026-07-01');
+  insertImpact.run('usr_user1', 'scanner', 'Verified AI Scanner Detections', 14.0, 'analyses', 'AI Technology', '2026-07-15');
+
+  // Seed Dynamic Environmental Impact Records for usr_user2 (Bob Forester)
+  insertImpact.run('usr_user2', 'rescues', 'Rescued Animals Assisted', 48.0, 'animals', 'Animal Welfare', '2026-06-12');
+  insertImpact.run('usr_user2', 'trainings', 'Completed Pet Training Sessions', 8.0, 'sessions', 'Training', '2026-07-01');
+  insertImpact.run('usr_user2', 'scanner', 'Verified AI Scanner Detections', 22.0, 'analyses', 'AI Technology', '2026-07-15');
+
+  // Seed Dynamic Environmental Impact Records for usr_user3 (Charlie Eco)
+  insertImpact.run('usr_user3', 'rescues', 'Rescued Animals Assisted', 12.0, 'animals', 'Animal Welfare', '2026-06-12');
+  insertImpact.run('usr_user3', 'trainings', 'Completed Pet Training Sessions', 2.0, 'sessions', 'Training', '2026-07-01');
+  insertImpact.run('usr_user3', 'scanner', 'Verified AI Scanner Detections', 5.0, 'analyses', 'AI Technology', '2026-07-15');
+
   // Seed Dynamic Achievements
   insertAchievement.run('usr1', 'RESCUE_HERO_1', 'Rescue Guardian', '🛡️', 'Welfare', 'Assisted 5+ animal rescues in your community', '2026-06-12');
   insertAchievement.run('usr1', 'AI_SCANNER_PRO', 'AI Bio Scanner Expert', '🧠', 'Technology', 'Performed 40+ accurate AI species analyses', '2026-07-15');
   insertAchievement.run('usr1', 'GREEN_CHAMPION', 'Carbon Reducer', '🌿', 'Eco', 'Saved over 100 kg of CO2 through eco activities', '2026-04-01');
   insertAchievement.run('usr1', 'MASTER_TRAINER', 'Agility Master', '🏆', 'Training', 'Completed 20+ training modules with pets', '2026-07-01');
+
+  // Seed Dynamic Achievements for usr_user3 (Charlie Eco)
+  insertAchievement.run('usr_user3', 'MASTER_TRAINER', 'Agility Master', '🏆', 'Training', 'Completed training modules with pets', '2026-07-01');
+  insertAchievement.run('usr_user3', 'RESCUE_HERO_1', 'Rescue Guardian', '🛡️', 'Welfare', 'Assisted rescues in your community', '2026-06-12');
 
   // Seed Sample Posts
   const now = new Date();
@@ -748,136 +854,38 @@ function seedInitialData(db) {
 
 function ensureUsersInSQLite(db) {
   const targetUsers = [
-    {
-      id: 'usr1',
-      ecotrack_id: 'ECO-948123',
-      email: 'user@ecotrack.org',
-      name: 'Eco Explorer',
-      role: 'admin',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-      cover: 'https://images.unsplash.com/photo-1511497584788-876761c119ef?w=1200',
-      bio: 'Nature enthusiast • Wildlife Protection Advocate • EcoTrack Certified Explorer',
-      country: 'India', city: 'Bengaluru',
-      languages: 'English, Hindi',
-      interests: 'Wildlife Conservation, AI Animal Diagnostics, Organic Pets',
-      favSpecies: 'Bengal Tiger, Peregrine Falcon',
-      vetStatus: 0, vetVerif: '', trainerCerts: 'Basic Animal Handling Certified',
-      rescueOrg: 'WildlifeSOS Contributor',
-      socialLinks: JSON.stringify({ twitter: '@eco_explorer', github: 'ecoexplorer' }),
-      website: 'https://ecotrack.org/explorers/eco',
-      education: 'B.Sc. Environmental Science, University of Delhi',
-      experience: '5 Years Volunteer Field Researcher at Wildlife Protection Society',
-      volunteerWork: '120+ Hours Animal Shelter Care & Wildlife Rescue',
-      skills: 'AI Species Identification, Emergency Animal Saline Wash, Tracking',
-      personalInfo: 'Passionate about digital wildlife preservation and rescue networks.',
-      reputation: 340, completion: 92
-    },
-    {
-      id: 'usr_user1',
-      ecotrack_id: 'VET-882104',
-      email: 'user1@ecotrack.org',
-      name: 'Alice Green',
-      role: 'veterinarian',
-      avatar: 'https://randomuser.me/api/portraits/women/45.jpg',
-      cover: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=1200',
-      bio: 'Professional Veterinarian & Pet Welfare Volunteer',
-      country: 'India', city: 'Chennai',
-      languages: 'English, Tamil, Hindi',
-      interests: 'Small Animal Surgery, Vet Diagnostics, Stray Vaccination Campaigns',
-      favSpecies: 'Peregrine Falcon, German Shepherd',
-      vetStatus: 1, vetVerif: 'VERIFIED_VET_LIC_99812', trainerCerts: 'Certified Vet Surgeon (BVSc & AH)',
-      rescueOrg: 'Chennai Stray Care NGO',
-      socialLinks: JSON.stringify({ linkedin: 'alicegreen' }),
-      website: 'https://chennaivetcare.com',
-      education: 'M.V.Sc. Veterinary Surgery, Madras Veterinary College',
-      experience: '12 Years Senior Veterinary Surgeon & Wild Care Specialist',
-      volunteerWork: 'Free Monthly Vaccination Drives for Stray Canines',
-      skills: 'Surgical Treatment, Vaccine Protocols, AI Pose Diagnostics',
-      personalInfo: 'Dedicated to providing top-tier medical assistance to animals everywhere.',
-      reputation: 980, completion: 100
-    },
-    {
-      id: 'usr_user2',
-      ecotrack_id: 'RGR-302194',
-      email: 'user2@ecotrack.org',
-      name: 'Bob Forester',
-      role: 'user',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-      cover: 'https://images.unsplash.com/photo-1511497584788-876761c119ef?w=1200',
-      bio: 'Wildlife Conservationist & Forest Ranger',
-      country: 'India', city: 'Coimbatore',
-      languages: 'English, Tamil',
-      interests: 'Wildlife Conservation, Forest Patrol, Rescue Tracking',
-      favSpecies: 'Bengal Tiger, Elephant',
-      vetStatus: 0, vetVerif: '', trainerCerts: 'Certified Forest Ranger',
-      rescueOrg: 'Western Ghats Rescue NGO',
-      socialLinks: JSON.stringify({ twitter: '@bob_ranger' }),
-      website: 'https://westernghatsrescue.org',
-      education: 'B.Sc. Forestry, Tamil Nadu Agricultural University',
-      experience: '8 Years Wildlife Ranger and Tracker',
-      volunteerWork: '500+ Hours Wild Animal Tracking & Rehab Support',
-      skills: 'Forest Navigation, Species ID, Wildlife First Aid',
-      personalInfo: 'Committed to safeguarding Western Ghats biodiversity and ecosystems.',
-      reputation: 750, completion: 94
-    },
-    {
-      id: 'usr_user3',
-      ecotrack_id: 'TRN-441209',
-      email: 'user3@ecotrack.org',
-      name: 'Charlie Eco',
-      role: 'trainer',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200',
-      cover: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=1200',
-      bio: 'Master Canine Agility Coach & Behaviorist',
-      country: 'India', city: 'Chennai',
-      languages: 'English, Hindi',
-      interests: 'Pet Obedience, Canine Agility, Rescue Rehab',
-      favSpecies: 'German Shepherd, Labrador',
-      vetStatus: 0, vetVerif: '', trainerCerts: 'Certified Agility Coach, PDT-KA',
-      rescueOrg: 'EcoTrack Welfare Grounds',
-      socialLinks: JSON.stringify({ instagram: '@charlie_dogs' }),
-      website: 'https://charliedogtraining.com',
-      education: 'B.Sc. Animal Behavior, University of Madras',
-      experience: '6 Years Professional Dog Trainer',
-      volunteerWork: 'Trains shelter dogs to improve adoption readiness',
-      skills: 'Leash Training, Obedience, Agility Course Design',
-      personalInfo: 'Unlocking pet potential through positive training methods.',
-      reputation: 670, completion: 95
-    }
+    { id: 'usr1', ecotrack_id: 'ECO-948123', email: 'user@ecotrack.org', name: 'Eco Explorer', role: 'admin', pass: 'demo' },
+    { id: 'usr_user1', ecotrack_id: 'VET-882104', email: 'user1@ecotrack.org', name: 'Alice Green', role: 'user', pass: 'password123' },
+    { id: 'usr_user2', ecotrack_id: 'RGR-302194', email: 'user2@ecotrack.org', name: 'Bob Forester', role: 'user', pass: 'password123' },
+    { id: 'usr_user3', ecotrack_id: 'TRN-441209', email: 'user3@ecotrack.org', name: 'Charlie Eco', role: 'user', pass: 'password123' }
   ];
 
   for (const u of targetUsers) {
     const existing = db.prepare(`SELECT id FROM Users WHERE email = ?`).get(u.email);
     if (!existing) {
-      db.prepare(`
-        INSERT INTO Users (id, ecotrack_id, email, name, password_hash, role)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(u.id, u.ecotrack_id, u.email, u.name, 'password123', u.role);
-
-      db.prepare(`
-        INSERT INTO Profiles (
-          user_id, display_name, ecotrack_id, avatar_url, cover_url, bio, country, city,
-          languages, interests, favorite_species, vet_status, vet_verification, trainer_certs,
-          rescue_org_membership, social_links, website, education, experience, volunteer_work,
-          skills, personal_info, privacy_setting, reputation_score, profile_completion_pct
-        ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-        )
-      `).run(
-        u.id, u.name, u.ecotrack_id, u.avatar, u.cover, u.bio, u.country, u.city,
-        u.languages, u.interests, u.favSpecies, u.vetStatus, u.vetVerif, u.trainerCerts,
-        u.rescueOrg, u.socialLinks, u.website, u.education, u.experience, u.volunteerWork,
-        u.skills, u.personalInfo, 'Public', u.reputation, u.completion
-      );
+      db.prepare(`INSERT INTO Users (id, ecotrack_id, email, name, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)`).run(u.id, u.ecotrack_id, u.email, u.name, u.pass, u.role);
     } else {
-      // Standardize the target user structure to match
-      db.prepare(`UPDATE Users SET id = ?, password_hash = ?, name = ?, role = ? WHERE email = ?`).run(u.id, 'password123', u.name, u.role, u.email);
-      db.prepare(`
-        UPDATE Profiles SET
-          user_id = ?, display_name = ?, avatar_url = ?, bio = ?, country = ?, city = ?,
-          vet_status = ?, trainer_certs = ?, rescue_org_membership = ?
-        WHERE user_id = ?
-      `).run(u.id, u.name, u.avatar, u.bio, u.country, u.city, u.vetStatus, u.trainerCerts, u.rescueOrg, u.id);
+      // Force align ID and core fields if mismatch
+      if (existing.id !== u.id) {
+        console.log(`[SQLite] Re-aligning ID for ${u.email}: ${existing.id} -> ${u.id}`);
+        try {
+          db.prepare(`UPDATE Users SET id = ?, ecotrack_id = ?, name = ?, password_hash = ?, role = ? WHERE email = ?`).run(u.id, u.ecotrack_id, u.name, u.pass, u.role, u.email);
+          // Update foreign keys in other tables
+          const tables = ['Profiles', 'Posts', 'Pets', 'Likes', 'Comments', 'SavedPosts', 'Achievements', 'EnvironmentalImpact', 'Followers', 'FullScans', 'AITrainerPrograms'];
+          tables.forEach(t => {
+            const col = (t === 'Pets') ? 'owner_id' : (t === 'Followers' ? 'follower_id' : 'user_id');
+            try { db.prepare(`UPDATE ${t} SET ${col} = ? WHERE ${col} = ?`).run(u.id, existing.id); } catch(e){}
+            if (t === 'Followers') {
+              try { db.prepare(`UPDATE Followers SET following_id = ? WHERE following_id = ?`).run(u.id, existing.id); } catch(e){}
+            }
+          });
+        } catch (err) { console.error(`[SQLite] Migration failed for ${u.email}:`, err.message); }
+      }
+    }
+    // Ensure Profile exists for these core users
+    const profileExists = db.prepare(`SELECT 1 FROM Profiles WHERE user_id = ?`).get(u.id);
+    if (!profileExists) {
+      db.prepare(`INSERT INTO Profiles (user_id, display_name, ecotrack_id, bio, reputation_score) VALUES (?, ?, ?, ?, 120)`).run(u.id, u.name, u.ecotrack_id, 'EcoTrack member • Wildlife enthusiast');
     }
   }
 }

@@ -52,24 +52,10 @@ export default function LoginScreen() {
       };
       await AsyncStorage.setItem("@ecotrack_user_session", JSON.stringify(session));
       await AsyncStorage.setItem("@ecotrack_user_id", data.user.id);
+      await AsyncStorage.setItem("@ecotrack_auth_token", data.token);
       router.replace("/(tabs)");
     } catch (err: any) {
-      // Handle offline checks
-      if (email.trim().toLowerCase() === "user@ecotrack.org" && (password === "password123" || password === "demo")) {
-        const userId = "user_default_01";
-        const session = {
-          user_id: userId,
-          email: email.trim(),
-          name: "EcoTrack Member",
-          token: "offline_token",
-          loggedInAt: new Date().toISOString(),
-        };
-        await AsyncStorage.setItem("@ecotrack_user_session", JSON.stringify(session));
-        await AsyncStorage.setItem("@ecotrack_user_id", userId);
-        router.replace("/(tabs)");
-      } else {
-        Alert.alert("Login Failed", "Unable to authenticate. Please check your email and password.");
-      }
+      Alert.alert("Authentication Failed", "EcoTrack server is offline or unreachable. Please verify the backend is running.");
     } finally {
       setIsLoading(false);
     }

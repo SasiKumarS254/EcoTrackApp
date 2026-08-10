@@ -47,8 +47,17 @@ export async function fetchTaxonomySpecies(query: string = "", className: string
   }
   return null;
 }
+const getUserKey = async (baseKey: string) => {
+  try {
+    const raw = await AsyncStorage.getItem("@ecotrack_user_id");
+    return raw ? `${baseKey}_${raw}` : baseKey;
+  } catch {
+    return baseKey;
+  }
+};
 
 export async function syncAnalyticsData(record?: any) {
+  const analyticsKey = await getUserKey(STORAGE_KEYS.ANALYTICS);
   if (record) {
     try {
       await customFetch(`${API_BASE_URL}/analytics`, {
@@ -59,10 +68,10 @@ export async function syncAnalyticsData(record?: any) {
     } catch (e) {
       console.warn("Offline: saving analytics to local device storage");
     }
-    const local = await AsyncStorage.getItem(STORAGE_KEYS.ANALYTICS);
+    const local = await AsyncStorage.getItem(analyticsKey);
     const history = local ? JSON.parse(local) : [];
     history.unshift(record);
-    await AsyncStorage.setItem(STORAGE_KEYS.ANALYTICS, JSON.stringify(history));
+    await AsyncStorage.setItem(analyticsKey, JSON.stringify(history));
     return history;
   }
   try {
@@ -71,11 +80,12 @@ export async function syncAnalyticsData(record?: any) {
   } catch (e) {
     console.warn("Using offline analytics store");
   }
-  const local = await AsyncStorage.getItem(STORAGE_KEYS.ANALYTICS);
+  const local = await AsyncStorage.getItem(analyticsKey);
   return local ? JSON.parse(local) : { obedience: 85, focus: 90, level: 1, history: [] };
 }
 
 export async function saveScanRecord(scanData: any) {
+  const scansKey = await getUserKey(STORAGE_KEYS.SCANS);
   try {
     await customFetch(`${API_BASE_URL}/scans`, {
       method: "POST",
@@ -85,10 +95,10 @@ export async function saveScanRecord(scanData: any) {
   } catch (e) {
     console.warn("Offline: saving scan record to local device storage");
   }
-  const local = await AsyncStorage.getItem(STORAGE_KEYS.SCANS);
+  const local = await AsyncStorage.getItem(scansKey);
   const scans = local ? JSON.parse(local) : [];
   scans.unshift({ id: Date.now(), ...scanData, created_at: new Date().toISOString() });
-  await AsyncStorage.setItem(STORAGE_KEYS.SCANS, JSON.stringify(scans));
+  await AsyncStorage.setItem(scansKey, JSON.stringify(scans));
 }
 
 /**
@@ -249,6 +259,16 @@ export async function fetchUserProfile(userId: string) {
   return null;
 }
 
+export async function fetchSocialProfile(userId: string) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/profile/${userId}`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Fetch social profile offline", e);
+  }
+  return null;
+}
+
 // ── CHAT & MESSAGING SYNC ──
 export async function fetchThread(user1Id: string, user2Id: string) {
   try {
@@ -372,6 +392,40 @@ export async function fetchCareServices(type?: string, search?: string) {
     if (res.ok) return await res.json();
   } catch (e) {
     console.warn("Fetch care services offline, using static verified list");
+  }
+  return null;
+}
+
+// ── EVENTS SYNC ──
+export async function fetchEvents(category?: string) {
+  try {
+    const url = `${API_BASE_URL}/events` + (category ? `?category=${category}` : "");
+    const res = await customFetch(url);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Fetch events offline");
+  }
+  return null;
+}
+
+export async function registerForEvent(eventId: number) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/events/${eventId}/register`, {
+      method: "POST"
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Register event offline");
+  }
+  return null;
+}
+
+export async function fetchRegisteredEvents(userId: string) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/events/registrations/${userId}`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Fetch registered events offline");
   }
   return null;
 }

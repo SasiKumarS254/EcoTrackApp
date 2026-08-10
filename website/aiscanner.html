@@ -169,16 +169,18 @@
       overflow: hidden;
       aspect-ratio: 4 / 3;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       border: 1px solid rgba(255, 255, 255, 0.1);
+      resize: both;
     }
 
     .scan-screen-video {
       width: 100%;
-      height: 100%;
+      height: calc(100% - 44px);
       object-fit: contain;
-      transform: scaleX(-1);
+      background: #000;
     }
 
     .scan-screen-canvas {
@@ -186,7 +188,7 @@
       top: 0;
       left: 0;
       width: 100%;
-      height: 100%;
+      height: calc(100% - 44px);
       object-fit: contain;
       pointer-events: none;
       z-index: 5;
@@ -400,6 +402,46 @@
       background: var(--primary-light);
       color: var(--primary);
     }
+
+    /* Playback controls styles */
+    .playback-bar {
+      width: 100%;
+      height: 44px;
+      background: rgba(13, 27, 20, 0.95);
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      z-index: 8;
+    }
+
+    .play-btn {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      outline: none;
+      transition: color 0.2s;
+    }
+    .play-btn:hover {
+      color: var(--primary);
+    }
+
+    .timeline-slider {
+      flex: 1;
+      accent-color: var(--primary);
+      cursor: pointer;
+      height: 4px;
+      border-radius: 2px;
+    }
+
+    .time-label {
+      color: #fff;
+      font-size: 11px;
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
@@ -503,7 +545,7 @@
         </div>
         
         <p style="font-size:12px; color:var(--text-secondary); margin-top:-10px; margin-bottom:16px; font-weight:600;">
-          Real computer vision via TensorFlow.js COCO-SSD + MediaPipe Pose Landmarker. Zero simulations.
+          Backend AI computer vision via high-performance inference engine.
         </p>
 
         <!-- Parameters Bar -->
@@ -523,7 +565,7 @@
           <div class="param-field">
             <label class="param-label">Exercise Select</label>
             <select id="exerciseSelect" class="param-select">
-              <!-- Dynamically populated based on target species -->
+              <!-- Dynamically populated -->
             </select>
           </div>
 
@@ -534,28 +576,42 @@
 
           <div class="param-field">
             <label class="param-label">Input Source</label>
-            <select id="inputSourceSelect" class="param-select" onchange="handleInputSourceChange()">
-              <option value="webcam">Live Webcam (MediaPipe real-time)</option>
-              <option value="upload">Video Upload (Frame-by-frame analysis)</option>
+            <select id="inputSourceSelect" class="param-select" disabled>
+              <option value="upload" selected>Video File Upload Only</option>
             </select>
           </div>
 
         </div>
 
-        <!-- Scanning Area Grid (Viewport + Telemetry) -->
+        <!-- Target Selection -->
+        <div id="targetSelectionContainer" style="display:none; margin-bottom:16px; background:var(--primary-ultra-light); padding:16px; border-radius:var(--radius-md); border:1px solid rgba(16,185,129,0.3);">
+          <div class="param-field">
+            <label class="param-label" style="color:var(--primary); font-weight:800; font-size:12px; margin-bottom:4px;">Multiple Targets Detected. Select Subject:</label>
+            <select id="targetSelect" class="param-select" style="border-color:var(--primary);" onchange="changeActivePlaybackTarget()">
+            </select>
+          </div>
+        </div>
+
+        <!-- Scanning Area -->
         <div class="scan-area-split">
           
-          <!-- Viewport Panel -->
-          <div class="scan-screen-box">
+          <div class="scan-screen-box" id="scanScreenBox">
             
-            <video id="aiScannerVideo" class="scan-screen-video" autoplay playsinline style="display:none;"></video>
+            <video id="aiScannerVideo" class="scan-screen-video" playsinline style="display:none;"></video>
             <canvas id="aiScannerCanvas" class="scan-screen-canvas"></canvas>
+
+            <!-- Playback control bar -->
+            <div id="playbackBar" class="playback-bar" style="display:none;">
+              <button id="playPauseBtn" class="play-btn" onclick="togglePlayPause()"><i class="fas fa-pause"></i></button>
+              <input type="range" id="timelineSlider" class="timeline-slider" value="0" min="0" max="100" step="0.1" oninput="seekVideo(this.value)">
+              <span id="timeLabel" class="time-label">0:00 / 0:00</span>
+            </div>
             
             <!-- Video Upload Dropzone Overlay -->
-            <div id="videoDropzone" class="dropzone-overlay" style="display:none;" onclick="triggerVideoFilePicker()">
+            <div id="videoDropzone" class="dropzone-overlay" onclick="triggerVideoFilePicker()">
               <i class="fas fa-cloud-arrow-up" style="font-size:44px;color:var(--primary);margin-bottom:12px;"></i>
               <h3 style="color:#fff;font-size:16px;font-weight:800;margin-bottom:6px;">Upload a Video File</h3>
-              <p style="color:var(--text-muted);font-size:12px;max-width:320px;line-height:1.5;">Drag and drop video here, or click to browse. Max size 20MB.</p>
+              <p style="color:var(--text-muted);font-size:12px;max-width:320px;line-height:1.5;">Drag and drop video here, or click to browse. Max size 500MB.</p>
               <span id="selectedFileName" style="color:var(--primary);margin-top:12px;font-size:12px;font-weight:700;word-break:break-all;"></span>
               <input type="file" id="videoFileInput" accept="video/*" style="display:none;" onchange="handleVideoFileSelection(event)">
             </div>
@@ -565,14 +621,7 @@
               <div class="spinner"></div>
               <h3 style="font-weight:800;font-size:16px;margin-bottom:4px;" id="processingTitle">Processing Video</h3>
               <p style="font-size:12px;color:var(--text-muted);" id="processingMessage">Uploading and running inference on EcoTrack CV backend...</p>
-            </div>
-
-            <!-- Webcam Initial Setup Overlay -->
-            <div id="webcamOverlay" style="position:absolute;inset:0;background:rgba(5,7,12,0.85);z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;color:#fff;">
-              <i class="fas fa-camera" style="font-size:40px;color:var(--primary);margin-bottom:14px;"></i>
-              <h3 style="font-size:16px;font-weight:800;margin-bottom:8px;">Webcam Mode</h3>
-              <p style="color:var(--text-muted);font-size:12px;max-width:320px;margin-bottom:16px;">Initialize camera stream and stand completely in the center of the frame.</p>
-              <button class="btn btn-primary" onclick="initWebcamStream()"><i class="fas fa-power-off" style="margin-right:6px;"></i> Initialize Camera</button>
+              <button class="btn btn-secondary" style="margin-top:14px;background:#ef4444;color:#fff;border:none;" onclick="cancelUpload()">Cancel</button>
             </div>
 
           </div>
@@ -583,7 +632,6 @@
             <div>
               <div style="font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Scanner Telemetry HUD</div>
               
-              <!-- Metrics Grid -->
               <div class="hud-metric-row">
                 <div class="hud-metric-box">
                   <div class="hud-metric-val" id="webFormScoreVal" style="color:var(--primary);">0%</div>
@@ -603,7 +651,6 @@
                 </div>
               </div>
 
-              <!-- HUD Status bar indicators -->
               <div style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;">
                 <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;">
                   <span>Latency:</span>
@@ -615,7 +662,6 @@
                 </div>
               </div>
 
-              <!-- Scan Progress bar -->
               <div style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px;">
                 <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">
                   <span>Scanner Progress</span>
@@ -627,7 +673,6 @@
               </div>
             </div>
 
-            <!-- Controller Row -->
             <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
               <button id="startScanBtn" class="btn btn-primary" style="flex:1;min-width:110px;" onclick="startSession()" disabled>
                 <i class="fas fa-play" style="margin-right:6px;"></i> Start Scan
@@ -641,132 +686,42 @@
             </div>
 
           </div>
-
         </div>
-
       </div>
 
-      <!-- Diagnostic Scan Report (Slide/fade in on stopping scan) -->
+      <!-- Report Card -->
       <div class="report-card" id="reportCard">
         <div id="reportPrintableArea">
           <div class="report-header">
             <div>
-              <h2 style="font-size:22px;font-weight:900;color:var(--text-primary);letter-spacing:-0.5px;margin:0;">
-                📊 Motion Scan Diagnostics Report
-              </h2>
-              <p style="font-size:12px;color:var(--text-secondary);margin-top:2px;font-weight:600;">
-                Generated by EcoTrack Welfare Intelligence engine
-              </p>
+              <h2 style="font-size:22px;font-weight:900;color:var(--text-primary);letter-spacing:-0.5px;margin:0;">📊 Motion Scan Diagnostics Report</h2>
+              <p style="font-size:12px;color:var(--text-secondary);margin-top:2px;font-weight:600;">Generated by EcoTrack Welfare Intelligence engine</p>
             </div>
             <div class="report-grade-circle" id="reportGradeCircle">A</div>
           </div>
-
-          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:20px;margin-bottom:24px;">
-            <div style="background:var(--bg-main);border:1px solid var(--border-color);padding:14px;border-radius:var(--radius-sm);">
-              <div style="font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Subject Profile</div>
-              <div style="font-size:15px;font-weight:800;color:var(--text-primary);margin-top:4px;" id="repSpeciesLabel">Human</div>
-              <div style="font-size:12px;color:var(--text-secondary);" id="repBreedLabel">Standard / Variant</div>
-              <div style="font-size:11px;color:var(--primary);font-weight:700;margin-top:4px;" id="repAccuracyLabel">Species ID Accuracy: 0%</div>
-            </div>
-            
-            <div style="background:var(--bg-main);border:1px solid var(--border-color);padding:14px;border-radius:var(--radius-sm);">
-              <div style="font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Inference Context</div>
-              <div style="font-size:15px;font-weight:800;color:var(--text-primary);margin-top:4px;" id="repExerciseLabel">Squat</div>
-              <div style="font-size:12px;color:var(--text-secondary);" id="repTimestampLabel">2026-08-07</div>
-            </div>
-
-            <div style="background:var(--bg-main);border:1px solid var(--border-color);padding:14px;border-radius:var(--radius-sm);text-align:center;">
-              <div style="font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Reps Count</div>
-              <div style="font-size:24px;font-weight:900;color:var(--text-primary);margin-top:2px;" id="repRepsLabel">0</div>
-            </div>
-          </div>
-
-          <h3 style="font-size:14px;font-weight:800;color:var(--text-primary);text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Biomechanics Performance Scores</h3>
-          
-          <div class="report-metrics-bar">
-            <div>
-              <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;">
-                <span>Form Score</span>
-                <span id="repFormVal">85%</span>
-              </div>
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill" id="repFormBar" style="width: 85%;"></div>
-              </div>
-            </div>
-
-            <div>
-              <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;">
-                <span>Posture Score</span>
-                <span id="repPostureVal">80%</span>
-              </div>
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill" id="repPostureBar" style="width: 80%; background:var(--accent);"></div>
-              </div>
-            </div>
-
-            <div>
-              <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;">
-                <span>Balance Score</span>
-                <span id="repBalanceVal">90%</span>
-              </div>
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill" id="repBalanceBar" style="width: 90%; background:var(--purple);"></div>
-              </div>
-            </div>
-          </div>
-
-          <h3 style="font-size:14px;font-weight:800;color:var(--text-primary);text-transform:uppercase;margin-bottom:12px;margin-top:24px;letter-spacing:0.5px;">📐 Joint Angle Analysis</h3>
-          <div id="repJointAngleList" style="display:flex;flex-direction:column;gap:8px;background:var(--bg-main);border:1px solid var(--border-color);padding:16px;border-radius:var(--radius-sm);margin-bottom:20px;">
-            <!-- Dynamically populated -->
-          </div>
-
-          <h3 style="font-size:14px;font-weight:800;color:var(--text-primary);text-transform:uppercase;margin-bottom:12px;margin-top:24px;letter-spacing:0.5px;">Biomechanical Insights & Feedback</h3>
-          
-          <div class="feedback-list" id="repFeedbackList">
-            <div class="feedback-item">
-              <i class="fas fa-check-circle"></i>
-              <span>Overall joint angles are within stable limits.</span>
-            </div>
-          </div>
+          <div id="repJointAngleList" style="display:flex;flex-direction:column;gap:8px;background:var(--bg-main);border:1px solid var(--border-color);padding:16px;border-radius:var(--radius-sm);margin-bottom:20px;"></div>
+          <div class="feedback-list" id="repFeedbackList"></div>
         </div>
-
         <div class="report-actions">
-          <button class="btn btn-primary" id="saveScanReportBtn" onclick="saveScanReportToDB()">
-            <i class="fas fa-floppy-disk" style="margin-right:6px;"></i> Save Scan to History
-          </button>
-          <button class="btn btn-secondary" onclick="exportReportToPDF()">
-            <i class="fas fa-file-pdf" style="margin-right:6px;color:#ef4444;"></i> Export PDF
-          </button>
-          <button class="btn btn-secondary" onclick="window.print()">
-            <i class="fas fa-print" style="margin-right:6px;"></i> Print Report
-          </button>
+          <button class="btn btn-primary" id="saveScanReportBtn" onclick="saveScanReportToDB()">Save Scan</button>
+          <button class="btn btn-secondary" onclick="exportReportToPDF()">Export PDF</button>
         </div>
-
       </div>
 
     </div>
-
   </main>
-
 </div>
 
 <!-- Scripts -->
 <script src="cv_engine.js"></script>
 <script>
-  // -----------------------------------------------------------------------------
-  // Config & State
-  // -----------------------------------------------------------------------------
   const API_URL = 'http://localhost:5001';
   let activeTheme = 'light';
   let currentUser = null;
-  let currentStream = null;
-  let activeSessionMode = 'webcam'; // 'webcam' or 'upload'
-  
-  // Webcam scanner state
+  let activeSessionMode = 'upload';
   let isScanning = false;
-  let localProgressTimer = null;
-  let progressPct = 0;
   let currentReportData = null;
+  let targetSpeciesFoundDuringSession = false;
   
   // Video upload state
   let selectedVideoFile = null;
@@ -796,7 +751,7 @@
     currentUser = JSON.parse(rawSession);
     
     // Set UI User profile
-    const userName = currentUser.name || "Sasi";
+    const userName = currentUser.name || (currentUser.email ? currentUser.email.split('@')[0] : 'User');
     document.getElementById("topUserName").textContent = userName;
     document.getElementById("sidebarUserName").textContent = userName;
     document.getElementById("sidebarUserEmail").textContent = currentUser.email || "";
@@ -1072,12 +1027,15 @@
     const source = document.getElementById('inputSourceSelect').value;
     activeSessionMode = source;
     
-    stopSession();
+    stopSession(false);
+    document.getElementById('reportCard').style.display = 'none';
+    resetHUDMetrics();
 
     if (source === 'webcam') {
       document.getElementById('videoDropzone').style.display = 'none';
       document.getElementById('webcamOverlay').style.display = 'flex';
       document.getElementById('aiScannerVideo').style.display = 'none';
+      document.getElementById('startScanBtn').disabled = !currentStream;
     } else {
       document.getElementById('webcamOverlay').style.display = 'none';
       document.getElementById('videoDropzone').style.display = 'flex';
@@ -1088,6 +1046,7 @@
         currentStream.getTracks().forEach(track => track.stop());
         currentStream = null;
       }
+      document.getElementById('startScanBtn').disabled = !selectedVideoBase64;
     }
   }
 
@@ -1189,6 +1148,7 @@
   // -----------------------------------------------------------------------------
   function startSession() {
     isScanning = true;
+    targetSpeciesFoundDuringSession = false;
     document.getElementById('startScanBtn').disabled = true;
     document.getElementById('stopScanBtn').disabled = false;
     document.getElementById('reportCard').style.display = 'none';
@@ -1206,9 +1166,9 @@
     }
   }
 
-  function stopSession() {
+  function stopSession(shouldReport = true) {
     isScanning = false;
-    document.getElementById('startScanBtn').disabled = false;
+    document.getElementById('startScanBtn').disabled = (activeSessionMode === 'webcam' ? !currentStream : !selectedVideoBase64);
     document.getElementById('stopScanBtn').disabled = true;
 
     if (activeSessionMode === 'webcam') {
@@ -1222,7 +1182,14 @@
         localProgressTimer = null;
       }
 
-      generateDiagnosticReport();
+      if (shouldReport) {
+        if (!targetSpeciesFoundDuringSession) {
+          alert(`Target species "${document.getElementById('targetSpecies').value.trim()}" was not detected during this scan session. No report was generated.`);
+          document.getElementById('reportCard').style.display = 'none';
+        } else {
+          generateDiagnosticReport();
+        }
+      }
     } else {
       // Stop video playback loop and release resources
       if (activePlaybackVideo) {
@@ -1240,8 +1207,19 @@
       // Restore dropzone container display
       document.getElementById('videoDropzone').style.display = 'flex';
       
-      generateDiagnosticReport();
+      if (shouldReport) {
+        if (!targetSpeciesFoundDuringSession) {
+          alert(`Target species "${document.getElementById('targetSpecies').value.trim()}" was not detected in this video. No report was generated.`);
+          document.getElementById('reportCard').style.display = 'none';
+        } else {
+          generateDiagnosticReport();
+        }
+      }
     }
+
+    // Hide scanner notification banner when not scanning
+    const banner = document.getElementById('scannerNotification');
+    if (banner) banner.style.display = 'none';
   }
 
   function resetSession() {
@@ -1271,8 +1249,14 @@
       currentStream = null;
     }
     
-    // Reset video and overlay display states
-    document.getElementById('webcamOverlay').style.display = 'flex';
+    // Reset video and overlay display states based on mode
+    if (activeSessionMode === 'webcam') {
+      document.getElementById('webcamOverlay').style.display = 'flex';
+      document.getElementById('videoDropzone').style.display = 'none';
+    } else {
+      document.getElementById('webcamOverlay').style.display = 'none';
+      document.getElementById('videoDropzone').style.display = 'flex';
+    }
     document.getElementById('aiScannerVideo').style.display = 'none';
 
     // 3. Handle Video Upload Reset
@@ -1285,14 +1269,17 @@
     
     const fileNameEl = document.getElementById('selectedFileName');
     if (fileNameEl) fileNameEl.textContent = '';
-    
-    document.getElementById('videoDropzone').style.display = 'flex';
 
     // 4. Reset HUD & Report Card states
     resetHUDMetrics();
     window.latestCapturedAngles = {};
     window.latestSpeciesConfidence = 0;
+    targetSpeciesFoundDuringSession = false;
     document.getElementById('reportCard').style.display = 'none';
+
+    // Hide scanner notification banner
+    const banner = document.getElementById('scannerNotification');
+    if (banner) banner.style.display = 'none';
 
     // Adjust button states
     document.getElementById('startScanBtn').disabled = true;
@@ -1310,44 +1297,21 @@
     progressPct = 0;
   }
 
-  // -----------------------------------------------------------------------------
-  // Webcam Inference Run
-  // -----------------------------------------------------------------------------
-  function runWebcamScan(targetSpecies) {
-    const video = document.getElementById('aiScannerVideo');
-    const canvas = document.getElementById('aiScannerCanvas');
-
-    // Make sure we have the drill name
-    const exerciseSelect = document.getElementById('exerciseSelect');
-    const exerciseName = exerciseSelect.options[exerciseSelect.selectedIndex].text;
-    window.currentAiScannerDrill = exerciseName;
-
-    progressPct = 0;
-
-    // Simulate progress increments for UI UX
-    localProgressTimer = setInterval(() => {
-      if (progressPct < 98) {
-        progressPct += 1.5;
-        document.getElementById('aiScannerProgressLabel').textContent = `${Math.floor(progressPct)}%`;
-        document.getElementById('aiScannerProgressBar').style.width = `${Math.floor(progressPct)}%`;
-      }
-    }, 800);
-
-    if (typeof window.runInferenceLoop === 'function') {
-      window.runInferenceLoop(video, canvas, targetSpecies,
-        (errorMsg) => {
-          alert("Webcam scan stopped: " + errorMsg);
-          stopSession();
-        },
-        (progressData) => {
-          // If target is detected, we can trigger telemetry progress
-          if (progressData.targetFound) {
-            if (progressData.confidence) {
-              window.latestSpeciesConfidence = progressData.confidence;
-            }
-          }
-        }
-      );
+  function updateNotificationBanner(targetFound, targetSpecies) {
+    const banner = document.getElementById('scannerNotification');
+    if (!banner) return;
+    
+    banner.style.display = 'flex';
+    if (targetFound) {
+      banner.style.background = 'rgba(16, 185, 129, 0.15)';
+      banner.style.color = '#10b981';
+      banner.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+      banner.innerHTML = `<i class="fas fa-circle-check"></i><span>Tracking active: target species "${targetSpecies}" detected in frame.</span>`;
+    } else {
+      banner.style.background = 'rgba(239, 68, 68, 0.15)';
+      banner.style.color = '#ef4444';
+      banner.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+      banner.innerHTML = `<i class="fas fa-triangle-exclamation"></i><span>Warning: target species "${targetSpecies}" not detected. Please align camera.</span>`;
     }
   }
 
@@ -1355,7 +1319,7 @@
   // Video Processing Inference & Playback Run
   // -----------------------------------------------------------------------------
   async function runVideoUploadScan(targetSpecies, exerciseKey) {
-    if (!selectedVideoBase64) {
+    if (!selectedVideoFile) {
       alert("Please select a video file first.");
       stopSession();
       return;
@@ -1369,42 +1333,133 @@
     pTitle.textContent = 'Processing Video';
     pMsg.textContent = 'Uploading file to EcoTrack server...';
 
-    try {
-      const response = await fetch(`${API_URL}/process-video`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          video_base64: selectedVideoBase64,
-          species: targetSpecies.toLowerCase(),
-          exercise_id: exerciseKey
-        })
-      });
+    // Disable buttons
+    document.getElementById('startScanBtn').disabled = true;
+    document.getElementById('stopScanBtn').disabled = true;
 
-      if (!response.ok) {
-        throw new Error("Backend video processing failed.");
+    const formData = new FormData();
+    formData.append('video', selectedVideoFile);
+    formData.append('species', targetSpecies.toLowerCase());
+    formData.append('exercise_id', exerciseKey);
+    formData.append('user_id', currentUser.id);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_URL}/process-video`, true);
+    
+    // Track upload progress
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 50); // first 50% is upload
+        document.getElementById('aiScannerProgressLabel').textContent = `${pct}%`;
+        document.getElementById('aiScannerProgressBar').style.width = `${pct}%`;
+        pMsg.textContent = `Uploading video file: ${pct}%`;
       }
+    };
 
-      const data = await response.json();
-      if (!data.success || !data.frames || data.frames.length === 0) {
-        alert("Species or keypoints could not be analyzed in this video. Please try another recording.");
+    xhr.onload = async () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        // Next 50% is processing progress simulation
+        let procPct = 50;
+        const interval = setInterval(() => {
+          if (procPct < 95) {
+            procPct += 5;
+            document.getElementById('aiScannerProgressLabel').textContent = `${procPct}%`;
+            document.getElementById('aiScannerProgressBar').style.width = `${procPct}%`;
+            pMsg.textContent = `Analyzing motion posture: ${procPct}%`;
+          }
+        }, 300);
+
+        try {
+          const data = JSON.parse(xhr.responseText);
+          clearInterval(interval);
+          
+          document.getElementById('aiScannerProgressLabel').textContent = '100%';
+          document.getElementById('aiScannerProgressBar').style.width = '100%';
+          
+          if (!data.success || !data.reports || data.reports.length === 0) {
+            alert(`Target species "${targetSpecies}" was not detected in the video. Please verify the target and try again.`);
+            overlay.style.display = 'none';
+            stopSession(false);
+            return;
+          }
+
+          // Handle multi-target reports
+          window.activeVideoReports = data.reports;
+          window.activeReportIndex = 0;
+          
+          const targetSelect = document.getElementById('targetSelect');
+          targetSelect.innerHTML = '';
+          data.reports.forEach((rep, index) => {
+            const opt = document.createElement('option');
+            opt.value = index;
+            opt.textContent = `${rep.targetId} (Form: ${rep.formScore}%, Reps: ${rep.repsCompleted})`;
+            targetSelect.appendChild(opt);
+          });
+          document.getElementById('targetSelectionContainer').style.display = data.reports.length > 1 ? 'block' : 'none';
+
+          const initialReport = data.reports[0];
+          processedVideoFrames = initialReport.frames;
+          targetSpeciesFoundDuringSession = true;
+          overlay.style.display = 'none';
+          
+          // Start skeletal playback
+          playbackVideoInference(data);
+        } catch (e) {
+          clearInterval(interval);
+          alert("Error parsing server response.");
+          overlay.style.display = 'none';
+          stopSession(false);
+        }
+      } else {
+        alert("Server returned error: " + xhr.statusText);
         overlay.style.display = 'none';
-        stopSession();
-        return;
+        stopSession(false);
       }
+    };
 
-      processedVideoFrames = data.frames;
+    xhr.onerror = () => {
+      alert("Network error occurred during video upload.");
       overlay.style.display = 'none';
-      
-      // Start skeletal playback on canvas
-      playbackVideoInference(data);
+      stopSession(false);
+    };
 
-    } catch (err) {
-      console.error(err);
-      alert("Error uploading or processing video. Verify local Python API is running.");
-      overlay.style.display = 'none';
-      stopSession();
-    }
+    xhr.send(formData);
   }
+
+  window.changeActivePlaybackTarget = function() {
+    const val = parseInt(document.getElementById('targetSelect').value) || 0;
+    window.activeReportIndex = val;
+    const report = window.activeVideoReports[val];
+    processedVideoFrames = report.frames;
+    
+    currentReportData = {
+      detectedSpecies: report.detectedSpecies,
+      detectedBreed: report.detectedBreed || 'Standard / Variant',
+      exerciseName: report.exerciseName,
+      exerciseId: report.exerciseId,
+      formScore: report.formScore,
+      postureScore: report.postureScore,
+      balanceScore: report.balanceScore,
+      repsCompleted: report.repsCompleted,
+      grade: report.grade,
+      timestamp: report.timestamp,
+      boundingBox: report.boundingBox,
+      keypoints: report.keypoints,
+      jointAngles: report.jointAngles,
+      jointSummaries: report.jointSummaries,
+      coachingTip: report.coachingTip,
+      isFullBodyVisible: report.isFullBodyVisible
+    };
+    
+    // Refresh HUD displays for the new selection
+    document.getElementById('webFormScoreVal').textContent = `${report.formScore}%`;
+    document.getElementById('webRepCountVal').textContent = report.repsCompleted;
+    document.getElementById('webPostureScoreVal').textContent = `${report.postureScore}%`;
+    document.getElementById('webBalanceScoreVal').textContent = `${report.balanceScore}%`;
+    
+    // Refresh diagnostic report UI
+    generateDiagnosticReport();
+  };
 
   // Skeleton playback simulation on canvas
   function playbackVideoInference(data) {
@@ -1518,10 +1573,52 @@
     });
 
     // 2. Exercise Rules matching & Joint Status color assignment
-    let formScore = 100;
-    let postureScore = 85;
-    let balanceScore = 90;
+    let formScore = 0;
+    let postureScore = 100;
+    let balanceScore = 100;
     
+    // Calculate dynamic real posture and balance scores based on geometry
+    if (isHuman) {
+      // Torso alignment relative to vertical y-axis
+      const l_sh = kpMap['left_shoulder'];
+      const l_hip = kpMap['left_hip'];
+      if (l_sh && l_hip && l_sh.visibility > 0.4 && l_hip.visibility > 0.4) {
+        const dx = l_sh.x - l_hip.x;
+        const dy = l_sh.y - l_hip.y;
+        const angleRad = Math.atan2(Math.abs(dx), Math.abs(dy));
+        const angleDeg = angleRad * 180 / Math.PI;
+        postureScore = Math.max(0, Math.round(100 - angleDeg * 2.2));
+      }
+      
+      // Shoulder symmetry for balance
+      const r_sh = kpMap['right_shoulder'];
+      if (l_sh && r_sh && l_sh.visibility > 0.4 && r_sh.visibility > 0.4) {
+        const heightDiff = Math.abs(l_sh.y - r_sh.y);
+        const normDiff = heightDiff / bbox.height;
+        balanceScore = Math.max(0, Math.round(100 - normDiff * 350));
+      }
+    } else {
+      // Quadruped: spine alignment (Neck to root_of_tail) relative to horizontal x-axis
+      const neck = kpMap['Neck'];
+      const tail = kpMap['root_of_tail'];
+      if (neck && tail && neck.visibility > 0.4 && tail.visibility > 0.4) {
+        const dx = neck.x - tail.x;
+        const dy = neck.y - tail.y;
+        const angleRad = Math.atan2(Math.abs(dy), Math.abs(dx));
+        const angleDeg = angleRad * 180 / Math.PI;
+        postureScore = Math.max(0, Math.round(100 - angleDeg * 2.5));
+      }
+      
+      // Shoulder balance
+      const l_sh = kpMap['L_Shoulder'];
+      const r_sh = kpMap['R_Shoulder'];
+      if (l_sh && r_sh && l_sh.visibility > 0.4 && r_sh.visibility > 0.4) {
+        const heightDiff = Math.abs(l_sh.y - r_sh.y);
+        const normDiff = heightDiff / bbox.height;
+        balanceScore = Math.max(0, Math.round(100 - normDiff * 350));
+      }
+    }
+
     if (exercise && exercise.rules) {
       let totalScore = 0;
       let count = 0;
@@ -1565,11 +1662,9 @@
         playbackRepTrackingState.lastY = currentY;
       }
     } else {
-      // Fallback if no rules matched
-      formScore = 90;
-      postureScore = 88;
-      balanceScore = 92;
-      playbackRepCount = Math.min(8, Math.floor(index / 25));
+      // If no specific exercise rules are defined, form score is average of posture and balance
+      formScore = Math.round((postureScore + balanceScore) / 2);
+      playbackRepCount = 0; // Explicitly set reps to 0 for generic scans
     }
 
     document.getElementById('webFormScoreVal').textContent = `${formScore}%`;
@@ -1692,30 +1787,16 @@
   function generateDiagnosticReport() {
     const report = document.getElementById('reportCard');
     
-    // Read scores from telemetry HUD elements
-    const form = parseInt(document.getElementById('webFormScoreVal').textContent) || 85;
-    const reps = parseInt(document.getElementById('webRepCountVal').textContent) || 0;
-    const posture = parseInt(document.getElementById('webPostureScoreVal').textContent) || 80;
-    const balance = parseInt(document.getElementById('webBalanceScoreVal').textContent) || 90;
+    // Read scores from telemetry HUD elements or currentReportData
+    const form = currentReportData ? currentReportData.formScore : (parseInt(document.getElementById('webFormScoreVal').textContent) || 85);
+    const reps = currentReportData ? currentReportData.repsCompleted : (parseInt(document.getElementById('webRepCountVal').textContent) || 0);
+    const posture = currentReportData ? currentReportData.postureScore : (parseInt(document.getElementById('webPostureScoreVal').textContent) || 80);
+    const balance = currentReportData ? currentReportData.balanceScore : (parseInt(document.getElementById('webBalanceScoreVal').textContent) || 90);
     
-    const species = document.getElementById('targetSpecies').value.trim();
-    const breed = document.getElementById('breedVariant').value.trim() || 'Standard / Variant';
-    
-    // Read exercise select and resolve if "Other" custom name was entered
-    const exerciseSelect = document.getElementById('exerciseSelect');
-    const exerciseVal = exerciseSelect.value;
-    let exercise = exerciseSelect.options[exerciseSelect.selectedIndex].text;
-    if (exerciseVal === 'other') {
-      const customInput = document.getElementById('customExerciseInput').value.trim();
-      exercise = customInput || 'Other Exercise';
-    }
-    
-    // Determine Grade letter
-    let grade = 'B';
-    if (form >= 90) grade = 'A';
-    else if (form >= 75) grade = 'B';
-    else if (form >= 60) grade = 'C';
-    else grade = 'D';
+    const species = currentReportData ? currentReportData.detectedSpecies : document.getElementById('targetSpecies').value.trim();
+    const breed = (currentReportData && currentReportData.detectedBreed) ? currentReportData.detectedBreed : (document.getElementById('breedVariant').value.trim() || 'Standard / Variant');
+    const exercise = currentReportData ? currentReportData.exerciseName : 'Video Scan';
+    const grade = currentReportData ? currentReportData.grade : (form >= 90 ? 'A' : form >= 75 ? 'B' : form >= 60 ? 'C' : 'D');
 
     // Populate report elements
     document.getElementById('reportGradeCircle').textContent = grade;
@@ -1744,31 +1825,39 @@
     
     const isHuman = species.toLowerCase().includes('human') || species.toLowerCase().includes('person');
     const template = isHuman ? SKELETON_TEMPLATES.human : SKELETON_TEMPLATES.animal;
+    const exerciseSelect = document.getElementById('exerciseSelect');
+    const exerciseVal = exerciseSelect.value;
     const exerciseRules = EXERCISE_RULES[exerciseVal];
-    const angles = window.latestCapturedAngles || {};
+    const angles = currentReportData && currentReportData.jointAngles ? currentReportData.jointAngles : (window.latestCapturedAngles || {});
 
     template.triplets.forEach(triplet => {
       const jointKey = triplet.b; // Vertex key
       const jointLabel = triplet.label || jointKey.replace(/_/g, ' ');
       
       const angle = angles[jointKey];
-      if (angle === undefined || isNaN(angle)) return; // Skip non-measured joints
       
-      let statusLabel = 'Normal (Active tracking)';
-      let color = '#3b82f6'; // Blue for tracked but not evaluated under rules
+      let statusLabel = 'Unavailable';
+      let color = '#64748b'; // Gray for unavailable
+      let displayAngle = 'Unavailable';
       
-      if (exerciseRules && exerciseRules.rules && exerciseRules.rules[jointKey]) {
-        const rule = exerciseRules.rules[jointKey];
-        const tolerance = rule.tolerance || 10;
-        if (angle >= rule.min && angle <= rule.max) {
-          statusLabel = `Optimal (target: ${rule.min}°-${rule.max}°)`;
-          color = '#10b981'; // Green
-        } else if (angle >= (rule.min - tolerance) && angle <= (rule.max + tolerance)) {
-          statusLabel = `Warning (target: ${rule.min}°-${rule.max}°)`;
-          color = '#f59e0b'; // Yellow
-        } else {
-          statusLabel = `Incorrect (target: ${rule.min}°-${rule.max}°)`;
-          color = '#ef4444'; // Red
+      if (angle !== undefined && !isNaN(angle) && angle !== null) {
+        displayAngle = `${angle}°`;
+        statusLabel = 'Normal (Active tracking)';
+        color = '#3b82f6'; // Blue
+        
+        if (exerciseRules && exerciseRules.rules && exerciseRules.rules[jointKey]) {
+          const rule = exerciseRules.rules[jointKey];
+          const tolerance = rule.tolerance || 10;
+          if (angle >= rule.min && angle <= rule.max) {
+            statusLabel = `Optimal (target: ${rule.min}°-${rule.max}°)`;
+            color = '#10b981'; // Green
+          } else if (angle >= (rule.min - tolerance) && angle <= (rule.max + tolerance)) {
+            statusLabel = `Warning (target: ${rule.min}°-${rule.max}°)`;
+            color = '#f59e0b'; // Yellow
+          } else {
+            statusLabel = `Incorrect (target: ${rule.min}°-${rule.max}°)`;
+            color = '#ef4444'; // Red
+          }
         }
       }
 
@@ -1785,7 +1874,7 @@
           <span style="font-size:13px;font-weight:700;color:var(--text-primary);text-transform:capitalize;">${jointLabel}</span>
         </div>
         <div style="display:flex;align-items:center;gap:16px;">
-          <span style="font-size:13px;font-weight:800;color:var(--text-primary);">${angle}°</span>
+          <span style="font-size:13px;font-weight:800;color:var(--text-primary);">${displayAngle}</span>
           <span style="font-size:10px;font-weight:700;color:${color};padding:2px 8px;border-radius:12px;background-color:${color}15;border:1px solid ${color}33;">${statusLabel}</span>
         </div>
       `;
@@ -1827,18 +1916,20 @@
     });
 
     // Save report data for SQLite DB save
-    currentReportData = {
-      detectedSpecies: species,
-      detectedBreed: breed,
-      exerciseName: exercise,
-      exerciseId: exerciseVal === 'other' ? 'other_' + exercise.toLowerCase().replace(/\s+/g, '_') : exerciseVal,
-      formScore: form,
-      postureScore: posture,
-      balanceScore: balance,
-      repsCompleted: reps,
-      grade: grade,
-      timestamp: new Date().toISOString()
-    };
+    if (!currentReportData) {
+      currentReportData = {
+        detectedSpecies: species,
+        detectedBreed: breed,
+        exerciseName: exercise,
+        exerciseId: exerciseVal === 'other' ? 'other_' + exercise.toLowerCase().replace(/\s+/g, '_') : exerciseVal,
+        formScore: form,
+        postureScore: posture,
+        balanceScore: balance,
+        repsCompleted: reps,
+        grade: grade,
+        timestamp: new Date().toISOString()
+      };
+    }
 
     // Reveal report card
     report.style.display = 'block';
@@ -1850,7 +1941,7 @@
     saveBtn.innerHTML = '<i class="fas fa-floppy-disk" style="margin-right:6px;"></i> Save Scan to History';
   }
 
-  // Save report to Flask Backend sqlite
+  // Save report to Express Backend sqlite
   async function saveScanReportToDB() {
     if (!currentReportData) return;
 
@@ -1862,14 +1953,19 @@
       ...currentReportData,
       scanId: `web_scan_${Date.now()}`,
       user_id: currentUser.id || 'usr1',
-      scannerVersion: '2.0.0-standalone',
-      analysisSource: 'standalone_page_ai'
+      scannerVersion: '3.0.0-web',
+      analysisSource: 'backend_ai'
     };
 
+    let authHeaders = { 'Content-Type': 'application/json' };
+    if (currentUser && currentUser.token) {
+      authHeaders['Authorization'] = `Bearer ${currentUser.token}`;
+    }
+
     try {
-      const res = await fetch(`${API_URL}/scan-save`, {
+      const res = await fetch(`http://localhost:5000/api/ai/scan-save`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify(payload)
       });
 
@@ -1882,7 +1978,7 @@
     } catch {
       saveBtn.disabled = false;
       saveBtn.innerHTML = '<i class="fas fa-circle-xmark"></i> Failed to Save';
-      alert("Failed to connect to backend Flask sqlite server.");
+      alert("Failed to save scan to Express backend server.");
     }
   }
 

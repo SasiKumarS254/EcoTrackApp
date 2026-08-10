@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -10,6 +10,8 @@ import Svg, { Rect } from "react-native-svg";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Radius, Shadow, FontSize } from "@/constants/theme";
+import { useFocusEffect, router } from "expo-router";
+import { fetchEvents, registerForEvent, fetchRegisteredEvents } from "../../services/api";
 
 const { width } = Dimensions.get("window");
 
@@ -55,88 +57,7 @@ type Service = {
   contactInfo: string;
 };
 
-const INITIAL_EVENTS: Event[] = [
-  {
-    id: 1,
-    title: "Wildlife Rescue Camp",
-    date: "20 June 2026",
-    location: "Chennai Wildlife Reserve",
-    image: "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=600",
-    description: "Join wildlife experts and rescue injured animals in a hands-on camp.",
-    longDescription: "This intensive weekend camp is designed for animal lovers who want to learn real-world rescue techniques. You will shadow senior veterinarians, participate in rehabilitation sessions for raptors, and learn how to safely transport injured mammals. All equipment and basic meals provided.",
-    category: "Rescue",
-    attendees: 142,
-    isFree: true,
-    price: 0,
-    refundPolicy: "Full refund available up to 48 hours before the event.",
-    coordinates: { lat: 12.9229, lng: 80.1275 },
-    organizer: "EcoTrack Foundation"
-  },
-  {
-    id: 2,
-    title: "International Dog Exhibition",
-    date: "28 June 2026",
-    location: "Bangalore Expo Center",
-    image: "https://images.unsplash.com/photo-1517849845537-4d257902454a?w=600",
-    description: "Showcase dog breeds, participate in competitions, meet breeders.",
-    longDescription: "The biggest canine event of the year! Over 500 breeds on display, agility competitions, grooming workshops, and stalls from the top pet care brands in Asia. Special sessions on advanced obedience using AI tracking tools. Tickets include a goodie bag for your pet.",
-    category: "Exhibition",
-    attendees: 894,
-    isFree: false,
-    price: 499,
-    refundPolicy: "80% refundable until 24h before. No refunds on the day of event.",
-    coordinates: { lat: 12.9716, lng: 77.5946 },
-    organizer: "Kennel Club India"
-  },
-  {
-    id: 3,
-    title: "National Adoption Drive",
-    date: "5 July 2026",
-    location: "Chennai SPCA",
-    image: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=600",
-    description: "Adopt a rescued dog or cat and give them a loving forever home.",
-    longDescription: "Find your new best friend at our monthly adoption drive. Over 50 dogs and cats from various shelters will be present. All animals are vaccinated, dewormed, and microchipped. Adoption counselors will be on site to help you find the perfect match for your lifestyle.",
-    category: "Adoption",
-    attendees: 320,
-    isFree: true,
-    price: 0,
-    refundPolicy: "Not applicable.",
-    coordinates: { lat: 13.0827, lng: 80.2707 },
-    organizer: "Blue Cross India"
-  },
-  {
-    id: 4,
-    title: "Bird Conservation Seminar",
-    date: "12 July 2026",
-    location: "TNAU Auditorium, Coimbatore",
-    image: "https://images.unsplash.com/photo-1444464666168-49d633b86797?w=600",
-    description: "Expert talks on endangered bird species conservation and habitat protection.",
-    longDescription: "A gathering of ornithologists and conservationists to discuss the state of migratory birds in South India. Topics include wetland protection, pesticide impacts, and how citizen scientists can contribute to bird counts using the EcoTrack app.",
-    category: "Conservation",
-    attendees: 68,
-    isFree: true,
-    price: 0,
-    refundPolicy: "Not applicable.",
-    coordinates: { lat: 11.0168, lng: 76.9558 },
-    organizer: "Bird Watch India"
-  },
-  {
-    id: 5,
-    title: "AI Animal Training Workshop",
-    date: "19 July 2026",
-    location: "Virtual + Chennai Hub",
-    image: "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=600",
-    description: "Learn AI-powered training techniques for pets and wild animals.",
-    longDescription: "Discover how machine learning and skeleton mapping are revolutionizing animal training. This workshop covers the basics of using the AI Scanner for behavior correction, focus training, and monitoring rehabilitation progress in injured animals.",
-    category: "Training",
-    attendees: 210,
-    isFree: false,
-    price: 999,
-    refundPolicy: "50% Refundable. No-show will not be refunded.",
-    coordinates: { lat: 13.0475, lng: 80.2089 },
-    organizer: "EcoTrack AI Labs"
-  },
-];
+const INITIAL_EVENTS: Event[] = [];
 
 const INITIAL_SERVICES: Service[] = [
   {
@@ -211,39 +132,109 @@ export default function EventsScreen() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [registered, setRegistered] = useState<number[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
 
-  // Persistence: Load events & tickets on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const storedEvents = await AsyncStorage.getItem("@ecotrack_events_list");
-        if (storedEvents) setEvents(JSON.parse(storedEvents));
+  // Persistence: Load events & tickets on focus/mount
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      const loadEventsData = async () => {
+        try {
+          const raw = await AsyncStorage.getItem("@ecotrack_user_session");
+          let currentUid = null;
+          if (raw) {
+            const sess = JSON.parse(raw);
+            currentUid = sess.user_id;
+            if (userId !== sess.user_id) {
+              setRegistered([]);
+              setTickets([]);
+              setEvents([]);
+            }
+            setUserId(sess.user_id);
+          } else {
+            if (userId !== null) {
+              setRegistered([]);
+              setTickets([]);
+              setEvents([]);
+            }
+            setUserId(null);
+          }
 
-        const storedReg = await AsyncStorage.getItem("@ecotrack_events_registered");
-        if (storedReg) setRegistered(JSON.parse(storedReg));
+          // Load from backend
+          const backendEvents = await fetchEvents();
+          if (isMounted && backendEvents && backendEvents.length > 0) {
+            const mapped = backendEvents.map((ev: any) => ({
+              id: ev.id,
+              title: ev.title,
+              date: ev.date || "TBD",
+              location: ev.location || "TBD",
+              image: ev.image_url || ev.image || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400",
+              description: ev.description || "",
+              longDescription: ev.long_description || ev.description || "",
+              category: ev.category || "General",
+              attendees: ev.attendees || 0,
+              isFree: ev.price === 0,
+              price: ev.price || 0,
+              organizer: ev.organizer || "EcoTrack"
+            }));
+            setEvents(mapped);
+          } else {
+            const listKey = currentUid ? `@ecotrack_events_list_${currentUid}` : "@ecotrack_events_list";
+            const storedEvents = await AsyncStorage.getItem(listKey);
+            if (storedEvents && isMounted) setEvents(JSON.parse(storedEvents));
+          }
 
-        const storedTickets = await AsyncStorage.getItem("@ecotrack_events_tickets");
-        if (storedTickets) setTickets(JSON.parse(storedTickets));
-      } catch (e) {
-        console.warn("Error loading events data", e);
-      }
-    })();
-  }, []);
+          if (currentUid) {
+            const regs = await fetchRegisteredEvents(currentUid);
+            if (isMounted && regs) {
+              const regIds = regs.map((r: any) => r.event_id);
+              setRegistered(regIds);
+
+              const mappedTickets = regs.map((r: any) => {
+                return {
+                  eventId: r.event_id,
+                  serialNumber: r.ticket_id,
+                  qrData: `ECOTRACK-${r.event_id}-${r.ticket_id}`,
+                  purchaseDate: r.registered_at ? new Date(r.registered_at).toLocaleDateString() : new Date().toLocaleDateString()
+                };
+              });
+              setTickets(mappedTickets);
+            }
+          } else {
+            const regKey = currentUid ? `@ecotrack_events_registered_${currentUid}` : "@ecotrack_events_registered";
+            const storedReg = await AsyncStorage.getItem(regKey);
+            if (storedReg && isMounted) setRegistered(JSON.parse(storedReg));
+
+            const ticketKey = currentUid ? `@ecotrack_events_tickets_${currentUid}` : "@ecotrack_events_tickets";
+            const storedTickets = await AsyncStorage.getItem(ticketKey);
+            if (storedTickets && isMounted) setTickets(JSON.parse(storedTickets));
+          }
+        } catch (e) {
+          console.warn("Error loading events data", e);
+        }
+      };
+      loadEventsData();
+      return () => { isMounted = false; };
+    }, [userId])
+  );
 
   // Persistence: Save events, registered, and tickets on change
   useEffect(() => {
-    AsyncStorage.setItem("@ecotrack_events_list", JSON.stringify(events)).catch(() => {});
-  }, [events]);
+    const listKey = userId ? `@ecotrack_events_list_${userId}` : "@ecotrack_events_list";
+    AsyncStorage.setItem(listKey, JSON.stringify(events)).catch(() => {});
+  }, [events, userId]);
 
   useEffect(() => {
-    AsyncStorage.setItem("@ecotrack_events_registered", JSON.stringify(registered)).catch(() => {});
-  }, [registered]);
+    const regKey = userId ? `@ecotrack_events_registered_${userId}` : "@ecotrack_events_registered";
+    AsyncStorage.setItem(regKey, JSON.stringify(registered)).catch(() => {});
+  }, [registered, userId]);
 
   useEffect(() => {
-    AsyncStorage.setItem("@ecotrack_events_tickets", JSON.stringify(tickets)).catch(() => {});
-  }, [tickets]);
+    const ticketKey = userId ? `@ecotrack_events_tickets_${userId}` : "@ecotrack_events_tickets";
+    AsyncStorage.setItem(ticketKey, JSON.stringify(tickets)).catch(() => {});
+  }, [tickets, userId]);
 
   // Host Event State
   const [newTitle, setNewTitle] = useState("");
@@ -305,8 +296,19 @@ export default function EventsScreen() {
     confirmReservation(id, title);
   };
 
-  const confirmReservation = (id: number, title: string) => {
-    const serial = "ET-" + Math.random().toString(36).substr(2, 9).toUpperCase();
+  const confirmReservation = async (id: number, title: string) => {
+    let serial = "ET-" + Math.random().toString(36).substr(2, 9).toUpperCase();
+    if (userId) {
+      try {
+        const res = await registerForEvent(id);
+        if (res && res.registration) {
+          serial = res.registration.ticket_id;
+        }
+      } catch (e) {
+        console.warn("Backend event registration failed, using offline ticket fallback", e);
+      }
+    }
+
     const newTicket: Ticket = {
       eventId: id,
       serialNumber: serial,

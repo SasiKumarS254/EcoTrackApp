@@ -80,22 +80,13 @@ let otpTimerInterval = null;
 let currentOtpState = { email: "", otp: "", expiresAt: 0, verified: false };
 
 function getRegisteredAccounts() {
-  const defaultAccounts = {
-    "user@ecotrack.org": {
-      id: "user_default_01",
-      email: "user@ecotrack.org",
-      password: "password123",
-      name: "EcoTrack Member",
-      bio: "EcoTrack member • Wildlife enthusiast",
-      avatar: "https://ui-avatars.com/api/?name=EcoTrack+Member&background=10b981&color=fff",
-      stats: { rescues: 12, xp: 450, plans: 3, scans: 28 }
-    }
-  };
+  // No default accounts — all accounts must come from the backend
+  // The only defaults we allow are read from localStorage (previously backend-registered users)
+  const defaultAccounts = {};
   try {
     const raw = localStorage.getItem("@ecotrack_registered_accounts");
     if (raw) {
-      const parsed = JSON.parse(raw);
-      return { ...defaultAccounts, ...parsed };
+      return JSON.parse(raw);
     }
   } catch (err) {
     console.error("Error reading registered accounts:", err);
@@ -442,8 +433,16 @@ async function handleResetPassword(e) {
 }
 
 function completeLogin(user, token) {
-  currentUser = user;
-  window.currentUser = user;
+  // Clear any previous user's in-memory state to prevent cross-user leakage
+  COMMUNITY_POSTS = [];
+  userPets = [];
+  cart = [];
+  favorites = [];
+  chatHistory = {};
+
+  currentUser = { ...user, token };
+  window.currentUser = currentUser;
+
   const session = { ...user, token, loggedInAt: new Date().toISOString() };
   localStorage.setItem("@ecotrack_web_session", JSON.stringify(session));
 
@@ -518,7 +517,9 @@ function handleLogout() {
   localStorage.removeItem("@ecotrack_web_session");
   currentUser = null;
   window.currentUser = null;
+  // Clear all in-memory user state
   cart = []; favorites = []; chatHistory = {};
+  COMMUNITY_POSTS = []; userPets = [];
 
   // Clean DOM elements and forms for next user session
   const container = document.getElementById("trainingResultContainer");
@@ -577,7 +578,7 @@ function initApp() {
 
 function updateSidebarUser() {
   if (!currentUser) return;
-  const name = currentUser.name || "Eco Explorer";
+  const name = currentUser.name || (currentUser.email ? currentUser.email.split('@')[0] : 'User');
   const email = currentUser.email || "";
   const initial = name.charAt(0).toUpperCase();
 
@@ -594,6 +595,11 @@ function updateSidebarUser() {
     }
   }
 }
+
+window.switchTab = switchTab;
+window.updateSidebarUser = updateSidebarUser;
+window.completeLogin = completeLogin;
+window.handleLogout = handleLogout;
 
 // ══════════════════════════════════════════════════
 // NAVIGATION
@@ -2225,7 +2231,7 @@ async function submitNewPost() {
 
   const postData = {
     user_id: currentUser.id,
-    user: currentUser.name || "Eco Explorer",
+    user: currentUser.name || (currentUser.email ? currentUser.email.split('@')[0] : 'User'),
     avatar: currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name || "E")}&background=10b981&color=fff`,
     caption: caption || "",
     image: mediaUrl,

@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Image, Alert, StatusBar, Dimensions, Modal,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -46,13 +46,7 @@ type Accessory = {
   speciesTarget: string;
 };
 
-const INITIAL_LISTINGS: Listing[] = [
-  { id: 1, name: "Golden Retriever", age: "2 Years", price: "₹15,000", location: "Chennai", distance: "2.5 km", image: "https://images.unsplash.com/photo-1552053831-71594a27632d?w=400", verified: true, vaccinated: true, type: "sale", breed: "Golden Retriever", recommendation: "Great with children. Highly trainable.", sellerId: "usr_user1", sellerName: "Alice Green" },
-  { id: 2, name: "Persian Cat", age: "1 Year", price: "₹8,000", location: "Madurai", distance: "4 km", image: "https://images.unsplash.com/photo-1519052537078-e6302a4968d4?w=400", verified: false, vaccinated: true, type: "sale", breed: "Persian", recommendation: "Perfect for apartment living.", sellerId: "usr_user2", sellerName: "Bob Forester" },
-  { id: 3, name: "Macaw Parrot", age: "8 Months", price: "₹12,000", location: "Coimbatore", distance: "6 km", image: "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=400", verified: true, vaccinated: false, type: "sale", breed: "Scarlet Macaw", recommendation: "Highly intelligent and social.", sellerId: "usr_user3", sellerName: "Charlie Eco" },
-  { id: 4, name: "Indie Dog (Rescued)", age: "1.5 Years", price: "Free", location: "Chennai", distance: "3 km", image: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400", verified: true, vaccinated: true, type: "adoption", breed: "Indian Pariah", recommendation: "Very loyal and low-maintenance.", sellerId: "usr_user1", sellerName: "Alice Green" },
-  { id: 5, name: "Mini Rabbit", age: "4 Months", price: "₹3,500", location: "Trichy", distance: "8 km", image: "https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?w=400", verified: false, vaccinated: false, type: "sale", breed: "Holland Lop", recommendation: "Great starter pet for families.", sellerId: "usr_user2", sellerName: "Bob Forester" },
-];
+const INITIAL_LISTINGS: Listing[] = [];
 
 const INITIAL_ACCESSORIES: Accessory[] = [
   { id: 1, name: "Premium Dog Food (5kg)", priceNum: 1200, priceStr: "₹1,200", image: "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=300", category: "Food", speciesTarget: "Dog" },
@@ -102,60 +96,84 @@ export default function MarketplaceScreen() {
 
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Persistence: Load on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem("@ecotrack_user_session");
-        if (raw) {
-          const sess = JSON.parse(raw);
-          setUserId(sess.user_id);
-          
-          // Load cart from backend
-          const backendCart = await fetchCart(sess.user_id);
-          setCart(backendCart);
+  // Persistence: Load on focus/mount
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      const loadMarketplace = async () => {
+        try {
+          const raw = await AsyncStorage.getItem("@ecotrack_user_session");
+          let currentUid = null;
+          if (raw) {
+            const sess = JSON.parse(raw);
+            currentUid = sess.user_id;
+            if (userId !== sess.user_id) {
+              // Reset state for new user
+              setCart([]);
+              setFavorites([]);
+              setListings([]);
+            }
+            setUserId(sess.user_id);
+            
+            // Load cart from backend
+            const backendCart = await fetchCart(sess.user_id);
+            if (isMounted) setCart(backendCart || []);
 
-          // Load favorites from backend
-          const backendFavs = await apiFetchFavorites(sess.user_id);
-          setFavorites(backendFavs);
-        } else {
-          // fallback offline
-          const storedCart = await AsyncStorage.getItem("@ecotrack_cart");
-          if (storedCart) setCart(JSON.parse(storedCart));
+            // Load favorites from backend
+            const backendFavs = await apiFetchFavorites(sess.user_id);
+            if (isMounted) setFavorites(backendFavs || []);
+          } else {
+            if (userId !== null) {
+              setCart([]);
+              setFavorites([]);
+              setListings([]);
+            }
+            setUserId(null);
+            
+            // fallback offline
+            const storedCart = await AsyncStorage.getItem("@ecotrack_cart");
+            if (storedCart && isMounted) setCart(JSON.parse(storedCart));
 
-          const storedFavs = await AsyncStorage.getItem("@ecotrack_favorites");
-          if (storedFavs) setFavorites(JSON.parse(storedFavs));
+            const storedFavs = await AsyncStorage.getItem("@ecotrack_favorites");
+            if (storedFavs && isMounted) setFavorites(JSON.parse(storedFavs));
+          }
+
+          // Load listings from backend
+          const backendListings = await apiFetchListings();
+          if (isMounted) {
+            if (backendListings && backendListings.length > 0) {
+              const mapped = backendListings.map((item: any) => ({
+                id: item.id,
+                name: item.title,
+                breed: item.breed || "Mixed Breed",
+                age: item.age || "Unknown",
+                price: item.price === 0 ? "Free" : `₹${item.price.toLocaleString("en-IN")}`,
+                location: item.location || "Local",
+                distance: "Local",
+                image: item.image_url || item.image || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400",
+                verified: item.seller?.verified || true,
+                vaccinated: item.vaccinated || true,
+                type: item.type === "adoption" ? "adoption" : "sale",
+                recommendation: item.description || "Healthy, gentle temperament.",
+                sellerId: item.seller?.id || "usr_user1",
+                sellerName: item.seller?.name || item.sellerName || "Alice Green"
+              }));
+              setListings(mapped);
+            } else {
+              const uId = currentUid || userId;
+              const key = uId ? `@ecotrack_listings_${uId}` : "@ecotrack_listings";
+              const storedListings = await AsyncStorage.getItem(key);
+              if (storedListings && isMounted) setListings(JSON.parse(storedListings));
+            }
+          }
+        } catch (e) {
+          console.warn("Error loading marketplace state", e);
         }
-
-        // Load listings from backend
-        const backendListings = await apiFetchListings();
-        if (backendListings && backendListings.length > 0) {
-          const mapped = backendListings.map((item: any) => ({
-            id: item.id,
-            name: item.title,
-            breed: item.breed || "Mixed Breed",
-            age: item.age || "Unknown",
-            price: item.price === 0 ? "Free" : `₹${item.price.toLocaleString("en-IN")}`,
-            location: item.location || "Local",
-            distance: "Local",
-            image: item.image_url || item.image || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400",
-            verified: item.seller?.verified || true,
-            vaccinated: item.vaccinated || true,
-            type: item.type === "adoption" ? "adoption" : "sale",
-            recommendation: item.description || "Healthy, gentle temperament.",
-            sellerId: item.seller?.id || "usr_user1",
-            sellerName: item.seller?.name || item.sellerName || "Alice Green"
-          }));
-          setListings(mapped);
-        } else {
-          const storedListings = await AsyncStorage.getItem("@ecotrack_listings");
-          if (storedListings) setListings(JSON.parse(storedListings));
-        }
-      } catch (e) {
-        console.warn("Error loading marketplace state", e);
-      }
-    })();
-  }, []);
+      };
+      loadMarketplace();
+      return () => { isMounted = false; };
+    }, [userId])
+  );
 
   // Persistence: Save on change
   useEffect(() => {
@@ -405,54 +423,61 @@ export default function MarketplaceScreen() {
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* ANIMALS & ADOPTION LISTINGS */}
         {activeTab === "animals" && (
-          <View style={styles.listGrid}>
-            {filteredListings.map((item) => {
-              const isFav = favorites.includes(item.id);
-              return (
-                <View key={item.id} style={styles.card}>
-                  <View style={styles.imageBox}>
-                    <Image source={{ uri: item.image }} style={styles.cardImg} />
-                    <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(item.id)}>
-                      <Ionicons name={isFav ? "heart" : "heart-outline"} size={18} color={isFav ? colors.danger : "#fff"} />
-                    </TouchableOpacity>
-                    <View style={styles.cardBadges}>
-                      {item.verified && (
-                        <View style={styles.verifiedTag}>
-                          <Ionicons name="shield-checkmark" size={10} color="#fff" />
-                          <Text style={styles.tagText}>Verified</Text>
+          filteredListings.length === 0 ? (
+            <View style={[styles.emptyCart, { width: width - 32, alignSelf: 'center', marginTop: 40 }]}>
+              <Ionicons name="paw-outline" size={56} color={colors.textMuted} />
+              <Text style={styles.emptyText}>No animal listings found. Click '+' to post a new listing.</Text>
+            </View>
+          ) : (
+            <View style={styles.listGrid}>
+              {filteredListings.map((item) => {
+                const isFav = favorites.includes(item.id);
+                return (
+                  <View key={item.id} style={styles.card}>
+                    <View style={styles.imageBox}>
+                      <Image source={{ uri: item.image }} style={styles.cardImg} />
+                      <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(item.id)}>
+                        <Ionicons name={isFav ? "heart" : "heart-outline"} size={18} color={isFav ? colors.danger : "#fff"} />
+                      </TouchableOpacity>
+                      <View style={styles.cardBadges}>
+                        {item.verified && (
+                          <View style={styles.verifiedTag}>
+                            <Ionicons name="shield-checkmark" size={10} color="#fff" />
+                            <Text style={styles.tagText}>Verified</Text>
+                          </View>
+                        )}
+                        <View style={[styles.typeBadge, { backgroundColor: item.type === 'adoption' ? colors.secondary : colors.primary }]}>
+                          <Text style={styles.tagText}>{item.type === 'adoption' ? 'Adoption' : 'For Sale'}</Text>
                         </View>
-                      )}
-                      <View style={[styles.typeBadge, { backgroundColor: item.type === 'adoption' ? colors.secondary : colors.primary }]}>
-                        <Text style={styles.tagText}>{item.type === 'adoption' ? 'Adoption' : 'For Sale'}</Text>
                       </View>
                     </View>
-                  </View>
 
-                  <View style={styles.cardContent}>
-                    <View style={styles.titleRow}>
-                      <Text style={styles.cardTitle}>{item.name}</Text>
-                      <Text style={[styles.priceTag, item.price === 'Free' && { color: colors.secondary }]}>{item.price}</Text>
+                    <View style={styles.cardContent}>
+                      <View style={styles.titleRow}>
+                        <Text style={styles.cardTitle}>{item.name}</Text>
+                        <Text style={[styles.priceTag, item.price === 'Free' && { color: colors.secondary }]}>{item.price}</Text>
+                      </View>
+                      <View style={styles.metaRow}>
+                        <View style={styles.metaItem}><Ionicons name="paw" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.breed}</Text></View>
+                        <View style={styles.metaItem}><Ionicons name="time" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.age}</Text></View>
+                        <View style={styles.metaItem}><Ionicons name="location" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.distance}</Text></View>
+                      </View>
+
+                      <Text style={styles.recText}>{item.recommendation}</Text>
+
+                      <TouchableOpacity
+                        style={styles.contactBtn}
+                        onPress={() => router.push(`/chat/${item.sellerId || item.id}?name=${encodeURIComponent(item.sellerName || item.name)}`)}
+                      >
+                        <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
+                        <Text style={styles.contactText}>Message Seller</Text>
+                      </TouchableOpacity>
                     </View>
-                    <View style={styles.metaRow}>
-                      <View style={styles.metaItem}><Ionicons name="paw" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.breed}</Text></View>
-                      <View style={styles.metaItem}><Ionicons name="time" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.age}</Text></View>
-                      <View style={styles.metaItem}><Ionicons name="location" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.distance}</Text></View>
-                    </View>
-
-                    <Text style={styles.recText}>{item.recommendation}</Text>
-
-                    <TouchableOpacity
-                      style={styles.contactBtn}
-                      onPress={() => router.push(`/chat/${item.sellerId || item.id}?name=${encodeURIComponent(item.sellerName || item.name)}`)}
-                    >
-                      <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
-                      <Text style={styles.contactText}>Message Seller</Text>
-                    </TouchableOpacity>
                   </View>
-                </View>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
+          )
         )}
 
         {/* PRODUCTS & ACCESSORIES */}

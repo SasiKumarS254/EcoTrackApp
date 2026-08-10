@@ -57,25 +57,13 @@ export default function SignupScreen() {
       };
       await AsyncStorage.setItem("@ecotrack_user_session", JSON.stringify(session));
       await AsyncStorage.setItem("@ecotrack_user_id", data.user.id);
-
+      await AsyncStorage.setItem("@ecotrack_auth_token", data.token);
+ 
       Alert.alert("🎉 Welcome!", `Your account is ready, ${data.user.name}!`, [
         { text: "Explore EcoTrack", onPress: () => router.replace("/(tabs)") },
       ]);
-    } catch (err) {
-      // Offline fallback
-      const userId = "local_" + email.replace(/[^a-z0-9]/gi, "_");
-      const session = {
-        user_id: userId,
-        email: email.trim(),
-        name: name.trim() || email.split("@")[0],
-        token: "offline_token",
-        loggedInAt: new Date().toISOString(),
-      };
-      await AsyncStorage.setItem("@ecotrack_user_session", JSON.stringify(session));
-      await AsyncStorage.setItem("@ecotrack_user_id", userId);
-      Alert.alert("🎉 Account Ready!", "Signed up in offline mode.", [
-        { text: "Continue", onPress: () => router.replace("/(tabs)") },
-      ]);
+    } catch (err: any) {
+      Alert.alert("Signup Failed", "EcoTrack server is offline or unreachable. Please verify the backend is running.");
     } finally {
       setIsLoading(false);
     }

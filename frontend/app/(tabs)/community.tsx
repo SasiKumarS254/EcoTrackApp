@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -8,14 +8,17 @@ import * as ImagePicker from "expo-image-picker";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Radius, Shadow, FontSize } from "@/constants/theme";
+import { router, useFocusEffect } from "expo-router";
 import {
   fetchCommunityPosts, createCommunityPost, likeCommunityPost, commentCommunityPost
 } from "../../services/api";
 
-type CommentItem = { id: number; user: string; text: string; time: string };
+type CommentItem = { id: number; userId?: string; user: string; text: string; time: string };
 
 type Post = {
   id: number;
+  userId?: string;
+  user_id?: string;
   user: string;
   avatar: string;
   image: string;
@@ -26,106 +29,80 @@ type Post = {
   liked?: boolean;
   comments: CommentItem[];
 };
-
-const INITIAL_POSTS: Post[] = [
-  {
-    id: 1,
-    user: "Dr. Ananya (Vet)",
-    avatar: "https://randomuser.me/api/portraits/women/45.jpg",
-    image: "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=600",
-    caption: "🏥 Health Tip: If your pet gets a deep cut, flush immediately with 0.9% sterile saline and apply sterile bandage. Avoid alcohol on open cuts! #HealthAndCare #VetTips",
-    likes: 342,
-    time: "1h ago",
-    category: "Health & Care",
-    liked: false,
-    comments: [
-      { id: 101, user: "Rohan", text: "Thanks Dr. Ananya! Super helpful advice.", time: "45m ago" },
-      { id: 102, user: "Sarah", text: "Can I use chlorhexidine cream?", time: "30m ago" },
-    ],
-  },
-  {
-    id: 2,
-    user: "Rex Canine Academy",
-    avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-    image: "https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600",
-    caption: "🐕 Training Milestone: High-value rewards + 15 min daily sessions achieved 98% recall accuracy for German Shepherds! Check the Training tab for full schedule. #TrainingTips",
-    likes: 512,
-    time: "3h ago",
-    category: "Training Tips",
-    liked: true,
-    comments: [
-      { id: 103, user: "Kavya", text: "Tried this algorithm today with my puppy, worked like magic!", time: "2h ago" },
-    ],
-  },
-  {
-    id: 3,
-    user: "Western Ghats Rescue",
-    avatar: "https://randomuser.me/api/portraits/men/72.jpg",
-    image: "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=600",
-    caption: "🦜 Wildlife Sighting: Spotted a pair of Great Indian Hornbills in Coimbatore forest reserve. Safe habitat protected! #Wildlife #Conservation",
-    likes: 728,
-    time: "6h ago",
-    category: "Sightings",
-    liked: false,
-    comments: [],
-  },
-];
-
 const CATEGORIES = ["All", "Health & Care", "Training Tips", "Sightings", "General"];
 
 export default function CommunityScreen() {
   const { colors, isDark } = useTheme();
   const styles = React.useMemo(() => getStyles(colors, isDark), [colors, isDark]);
 
-  const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
 
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("You");
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
 
-  // Persistence: Load posts on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem("@ecotrack_user_session");
-        let uId = "";
-        if (raw) {
-          const sess = JSON.parse(raw);
-          setUserId(sess.user_id);
-          setUserName(sess.name || "You");
-          uId = sess.user_id;
-        }
+  // Persistence: Load posts on focus/mount
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      const loadPosts = async () => {
+        try {
+          const raw = await AsyncStorage.getItem("@ecotrack_user_session");
+          let uId = "";
+          if (raw) {
+            const sess = JSON.parse(raw);
+            if (userId !== sess.user_id) {
+              setPosts([]); // clear state of previous user immediately to avoid stale data flash
+            }
+            setUserId(sess.user_id);
+            setUserName(sess.name || "You");
+            setUserAvatar(sess.avatar || null);
+            uId = sess.user_id;
+          } else {
+            setUserId(null);
+            setUserName("You");
+            setUserAvatar(null);
+          }
 
-        const backendPosts = await fetchCommunityPosts(uId || undefined);
-        if (backendPosts && backendPosts.length > 0) {
-          const mapped = backendPosts.map((p: any) => ({
-            id: p.id,
-            user: p.user || "EcoTracker",
-            avatar: p.avatar || "https://randomuser.me/api/portraits/women/22.jpg",
-            image: p.media || p.image || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=600",
-            caption: p.content || p.caption || "",
-            likes: p.likes || 0,
-            time: p.timestamp ? new Date(p.timestamp).toLocaleDateString() : "Just now",
-            category: p.category || "General",
-            liked: p.liked || false,
-            comments: (p.comments || []).map((c: any) => ({
-              id: c.id,
-              user: c.user || "User",
-              text: c.text,
-              time: c.timestamp ? new Date(c.timestamp).toLocaleDateString() : "Just now"
-            }))
-          }));
-          setPosts(mapped);
-        } else {
-          const stored = await AsyncStorage.getItem("@ecotrack_community_posts");
-          if (stored) setPosts(JSON.parse(stored));
+          const backendPosts = await fetchCommunityPosts(uId || undefined);
+          if (isMounted) {
+            if (backendPosts && backendPosts.length > 0) {
+              const mapped = backendPosts.map((p: any) => ({
+                id: p.id,
+                userId: p.user_id || p.userId, // Save post author user_id
+                user: p.user || "EcoTracker",
+                avatar: p.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.user || "EcoTracker")}&background=10b981&color=fff`,
+                image: p.media || p.image || "",
+                caption: p.content || p.caption || "",
+                likes: p.likes || 0,
+                time: p.timestamp ? new Date(p.timestamp).toLocaleDateString() : "Just now",
+                category: p.category || "General",
+                liked: p.liked || false,
+                comments: (p.comments || []).map((c: any) => ({
+                  id: c.id,
+                  userId: c.user_id || c.userId, // Save comment author user_id
+                  user: c.user || "User",
+                  text: c.text,
+                  time: c.timestamp ? new Date(c.timestamp).toLocaleDateString() : "Just now"
+                }))
+              }));
+              setPosts(mapped);
+            } else {
+              const key = uId ? `@ecotrack_community_posts_${uId}` : "@ecotrack_community_posts";
+              const stored = await AsyncStorage.getItem(key);
+              if (stored && isMounted) setPosts(JSON.parse(stored));
+            }
+          }
+        } catch (e) {
+          console.warn("Error loading community posts", e);
         }
-      } catch (e) {
-        console.warn("Error loading community posts", e);
-      }
-    })();
-  }, []);
+      };
+      loadPosts();
+      return () => { isMounted = false; };
+    }, [userId])
+  );
 
   // Persistence: Save posts on change
   useEffect(() => {
@@ -181,8 +158,8 @@ export default function CommunityScreen() {
     const postData = {
       user: userName,
       user_id: userId,
-      avatar: "https://randomuser.me/api/portraits/women/22.jpg",
-      media: postImage || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=600",
+      avatar: userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=10b981&color=fff`,
+      media: postImage || "",
       content: postCaption,
       category: postCategory
     };
@@ -194,8 +171,8 @@ export default function CommunityScreen() {
         const mapped = backendPosts.map((p: any) => ({
           id: p.id,
           user: p.user || "EcoTracker",
-          avatar: p.avatar || "https://randomuser.me/api/portraits/women/22.jpg",
-          image: p.media || p.image || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=600",
+          avatar: p.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.user || "EcoTracker")}&background=10b981&color=fff`,
+          image: p.media || p.image || "",
           caption: p.content || p.caption || "",
           likes: p.likes || 0,
           time: p.timestamp ? new Date(p.timestamp).toLocaleDateString() : "Just now",
@@ -213,9 +190,9 @@ export default function CommunityScreen() {
     } catch {
       const newPost: Post = {
         id: Date.now(),
-        user: "You (EcoTracker)",
-        avatar: "https://randomuser.me/api/portraits/women/22.jpg",
-        image: postImage || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=600",
+        user: userName || "You (EcoTracker)",
+        avatar: userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=10b981&color=fff`,
+        image: postImage || "",
         caption: postCaption,
         likes: 1,
         time: "Just now",
@@ -239,7 +216,7 @@ export default function CommunityScreen() {
       user_id: userId || "local",
       user_name: userName,
       text: newCommentInput.trim(),
-      avatar: "https://randomuser.me/api/portraits/women/22.jpg"
+      avatar: userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=10b981&color=fff`
     };
 
     try {
@@ -338,7 +315,15 @@ export default function CommunityScreen() {
         {filteredPosts.map((post) => (
           <View key={post.id} style={styles.postCard}>
             {/* User Row */}
-            <View style={styles.userRow}>
+            <TouchableOpacity 
+              style={styles.userRow}
+              onPress={() => {
+                const id = post.userId || post.user_id;
+                if (id) {
+                  router.push(`/profile/${id}` as any);
+                }
+              }}
+            >
               <Image source={{ uri: post.avatar }} style={styles.avatar} />
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={styles.userName}>{post.user}</Text>
@@ -347,7 +332,7 @@ export default function CommunityScreen() {
               <View style={styles.catBadge}>
                 <Text style={styles.catBadgeText}>{post.category}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* Image */}
             <Image source={{ uri: post.image }} style={styles.postImg} />

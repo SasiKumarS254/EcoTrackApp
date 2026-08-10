@@ -60,7 +60,16 @@ export interface TrainingAnalyticsState {
   lastAnalysis: MotionAnalysisResult | null;
 }
 
-const STORAGE_KEY = '@ecotrack_training_analytics_v4';
+const BASE_STORAGE_KEY = '@ecotrack_training_analytics_v4';
+
+async function getStorageKey(): Promise<string> {
+  try {
+    const raw = await AsyncStorage.getItem("@ecotrack_user_id");
+    return raw ? `${BASE_STORAGE_KEY}_${raw}` : BASE_STORAGE_KEY;
+  } catch {
+    return BASE_STORAGE_KEY;
+  }
+}
 
 const DEFAULT_STATE: TrainingAnalyticsState = {
   avgFormScore: 0,
@@ -77,7 +86,8 @@ const DEFAULT_STATE: TrainingAnalyticsState = {
 
 export async function getTrainingAnalytics(): Promise<TrainingAnalyticsState> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const key = await getStorageKey();
+    const raw = await AsyncStorage.getItem(key);
     if (!raw) return DEFAULT_STATE;
     return JSON.parse(raw) as TrainingAnalyticsState;
   } catch {
@@ -87,7 +97,8 @@ export async function getTrainingAnalytics(): Promise<TrainingAnalyticsState> {
 
 export async function resetTrainingAnalytics(): Promise<TrainingAnalyticsState> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_STATE));
+    const key = await getStorageKey();
+    await AsyncStorage.setItem(key, JSON.stringify(DEFAULT_STATE));
   } catch { /* ignore */ }
   return DEFAULT_STATE;
 }
@@ -151,7 +162,8 @@ export async function saveTrainingAnalytics(
       lastAnalysis: analysis,
     };
 
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    const key = await getStorageKey();
+    await AsyncStorage.setItem(key, JSON.stringify(updated));
     return updated;
   } catch {
     return DEFAULT_STATE;

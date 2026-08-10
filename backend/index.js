@@ -133,7 +133,7 @@ app.post('/api/auth/signup', (req, res) => {
   const result = db.createUser(email, name, password);
   if (result.error) return res.status(409).json({ error: result.error });
   const { password_hash, ...safeUser } = result.user;
-  const token = "ecotrack_" + Buffer.from(result.user.id + ":" + email).toString('base64');
+  const token = "ecotrack_" + Buffer.from(safeUser.id + ":" + safeUser.email).toString('base64');
   res.json({ message: "Account created successfully", token, user: safeUser });
 });
 
@@ -151,7 +151,7 @@ app.post('/api/auth/login', (req, res) => {
   if (loginRes.error) return res.status(401).json({ error: loginRes.error });
 
   const { password_hash, ...safeUser } = loginRes.user;
-  const token = "ecotrack_" + Buffer.from(safeUser.id + ":" + email).toString('base64');
+  const token = "ecotrack_" + Buffer.from(safeUser.id + ":" + safeUser.email).toString('base64');
   res.json({ message: "Login successful", token, user: safeUser });
 });
 
@@ -319,7 +319,7 @@ app.get('/api/social/notifications', (req, res) => {
       SELECT n.*, u.name as actor_name, p.avatar_url as actor_avatar
       FROM Notifications n
       JOIN Users u ON n.actor_id = u.id
-      JOIN Profiles p ON p.user_id = u.id
+      LEFT JOIN Profiles p ON p.user_id = u.id
       WHERE n.recipient_id = ?
       ORDER BY n.created_at DESC
     `).all(req.user.id);
@@ -558,13 +558,17 @@ app.get('/api/encyclopedia/:id', (req, res) => {
 });
 
 app.post('/api/encyclopedia/save', (req, res) => {
-  const { user_id, entry_id } = req.body;
-  if (!user_id || !entry_id) return res.status(400).json({ error: 'user_id and entry_id required' });
+  const { entry_id } = req.body;
+  const user_id = req.user.id; // SECURITY: Enforce authenticated user ID
+  if (!entry_id) return res.status(400).json({ error: 'entry_id required' });
   const saved = db.saveEncyclopediaEntry(user_id, entry_id);
   res.json({ message: 'Species saved to collection', saved });
 });
 
 app.get('/api/encyclopedia/saved/:userId', (req, res) => {
+  if (req.params.userId !== req.user.id) {
+    return res.status(403).json({ error: "Forbidden: Access denied" });
+  }
   res.json(db.getSavedEncyclopedia(req.params.userId));
 });
 
@@ -757,34 +761,155 @@ app.post('/api/cart/:userId/checkout', (req, res) => {
 // COMMUNITY
 // ══════════════════════════════════════════════
 app.get('/api/community', (req, res) => {
-  const userId = req.query.user_id;
-  const posts = db.getPosts({ category: req.query.category });
-  const result = posts.map(p => ({
-    ...p,
-    liked: userId ? (p.liked_by || []).includes(userId) : false
-  }));
-  res.json(result);
+  try {
+    const socialDb = getSocialDB();
+    const currentUserId = req.user ? req.user.id : null;
+    const filterCategory = req.query.category || 'All';
+    const targetUserId = req.query.user_id || '';
+
+    let query = `
+      SELECT p.*,
+             u.name as author_name, u.ecotrack_id as author_ecotrack_id,
+             pr.avatar_url as author_avatar, pr.vet_status,
+             (SELECT COUNT(*) FROM Likes l WHERE l.post_id = p.id) as likes_count,
+             (SELECT COUNT(*) FROM Comments c WHERE c.post_id = p.id) as comments_count,
+             EXISTS(SELECT 1 FROM Likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_me
+      FROM Posts p
+      JOIN Users u ON p.user_id = u.id
+      LEFT JOIN Profiles pr ON p.user_id = pr.user_id
+      WHERE 1=1
+    `;
+    const params = [currentUserId || ''];
+
+    if (targetUserId) {
+      query += ` AND p.user_id = ?`;
+      params.push(targetUserId);
+    }
+
+    if (filterCategory && filterCategory !== 'All') {
+      if (filterCategory === 'Health & Care' || filterCategory === 'veterinary') {
+        query += ` AND (p.post_type = 'veterinary' OR pr.vet_status = 1)`;
+      } else if (filterCategory === 'Training Tips' || filterCategory === 'training') {
+        query += ` AND p.post_type = 'training'`;
+      } else if (filterCategory === 'Sightings' || filterCategory === 'sightings') {
+        query += ` AND p.post_type = 'sightings'`;
+      } else {
+        query += ` AND p.post_type = ?`;
+        params.push(filterCategory.toLowerCase());
+      }
+    }
+
+    query += ` ORDER BY p.created_at DESC LIMIT 50`;
+
+    const posts = socialDb.prepare(query).all(...params);
+
+    const commentStmt = socialDb.prepare(`
+      SELECT c.*, u.name as author_name, pr.avatar_url as author_avatar
+      FROM Comments c
+      JOIN Users u ON c.user_id = u.id
+      LEFT JOIN Profiles pr ON c.user_id = pr.user_id
+      WHERE c.post_id = ?
+      ORDER BY c.created_at ASC
+    `);
+
+    const result = posts.map(p => {
+      const dbComments = commentStmt.all(p.id);
+      
+      const mediaList = p.media_urls ? JSON.parse(p.media_urls) : [];
+      const imageVal = mediaList[0] || '';
+
+      const commentsMapped = dbComments.map(c => ({
+        id: c.id,
+        user: c.author_name,
+        user_name: c.author_name,
+        text: c.text,
+        timestamp: c.created_at,
+        created_at: c.created_at,
+        avatar: c.author_avatar
+      }));
+
+      return {
+        id: p.id,
+        user_id: p.user_id,
+        user: p.author_name,
+        author_name: p.author_name,
+        avatar: p.author_avatar,
+        author_avatar: p.author_avatar,
+        image: imageVal,
+        media: imageVal,
+        media_urls: mediaList,
+        content: p.content,
+        caption: p.content,
+        likes: p.likes_count,
+        likes_count: p.likes_count,
+        timestamp: p.created_at,
+        created_at: p.created_at,
+        time: p.created_at,
+        category: p.post_type === 'veterinary' ? 'Health & Care' : (p.post_type === 'training' ? 'Training Tips' : (p.post_type === 'sightings' ? 'Sightings' : 'General')),
+        liked: !!p.liked_by_me,
+        liked_by_me: !!p.liked_by_me,
+        comments: commentsMapped
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/community', (req, res) => {
-  const post = db.addPost(req.body);
-  res.json({ message: "Post published", post });
+  try {
+    const user_id = req.user.id;
+    const { content, caption, media, media_urls, category, post_type } = req.body;
+
+    const finalContent = content || caption || '';
+    const finalMedia = media ? [media] : (media_urls || []);
+    let finalPostType = post_type || 'general';
+    if (category) {
+      if (category === 'Health & Care') finalPostType = 'veterinary';
+      else if (category === 'Training Tips') finalPostType = 'training';
+      else finalPostType = category.toLowerCase();
+    }
+
+    const post = db.addPost({
+      user_id,
+      content: finalContent,
+      media_urls: finalMedia,
+      post_type: finalPostType
+    });
+
+    res.json({ message: "Post published", post });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/community/:id/like', (req, res) => {
-  const { user_id } = req.body;
-  if (!user_id) return res.status(400).json({ error: "user_id required" });
-  const post = db.likePost(parseInt(req.params.id), user_id);
-  if (!post) return res.status(404).json({ error: "Post not found" });
-  res.json({ message: "Like toggled", post, liked: (post.liked_by || []).includes(user_id) });
+  try {
+    const user_id = req.user.id;
+    const postId = parseInt(req.params.id, 10);
+    const post = db.likePost(postId, user_id);
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    const socialDb = getSocialDB();
+    const liked = !!socialDb.prepare(`SELECT 1 FROM Likes WHERE user_id = ? AND post_id = ?`).get(user_id, postId);
+    res.json({ message: "Like toggled", post, liked });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/community/:id/comment', (req, res) => {
-  const { user_id, user_name, text, avatar } = req.body;
-  if (!user_id || !text) return res.status(400).json({ error: "user_id and text required" });
-  const post = db.addComment(parseInt(req.params.id), user_id, user_name || "User", text, avatar);
-  if (!post) return res.status(404).json({ error: "Post not found" });
-  res.json({ message: "Comment added", post });
+  try {
+    const user_id = req.user.id;
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: "text required" });
+    const post = db.addComment(parseInt(req.params.id), user_id, null, text, null);
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    res.json({ message: "Comment added", post });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ══════════════════════════════════════════════
@@ -820,15 +945,18 @@ app.get('/api/events', (req, res) => {
 });
 
 app.post('/api/events/:id/register', (req, res) => {
-  const { user_id, user_name } = req.body;
-  if (!user_id) return res.status(400).json({ error: "user_id required" });
-  const result = db.registerForEvent(parseInt(req.params.id), user_id, user_name || "User");
+  const user_id = req.user.id; // SECURITY: Enforce authenticated user ID
+  const user_name = req.user.name || "EcoTrack User";
+  const result = db.registerForEvent(parseInt(req.params.id), user_id, user_name);
   if (!result) return res.status(404).json({ error: "Event not found" });
   if (result.error) return res.status(400).json({ error: result.error });
   res.json({ message: "Successfully registered for event", registration: result });
 });
 
 app.get('/api/events/registrations/:userId', (req, res) => {
+  if (req.params.userId !== req.user.id) {
+    return res.status(403).json({ error: "Forbidden: Access denied" });
+  }
   res.json(db.getUserEventRegistrations(req.params.userId));
 });
 
@@ -933,6 +1061,9 @@ app.get('/api/ai/models-and-datasets', (req, res) => {
  * Get user exercise progression and unlocked exercises state.
  */
 app.get('/api/user/progress/:userId', (req, res) => {
+  if (req.params.userId !== req.user.id) {
+    return res.status(403).json({ error: "Forbidden: Access denied" });
+  }
   const prog = db.getUserProgress(req.params.userId);
   res.json(prog);
 });
@@ -942,6 +1073,7 @@ app.get('/api/user/progress/:userId', (req, res) => {
  * Save a complete scan with all real CV data.
  */
 app.post('/api/ai/scan-save', (req, res) => {
+  req.body.user_id = req.user.id; // SECURITY: Enforce authenticated user ID
   const scan = db.saveScanFull(req.body);
   res.json({ message: 'Scan saved successfully', scan });
 });
@@ -1076,8 +1208,30 @@ app.post('/api/ai/training-pipeline', (req, res) => {
  * Proxy to Python service to extract frames and process the video file.
  */
 app.post('/api/ai/process-video', async (req, res) => {
+  if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+    try {
+      const resp = await fetch('http://localhost:5001/process-video', {
+        method: 'POST',
+        headers: {
+          'content-type': req.headers['content-type'],
+        },
+        body: req,
+        duplex: 'half',
+      });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`AI Service error: ${errText}`);
+      }
+      const data = await resp.json();
+      return res.json(data);
+    } catch (err) {
+      console.error('Multipart proxy error:', err.message);
+      return res.status(500).json({ error: 'Video processing failed', details: err.message });
+    }
+  }
+
   const { video_base64, species, exercise_id } = req.body;
-  if (!video_base64) return res.status(400).json({ error: 'video_base64 required' });
+  if (!video_base64) return res.status(400).json({ error: 'video_base64 or multipart file required' });
 
   if (!tfLoaded) {
     return res.status(503).json({ error: 'AI service not ready — video processing unavailable' });
@@ -1112,7 +1266,8 @@ app.post('/api/ai/analytics-sync', (req, res) => {
  * Get complete scan history for a user.
  */
 app.get('/api/ai/scan-history', (req, res) => {
-  const history = db.getFullScanHistory(req.user.id);
+  const userId = req.user.id; // SECURITY: Strict user isolation
+  const history = db.getFullScanHistory(userId);
   res.json(history);
 });
 /**
@@ -1173,11 +1328,55 @@ try {
   console.error("❌ Eager DB initialization failed:", e.message);
 }
 
+// GET /api/social/me — returns current authenticated user's own full social profile
+app.get('/api/social/me', (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log(`[Social/Me] Fetching profile for ID: ${userId} (${req.user.email})`);
+
+    const fullProfile = db.getUserProfile(userId);
+    if (!fullProfile) {
+      console.warn(`[Social/Me] Profile not found in DB for ID: ${userId}`);
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    const socialDb = getSocialDB();
+    const followersCount = socialDb.prepare(`SELECT COUNT(*) as count FROM Followers WHERE following_id = ? AND status = 'Approved'`).get(userId).count;
+    const followingCount = socialDb.prepare(`SELECT COUNT(*) as count FROM Followers WHERE follower_id = ? AND status = 'Approved'`).get(userId).count;
+
+    const profile = {
+      ...fullProfile,
+      social_links: fullProfile.social_links ? (typeof fullProfile.social_links === 'string' ? JSON.parse(fullProfile.social_links) : fullProfile.social_links) : {},
+      is_owner: true,
+      followers_count: followersCount,
+      following_count: followingCount,
+      reputation_score: fullProfile.stats?.xp || 120,
+      impact_stats: fullProfile.impactStats,
+      // Priority fields for robust rendering
+      display_name: fullProfile.display_name || fullProfile.name,
+      avatar_url: fullProfile.avatar_url || fullProfile.avatar,
+      profession: fullProfile.profession,
+      bio: fullProfile.bio
+    };
+
+    console.log(`[Social/Me] Returning profile for ${profile.name}. Rescues: ${profile.impactStats.rescues}`);
+    res.json({
+      profile,
+      impactStats: fullProfile.impactStats,
+      achievements: fullProfile.achievements,
+      pets: fullProfile.pets
+    });
+  } catch (err) {
+    console.error('[Social/Me] CRITICAL Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/social/posts
 app.get('/api/social/posts', (req, res) => {
   try {
     const socialDb = getSocialDB();
-    const currentUserId = req.query.current_user_id || 'usr1';
+    const currentUserId = req.user.id;  // Always from auth token — never from query param
     const filter = req.query.filter || 'All';
     const search = req.query.search || '';
     const hashtag = req.query.hashtag || '';
@@ -1194,7 +1393,7 @@ app.get('/api/social/posts', (req, res) => {
              EXISTS(SELECT 1 FROM SavedPosts s WHERE s.post_id = p.id AND s.user_id = ?) as saved_by_me
       FROM Posts p
       JOIN Users u ON p.user_id = u.id
-      JOIN Profiles pr ON p.user_id = pr.user_id
+      LEFT JOIN Profiles pr ON p.user_id = pr.user_id
       WHERE 1=1
     `;
     const params = [currentUserId, currentUserId];
@@ -1241,7 +1440,7 @@ app.get('/api/social/posts', (req, res) => {
       SELECT c.*, u.name as author_name, pr.avatar_url as author_avatar
       FROM Comments c
       JOIN Users u ON c.user_id = u.id
-      JOIN Profiles pr ON c.user_id = pr.user_id
+      LEFT JOIN Profiles pr ON c.user_id = pr.user_id
       WHERE c.post_id = ?
       ORDER BY c.created_at ASC
     `);
@@ -1250,7 +1449,7 @@ app.get('/api/social/posts', (req, res) => {
       SELECT r.*, u.name as author_name, pr.avatar_url as author_avatar
       FROM Replies r
       JOIN Users u ON r.user_id = u.id
-      JOIN Profiles pr ON r.user_id = pr.user_id
+      LEFT JOIN Profiles pr ON r.user_id = pr.user_id
       WHERE r.comment_id = ?
       ORDER BY r.created_at ASC
     `);
@@ -1289,13 +1488,15 @@ app.get('/api/social/posts', (req, res) => {
 app.post('/api/social/posts', (req, res) => {
   try {
     const socialDb = getSocialDB();
-    const {
-      user_id, content, media_urls, media_types, post_type,
+    const { user_id: _, content, media_urls, media_types, post_type,
       training_achievement, scanner_report, encyclopedia_discovery,
       event_participation, marketplace_purchase, rescued_animal,
       certificate, environmental_milestones, privacy_visibility,
       location_tag, animal_tag, hashtags
     } = req.body;
+
+    // Always use the authenticated user's ID — never trust user_id from the request body
+    const user_id = req.user.id;
 
     if (!user_id) return res.status(400).json({ error: 'user_id required' });
 
@@ -1352,8 +1553,8 @@ app.post('/api/social/posts/:id/like', (req, res) => {
   try {
     const socialDb = getSocialDB();
     const postId = req.params.id;
-    const { user_id } = req.body;
-    if (!user_id) return res.status(400).json({ error: 'user_id required' });
+    const user_id = req.user.id;  // Always use token identity, not request body
+    if (!user_id) return res.status(401).json({ error: 'Authentication required' });
 
     const existing = socialDb.prepare(`SELECT 1 FROM Likes WHERE user_id = ? AND post_id = ?`).get(user_id, postId);
 
@@ -1387,8 +1588,9 @@ app.post('/api/social/posts/:id/bookmark', (req, res) => {
   try {
     const socialDb = getSocialDB();
     const postId = req.params.id;
-    const { user_id, collection_name } = req.body;
-    if (!user_id) return res.status(400).json({ error: 'user_id required' });
+    const { collection_name } = req.body;
+    const user_id = req.user.id;  // Always use token identity, not request body
+    if (!user_id) return res.status(401).json({ error: 'Authentication required' });
 
     const existing = socialDb.prepare(`SELECT 1 FROM SavedPosts WHERE user_id = ? AND post_id = ?`).get(user_id, postId);
 
@@ -1414,8 +1616,9 @@ app.post('/api/social/posts/:id/comments', (req, res) => {
   try {
     const socialDb = getSocialDB();
     const postId = req.params.id;
-    const { user_id, text, media_url } = req.body;
-    if (!user_id || !text) return res.status(400).json({ error: 'user_id and text required' });
+    const { text, media_url } = req.body;
+    const user_id = req.user.id;  // Always use token identity, not request body
+    if (!user_id || !text) return res.status(400).json({ error: 'text required' });
 
     const result = socialDb.prepare(`
       INSERT INTO Comments (post_id, user_id, text, media_url, created_at)
@@ -1443,8 +1646,9 @@ app.post('/api/social/comments/:id/replies', (req, res) => {
   try {
     const socialDb = getSocialDB();
     const commentId = req.params.id;
-    const { post_id, user_id, text, parent_reply_id } = req.body;
-    if (!post_id || !user_id || !text) return res.status(400).json({ error: 'post_id, user_id and text required' });
+    const { post_id, text, parent_reply_id } = req.body;
+    const user_id = req.user.id;  // Always use token identity
+    if (!post_id || !user_id || !text) return res.status(400).json({ error: 'post_id and text required' });
 
     const result = socialDb.prepare(`
       INSERT INTO Replies (comment_id, post_id, user_id, parent_reply_id, text, created_at)
@@ -1470,19 +1674,20 @@ app.get('/api/social/profile/:userIdOrEcoId', (req, res) => {
   try {
     const socialDb = getSocialDB();
     const identifier = req.params.userIdOrEcoId;
-    const currentUserId = req.query.current_user_id || 'usr1';
+    // Use token user for owner determination — cannot be spoofed via query param
+    const currentUserId = req.user.id;
 
     const user = socialDb.prepare(`
       SELECT u.id, u.ecotrack_id, u.email, u.name, u.role, u.created_at,
              p.*
       FROM Users u
-      JOIN Profiles p ON u.id = p.user_id
+      LEFT JOIN Profiles p ON u.id = p.user_id
       WHERE u.id = ? OR u.ecotrack_id = ?
     `).get(identifier, identifier);
 
     if (!user) return res.status(404).json({ error: 'Profile not found' });
 
-    const isOwner = (currentUserId === user.id) || (currentUserId === user.ecotrack_id) || (identifier === 'usr1' && currentUserId === 'usr1');
+    const isOwner = (currentUserId === user.id) || (currentUserId === user.ecotrack_id);
     const followRecord = socialDb.prepare(`
       SELECT status FROM Followers WHERE follower_id = ? AND following_id = ?
     `).get(currentUserId, user.id);
@@ -1544,50 +1749,54 @@ app.get('/api/social/profile/:userIdOrEcoId', (req, res) => {
 // PUT /api/social/profile
 app.put('/api/social/profile', (req, res) => {
   try {
-    const socialDb = getSocialDB();
-    const {
-      display_name, bio, country, city, languages, interests,
-      favorite_species, vet_status, trainer_certs, rescue_org_membership,
-      website, education, experience, volunteer_work, skills, personal_info,
-      privacy_setting, avatar_url, cover_url
-    } = req.body;
-
     const user_id = req.user.id;
+    const body = req.body;
 
-    socialDb.prepare(`
-      UPDATE Profiles SET
-        display_name = COALESCE(?, display_name),
-        bio = COALESCE(?, bio),
-        country = COALESCE(?, country),
-        city = COALESCE(?, city),
-        languages = COALESCE(?, languages),
-        interests = COALESCE(?, interests),
-        favorite_species = COALESCE(?, favorite_species),
-        vet_status = COALESCE(?, vet_status),
-        trainer_certs = COALESCE(?, trainer_certs),
-        rescue_org_membership = COALESCE(?, rescue_org_membership),
-        website = COALESCE(?, website),
-        education = COALESCE(?, education),
-        experience = COALESCE(?, experience),
-        volunteer_work = COALESCE(?, volunteer_work),
-        skills = COALESCE(?, skills),
-        personal_info = COALESCE(?, personal_info),
-        privacy_setting = COALESCE(?, privacy_setting),
-        avatar_url = COALESCE(?, avatar_url),
-        cover_url = COALESCE(?, cover_url)
-      WHERE user_id = ?
-    `).run(
-      display_name, bio, country, city, languages, interests,
-      favorite_species, vet_status, trainer_certs, rescue_org_membership,
-      website, education, experience, volunteer_work, skills, personal_info,
-      privacy_setting, avatar_url, cover_url, user_id
-    );
+    // Normalize: if display_name sent without name, sync name too
+    if (body.display_name && !body.name) body.name = body.display_name;
+    if (body.name && !body.display_name) body.display_name = body.name;
 
-    if (display_name) {
-      socialDb.prepare(`UPDATE Users SET name = ? WHERE id = ?`).run(display_name, user_id);
-    }
+    const updated = db.updateUserProfile(user_id, body);
+    if (!updated) return res.status(404).json({ error: "Profile not found" });
 
-    res.json({ message: 'Profile updated successfully' });
+    res.json({
+      message: 'Profile updated successfully',
+      profile: updated
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/social/profile/avatar — Persist avatar to DB
+app.post('/api/social/profile/avatar', (req, res) => {
+  try {
+    const user_id = req.user.id;
+    const { avatar_url } = req.body;
+    if (!avatar_url) return res.status(400).json({ error: 'avatar_url required' });
+
+    const socialDb = getSocialDB();
+    socialDb.prepare(`UPDATE Profiles SET avatar_url = ? WHERE user_id = ?`).run(avatar_url, user_id);
+
+    res.json({ message: 'Avatar updated successfully', avatar_url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/social/me/refresh — Reload fresh session data from DB
+app.get('/api/social/me/refresh', (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = db.getUserProfile(userId);
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({
+      ...user,
+      avatar: user.avatar_url || '',
+      token: req.headers.authorization.split(' ')[1] // return same token
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1605,7 +1814,7 @@ app.get('/api/social/search', (req, res) => {
     const people = socialDb.prepare(`
       SELECT u.id, u.ecotrack_id, u.name, p.avatar_url, p.bio, p.vet_status, p.country
       FROM Users u
-      JOIN Profiles p ON u.id = p.user_id
+      LEFT JOIN Profiles p ON u.id = p.user_id
       WHERE u.name LIKE ? OR u.ecotrack_id LIKE ? OR p.bio LIKE ? OR p.city LIKE ?
       LIMIT 10
     `).all(term, term, term, term);
@@ -1635,7 +1844,7 @@ app.get('/api/social/messages/conversations', (req, res) => {
         (SELECT COUNT(*) FROM Messages un WHERE un.sender_id = (CASE WHEN m.sender_id = :uid THEN m.receiver_id ELSE m.sender_id END) AND un.receiver_id = :uid AND un.is_seen = 0) as unread_count
       FROM Messages m
       JOIN Users u ON u.id = (CASE WHEN m.sender_id = :uid THEN m.receiver_id ELSE m.sender_id END)
-      JOIN Profiles pr ON pr.user_id = u.id
+      LEFT JOIN Profiles pr ON pr.user_id = u.id
       WHERE m.sender_id = :uid OR m.receiver_id = :uid
       ORDER BY m.created_at DESC
     `).all({ uid: userId });
@@ -1667,13 +1876,14 @@ app.get('/api/social/messages/:partnerId', (req, res) => {
   }
 });
 
-// POST /api/social/messages
+// POST /api/social/messages — Always use token identity as sender
 app.post('/api/social/messages', (req, res) => {
   try {
     const socialDb = getSocialDB();
-    const { sender_id, receiver_id, text } = req.body;
-    if (!sender_id || !receiver_id || !text) {
-      return res.status(400).json({ error: "sender_id, receiver_id, and text are required" });
+    const sender_id = req.user.id;  // SECURITY: Always from auth token, never from request body
+    const { receiver_id, text } = req.body;
+    if (!receiver_id || !text) {
+      return res.status(400).json({ error: "receiver_id and text are required" });
     }
 
     const stmt = socialDb.prepare(`
@@ -1689,12 +1899,13 @@ app.post('/api/social/messages', (req, res) => {
   }
 });
 
-// POST /api/social/pets
+// POST /api/social/pets — Always use token identity as owner, never trust body owner_id
 app.post('/api/social/pets', (req, res) => {
   try {
     const socialDb = getSocialDB();
-    const { owner_id, name, species, breed, age, weight, diet, images, medical_history, vaccination_records } = req.body;
-    if (!owner_id || !name || !species) return res.status(400).json({ error: 'owner_id, name, and species required' });
+    const owner_id = req.user.id;  // SECURITY: Always from auth token, never from request body
+    const { name, species, breed, age, weight, diet, images, medical_history, vaccination_records } = req.body;
+    if (!name || !species) return res.status(400).json({ error: 'name and species required' });
 
     const result = socialDb.prepare(`
       INSERT INTO Pets (owner_id, name, species, breed, age, weight, diet, images, medical_history, vaccination_records)
@@ -1706,7 +1917,8 @@ app.post('/api/social/pets', (req, res) => {
       vaccination_records ? JSON.stringify(vaccination_records) : '[]'
     );
 
-    res.json({ message: 'Pet added to vault', pet_id: result.lastInsertRowid });
+    const newPet = socialDb.prepare(`SELECT * FROM Pets WHERE id = ?`).get(result.lastInsertRowid);
+    res.json({ message: 'Pet added to vault', pet_id: result.lastInsertRowid, pet: newPet });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1716,8 +1928,9 @@ app.post('/api/social/pets', (req, res) => {
 app.post('/api/social/follow/toggle', (req, res) => {
   try {
     const socialDb = getSocialDB();
-    const { follower_id, following_id } = req.body;
-    if (!follower_id || !following_id) return res.status(400).json({ error: 'follower_id and following_id required' });
+    const { follower_id: _, following_id } = req.body;
+    const follower_id = req.user.id;  // Always use token identity
+    if (!follower_id || !following_id) return res.status(400).json({ error: 'following_id required' });
 
     const existing = socialDb.prepare(`SELECT * FROM Followers WHERE follower_id = ? AND following_id = ?`).get(follower_id, following_id);
 
@@ -1745,20 +1958,21 @@ app.post('/api/social/follow/toggle', (req, res) => {
   }
 });
 
-// GET /api/social/recommendations
+// GET /api/social/recommendations — Use token identity, not query param
 app.get('/api/social/recommendations', (req, res) => {
   try {
     const socialDb = getSocialDB();
-    const currentUserId = req.query.user_id || 'usr1';
+    const currentUserId = req.user.id;  // Always from auth token
 
     const users = socialDb.prepare(`
       SELECT u.id, u.ecotrack_id, u.name, p.avatar_url, p.bio, p.vet_status, p.trainer_certs
       FROM Users u
-      JOIN Profiles p ON u.id = p.user_id
+      LEFT JOIN Profiles p ON u.id = p.user_id
       WHERE u.id != ?
-      ORDER BY p.vet_status DESC, p.reputation_score DESC
-      LIMIT 5
-    `).all(currentUserId);
+        AND u.id NOT IN (SELECT following_id FROM Followers WHERE follower_id = ?)
+      ORDER BY COALESCE(p.vet_status, 0) DESC, COALESCE(p.reputation_score, 0) DESC
+      LIMIT 8
+    `).all(currentUserId, currentUserId);
 
     res.json({ users });
   } catch (err) {
@@ -1766,19 +1980,19 @@ app.get('/api/social/recommendations', (req, res) => {
   }
 });
 
-// GET /api/social/followers/:userId
+// GET /api/social/followers/:userId — Use token identity for is_following check
 app.get('/api/social/followers/:userId', (req, res) => {
   try {
     const socialDb = getSocialDB();
     const targetUserId = req.params.userId;
-    const currentUserId = req.query.current_user_id || 'usr1';
+    const currentUserId = req.user.id;  // Always from auth token
 
     const followers = socialDb.prepare(`
       SELECT f.id as follow_id, f.status, u.id, u.ecotrack_id, u.name, p.avatar_url, p.bio, p.vet_status,
         (SELECT 1 FROM Followers f2 WHERE f2.follower_id = ? AND f2.following_id = u.id AND f2.status = 'Approved') as is_following
       FROM Followers f
       JOIN Users u ON u.id = f.follower_id
-      JOIN Profiles p ON p.user_id = u.id
+      LEFT JOIN Profiles p ON p.user_id = u.id
       WHERE f.following_id = ? AND f.status = 'Approved'
     `).all(currentUserId, targetUserId);
 
@@ -1798,7 +2012,7 @@ app.get('/api/social/following/:userId', (req, res) => {
       SELECT f.id as follow_id, f.status, u.id, u.ecotrack_id, u.name, p.avatar_url, p.bio, p.vet_status, 1 as is_following
       FROM Followers f
       JOIN Users u ON u.id = f.following_id
-      JOIN Profiles p ON p.user_id = u.id
+      LEFT JOIN Profiles p ON p.user_id = u.id
       WHERE f.follower_id = ? AND f.status = 'Approved'
     `).all(targetUserId);
 
@@ -1812,8 +2026,9 @@ app.get('/api/social/following/:userId', (req, res) => {
 app.post('/api/social/follow/manage', (req, res) => {
   try {
     const socialDb = getSocialDB();
-    const { action, actor_id, target_id } = req.body;
-    if (!action || !actor_id || !target_id) return res.status(400).json({ error: 'action, actor_id, target_id required' });
+    const { action, target_id } = req.body;
+    const actor_id = req.user.id; // Always enforce token identity as actor
+    if (!action || !target_id) return res.status(400).json({ error: 'action and target_id required' });
 
     if (action === 'accept') {
       socialDb.prepare(`UPDATE Followers SET status = 'Approved' WHERE follower_id = ? AND following_id = ?`).run(target_id, actor_id);
@@ -1841,6 +2056,12 @@ app.delete('/api/social/pets/:petId', (req, res) => {
   try {
     const socialDb = getSocialDB();
     const petId = req.params.petId;
+    // Ownership check: only the pet's owner can delete it
+    const pet = socialDb.prepare(`SELECT owner_id FROM Pets WHERE id = ?`).get(petId);
+    if (!pet) return res.status(404).json({ error: 'Pet not found' });
+    if (pet.owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden: You can only remove your own pets' });
+    }
     socialDb.prepare(`DELETE FROM Pets WHERE id = ?`).run(petId);
     res.json({ message: 'Pet removed from vault' });
   } catch (err) {

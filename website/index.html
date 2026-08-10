@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=3">
 
   <!-- html2canvas, jsPDF, html2pdf & QRCode.js for Client-Side Pass & PDF Generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -573,91 +573,95 @@
       </div>
     </section>
 
-    <!-- ── 9. ECOTRACK ANIMAL WELFARE PROFILE ── -->
+    <!-- ── 9. REDESIGNED ECOTRACK PROFILE ── -->
     <section id="profile" class="tab-section">
 
-      <!-- Streamlined EcoTrack Hero -->
-      <div class="card profile-hero-card" style="padding:28px; border-radius:24px; border:1px solid var(--border-color); margin-bottom:24px; box-shadow:var(--shadow-sm);">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:20px;">
-          <div style="display:flex; align-items:center; gap:22px; flex-wrap:wrap;">
-            <div class="profile-avatar-wrap" style="position:relative;">
-              <div class="profile-avatar" id="profileAvatarDisplay" style="width:110px; height:110px; border-radius:50%; border:3px solid var(--primary); overflow:hidden; background:var(--primary); color:#fff; font-size:44px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(16,185,129,0.2);">
-                <span id="profileAvatarInitial">E</span>
-              </div>
-              <div class="profile-online-dot" title="Online Now" style="width:18px; height:18px; border-radius:50%; background:#10b981; border:3px solid var(--card-bg); position:absolute; bottom:4px; right:4px;"></div>
+      <!-- New Visual Hero -->
+      <div class="profile-hero-v2">
+        <div class="profile-hero-content">
+          <div class="profile-main-identity">
+            <div class="profile-avatar-v2" id="profileAvatarDisplay">
+              <span id="profileAvatarInitial">E</span>
             </div>
-            <div>
-              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <h2 id="profileHeroName" style="font-size:26px; font-weight:900; margin:0; color:var(--text-main);">Eco Explorer</h2>
-                <span id="profileHeroEcoId" class="badge" style="background:var(--primary-light, #10b98115); color:var(--primary); font-size:12.5px; font-weight:800; border:1px solid rgba(16,185,129,0.2); padding:4px 10px; border-radius:20px;">@ECO-948123</span>
-                <span id="profileHeroBadges"></span>
+            <div class="profile-text-identity">
+              <div class="profile-name-row">
+                <h2 id="profileHeroName">Eco Explorer</h2>
+                <div id="profileHeroBadges" class="profile-badges-row"></div>
               </div>
-              <p id="profileHeroBio" style="color:var(--text-muted); font-size:14px; margin:6px 0 8px; max-width:600px; line-height:1.4;">Nature enthusiast • Wildlife Protection Advocate • EcoTrack Certified Explorer</p>
-              <div style="font-size:13px; color:var(--text-muted); display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
-                <span><i class="fas fa-location-dot" style="color:var(--primary);"></i> <span id="profileHeroLoc">Bengaluru, India</span></span>
-                <span><i class="fas fa-calendar-alt" style="color:var(--primary);"></i> <span id="profileHeroJoined">Joined August 2025</span></span>
+              <p id="profileHeroBio">Redefining animal welfare through technology.</p>
+              <div class="profile-meta-v2">
+                <span id="profileHeroLocRow"><i class="fas fa-location-dot"></i> <span id="profileHeroLoc">Chennai, India</span></span>
+                <span id="profileHeroJoinedRow"><i class="fas fa-calendar-alt"></i> <span id="profileHeroJoined">Joined August 2026</span></span>
               </div>
             </div>
           </div>
 
-          <div id="profileHeroActions" style="display:flex; gap:10px; align-items:center;">
-            <button class="btn btn-primary" onclick="openEditProfileModal()" style="padding:9px 20px; font-weight:800;">
-              <i class="fas fa-pen"></i> Edit Profile
-            </button>
-            <button class="btn btn-secondary" onclick="openAddPetModal()" style="padding:9px 16px; font-weight:700;">
-              <i class="fas fa-plus-circle"></i> Add Pet
-            </button>
+          <div class="profile-hero-actions-v2" id="profileHeroActions">
+            <!-- Dynamic Actions -->
           </div>
         </div>
 
-        <!-- 4 Core EcoTrack Animal Welfare Stats -->
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:14px; margin-top:24px; padding-top:20px; border-top:1px solid var(--border-color);">
-          <div class="profile-stat-box" onclick="switchProfileTabSection('pets')" style="cursor:pointer; text-align:center; padding:14px; background:var(--card-bg-subtle, rgba(255,255,255,0.03)); border-radius:16px; border:1px solid var(--border-color);">
-            <div style="font-size:24px; font-weight:900; color:var(--primary);" id="statRescuesCount">0</div>
-            <div style="font-size:11.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-top:2px;">Rescues</div>
+        <!-- Glass Stats Overlay -->
+        <div class="profile-stats-glass">
+          <div class="glass-stat-item" onclick="switchProfileTabSection('followers')">
+            <span class="glass-stat-val" id="profileFollowersCount">0</span>
+            <span class="glass-stat-lab">Followers</span>
           </div>
-          <div class="profile-stat-box" onclick="switchProfileTabSection('posts')" style="cursor:pointer; text-align:center; padding:14px; background:var(--card-bg-subtle, rgba(255,255,255,0.03)); border-radius:16px; border:1px solid var(--border-color);">
-            <div style="font-size:24px; font-weight:900; color:#3b82f6;" id="statScansCount">0</div>
-            <div style="font-size:11.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-top:2px;">AI Species Scans</div>
+          <div class="glass-stat-divider"></div>
+          <div class="glass-stat-item" onclick="switchProfileTabSection('followers')">
+            <span class="glass-stat-val" id="profileFollowingCount">0</span>
+            <span class="glass-stat-lab">Following</span>
           </div>
-          <div class="profile-stat-box" onclick="switchProfileTabSection('posts')" style="cursor:pointer; text-align:center; padding:14px; background:var(--card-bg-subtle, rgba(255,255,255,0.03)); border-radius:16px; border:1px solid var(--border-color);">
-            <div style="font-size:24px; font-weight:900; color:#f59e0b;" id="statTrainerHours">0</div>
-            <div style="font-size:11.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-top:2px;">Trainings</div>
+          <div class="glass-stat-divider"></div>
+          <div class="glass-stat-item">
+            <span class="glass-stat-val" id="statRescuesCount">0</span>
+            <span class="glass-stat-lab">Rescues</span>
           </div>
-          <div class="profile-stat-box" onclick="switchProfileTabSection('pets')" style="cursor:pointer; text-align:center; padding:14px; background:var(--card-bg-subtle, rgba(255,255,255,0.03)); border-radius:16px; border:1px solid var(--border-color);">
-            <div style="font-size:24px; font-weight:900; color:#8b5cf6;" id="statPetsCount">0</div>
-            <div style="font-size:11.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-top:2px;">My Registered Pets</div>
+          <div class="glass-stat-divider"></div>
+          <div class="glass-stat-item">
+            <span class="glass-stat-val" id="statScansCount">0</span>
+            <span class="glass-stat-lab">AI Scans</span>
           </div>
         </div>
       </div>
 
-      <!-- Private Profile Restriction Banner -->
-      <div id="privateProfileBanner" class="card hidden" style="display:none; text-align:center; padding:50px 20px; border-radius:20px; border:1px solid var(--border-color);">
-        <div style="width:60px; height:60px; border-radius:50%; background:var(--primary-light, #10b98115); color:var(--primary); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; font-size:26px;">
-          <i class="fas fa-lock"></i>
-        </div>
-        <h3 style="font-weight:900; font-size:20px; margin-bottom:6px;">This Profile is Private</h3>
-        <p style="color:var(--text-muted); max-width:400px; margin:0 auto 18px; font-size:13.5px;">Follow this user to view their animal vault, rescues, and community updates.</p>
-        <button id="privateRequestFollowBtn" class="btn btn-primary" style="padding:10px 22px; font-weight:800;">
-          <i class="fas fa-user-plus"></i> Request to Follow
-        </button>
-      </div>
+      <!-- Main Profile Nav & Content -->
+      <div class="profile-layout-v2">
+        <aside class="profile-side-nav">
+          <button class="side-nav-btn active" onclick="switchProfileTabSection('pets', this)">
+            <i class="fas fa-shield-cat"></i> <span>Animal Vault</span>
+          </button>
+          <button class="side-nav-btn" onclick="switchProfileTabSection('scans', this)">
+            <i class="fas fa-microscope"></i> <span>Scan History</span>
+          </button>
+          <button class="side-nav-btn" onclick="switchProfileTabSection('posts', this)">
+            <i class="fas fa-rss"></i> <span>Activity Feed</span>
+          </button>
+          <button class="side-nav-btn" onclick="switchProfileTabSection('training', this)">
+            <i class="fas fa-bolt-lightning"></i> <span>Training Logs</span>
+          </button>
+          <button class="side-nav-btn" onclick="switchProfileTabSection('achievements', this)">
+            <i class="fas fa-award"></i> <span>Achievements</span>
+          </button>
 
-      <!-- Main Profile Content Area -->
-      <div id="profilePortfolioMain">
-        <!-- 6 Purpose-Built EcoTrack Tabs -->
-        <div class="card" style="margin-bottom:20px; border-radius:20px; padding:10px 16px;">
-          <div style="display:flex; gap:10px; overflow-x:auto;" id="profileSubTabBar">
-            <button class="btn btn-primary profile-subtab-btn active" onclick="switchProfileTabSection('pets', this)"><i class="fas fa-paw"></i> My Pets Vault</button>
-            <button class="btn btn-secondary profile-subtab-btn" onclick="switchProfileTabSection('posts', this)"><i class="fas fa-newspaper"></i> Activity & Posts</button>
-            <button class="btn btn-secondary profile-subtab-btn" onclick="switchProfileTabSection('training', this)"><i class="fas fa-bolt"></i> Training Progress</button>
-            <button class="btn btn-secondary profile-subtab-btn" onclick="switchProfileTabSection('achievements', this)"><i class="fas fa-trophy"></i> Achievements</button>
-            <button class="btn btn-secondary profile-subtab-btn" onclick="switchProfileTabSection('followers', this)"><i class="fas fa-users"></i> Connections</button>
+          <div class="impact-mini-card">
+            <div class="mini-card-title">Environmental Impact</div>
+            <div class="mini-impact-row">
+              <div class="mini-impact-item">
+                <i class="fas fa-leaf" style="color:#10b981;"></i>
+                <div id="statCo2Saved">0 kg</div>
+              </div>
+              <div class="mini-impact-item">
+                <i class="fas fa-sun" style="color:#f59e0b;"></i>
+                <div id="statTreesPlanted">0</div>
+              </div>
+            </div>
           </div>
-        </div>
+        </aside>
 
-        <!-- Sub-Tab Content Viewport -->
-        <div id="profileTabContentArea"></div>
+        <div class="profile-content-v2" id="profileTabContentArea">
+          <!-- Populated by JS -->
+        </div>
       </div>
 
     </section>
@@ -770,15 +774,35 @@
 
 <!-- STREAMLINED EDIT PROFILE MODAL -->
 <div id="editProfileModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'editProfileModal')">
-  <div class="modal-card" style="max-width:520px; width:95%; border-radius:24px; padding:0; overflow:hidden;">
+  <div class="modal-card" style="max-width:540px; width:95%; border-radius:24px; padding:0; overflow:hidden;">
     <div class="modal-header" style="padding:18px 24px; border-bottom:1px solid var(--border-color); background:var(--card-bg);">
       <h3 class="modal-title" style="font-weight:900;"><i class="fas fa-user-pen" style="color:var(--primary);"></i> Edit Profile</h3>
       <button class="modal-close" onclick="closeEditProfileModal()">✕</button>
     </div>
 
     <form onsubmit="handleEditProfileSubmit(event)">
-      <div class="modal-body" style="padding:24px; display:flex; flex-direction:column; gap:16px;">
-        
+      <div class="modal-body" style="padding:24px; display:flex; flex-direction:column; gap:16px; max-height:70vh; overflow-y:auto;">
+
+        <!-- Avatar Upload Section -->
+        <div class="form-group" style="text-align:center;">
+          <label class="form-label" style="display:block; margin-bottom:10px;"><i class="fas fa-camera" style="color:var(--primary);"></i> Profile Photo</label>
+          <div style="display:flex; align-items:center; gap:16px; justify-content:center;">
+            <div style="width:72px; height:72px; border-radius:50%; border:2px solid var(--primary); overflow:hidden; background:var(--card-bg-subtle); display:flex; align-items:center; justify-content:center;">
+              <img id="editAvatarPreview" style="width:100%; height:100%; object-fit:cover; display:none;" alt="Avatar preview">
+              <i class="fas fa-user" id="editAvatarIcon" style="font-size:28px; color:var(--text-muted);"></i>
+            </div>
+            <div style="flex:1; text-align:left;">
+              <label for="editProfileAvatarFile" class="btn btn-secondary" style="cursor:pointer; display:inline-block; padding:8px 14px; font-size:12.5px; font-weight:700;">
+                <i class="fas fa-upload"></i> Upload Photo
+              </label>
+              <input type="file" id="editProfileAvatarFile" accept="image/*" style="display:none;"
+                onchange="(function(e){ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ const p=document.getElementById('editAvatarPreview'); p.src=ev.target.result; p.style.display='block'; document.getElementById('editAvatarIcon').style.display='none'; }; r.readAsDataURL(f); })(event)">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Or paste URL below</div>
+              <input type="text" id="editProfileAvatarUrl" class="form-input" placeholder="https://... (optional)" style="margin-top:6px; font-size:12px; padding:7px 12px;">
+            </div>
+          </div>
+        </div>
+
         <div class="form-group">
           <label class="form-label">Display Name *</label>
           <input type="text" id="editProfileName" class="form-input" required placeholder="e.g. Dr. Alex Vance">
@@ -791,21 +815,32 @@
 
         <div class="form-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
           <div class="form-group">
-            <label class="form-label">Location</label>
-            <input type="text" id="editProfileCity" class="form-input" placeholder="e.g. Bengaluru, India">
+            <label class="form-label">Profession</label>
+            <input type="text" id="editProfileProfession" class="form-input" placeholder="e.g. Veterinary Surgeon">
           </div>
           <div class="form-group">
-            <label class="form-label">Role / Vet Status</label>
-            <select id="editProfileVetStatus" class="form-select">
-              <option value="0">🌿 Eco Explorer</option>
-              <option value="1">🩺 Licensed Vet Surgeon</option>
-            </select>
+            <label class="form-label">Organization</label>
+            <input type="text" id="editProfileOrganization" class="form-input" placeholder="e.g. Mumbai Stray Care NGO">
+          </div>
+        </div>
+
+        <div class="form-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div class="form-group">
+            <label class="form-label">City</label>
+            <input type="text" id="editProfileCity" class="form-input" placeholder="e.g. Bengaluru">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Country</label>
+            <input type="text" id="editProfileCountry" class="form-input" placeholder="e.g. India">
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Avatar Photo URL</label>
-          <input type="url" id="editProfileAvatarUrl" class="form-input" placeholder="https://images.unsplash.com/...">
+          <label class="form-label">Role / Vet Status</label>
+          <select id="editProfileVetStatus" class="form-select">
+            <option value="0">🌿 Eco Explorer</option>
+            <option value="1">🩺 Licensed Vet Surgeon</option>
+          </select>
         </div>
 
         <div class="form-group">
@@ -820,13 +855,14 @@
 
       <div class="modal-footer" style="padding:16px 24px; border-top:1px solid var(--border-color); background:var(--card-bg); display:flex; justify-content:flex-end; gap:12px;">
         <button type="button" class="btn btn-secondary" onclick="closeEditProfileModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary" style="padding:10px 24px; font-weight:800;">
-          <i class="fas fa-check-circle"></i> Save Changes
+        <button type="submit" id="editProfileSaveBtn" class="btn btn-primary" style="padding:10px 24px; font-weight:800;">
+          <i class="fas fa-save"></i> Save Changes
         </button>
       </div>
     </form>
   </div>
 </div>
+
 
 <!-- FOLLOWERS & FOLLOWING LIST MODAL -->
 <div id="followersListModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'followersListModal')">
@@ -1435,61 +1471,6 @@
   </div>
 </div>
 
-<!-- EDIT PROFILE MODAL -->
-<div id="editProfileModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'editProfileModal')">
-  <div class="modal-card" style="max-width:650px;">
-    <div class="modal-header">
-      <h3 class="modal-title"><i class="fas fa-user-pen" style="color:var(--primary);"></i> Edit EcoTrack Portfolio Profile</h3>
-      <button class="modal-close" onclick="closeEditProfileModal()">✕</button>
-    </div>
-    <div class="modal-body" style="max-height:80vh; overflow-y:auto;">
-      <form onsubmit="handleEditProfileSubmit(event)">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
-          <div>
-            <label style="font-size:12px; font-weight:700;">Display Name</label>
-            <input type="text" id="editProfileName" class="form-input" required>
-          </div>
-          <div>
-            <label style="font-size:12px; font-weight:700;">Profile Privacy</label>
-            <select id="editProfilePrivacy" class="form-input">
-              <option value="Public">🌍 Public Profile</option>
-              <option value="Followers Only">👥 Followers Only</option>
-              <option value="Friends Only">🤝 Friends Only</option>
-              <option value="Private">🔒 Private Profile</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-group" style="margin-bottom:12px;">
-          <label style="font-size:12px; font-weight:700;">Bio & Professional Tagline</label>
-          <textarea id="editProfileBio" class="form-input" rows="2"></textarea>
-        </div>
-
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
-          <input type="text" id="editProfileCity" class="form-input" placeholder="City (e.g. Mumbai)">
-          <input type="text" id="editProfileCountry" class="form-input" placeholder="Country (e.g. India)">
-        </div>
-
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
-          <input type="text" id="editProfileLanguages" class="form-input" placeholder="Languages (e.g. English, Hindi)">
-          <input type="text" id="editProfileInterests" class="form-input" placeholder="Interests & Specialties">
-        </div>
-
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
-          <input type="text" id="editProfileFavSpecies" class="form-input" placeholder="Favorite Species">
-          <select id="editProfileVetStatus" class="form-input">
-            <option value="0">User / Pet Owner</option>
-            <option value="1">🩺 Verified Veterinarian</option>
-          </select>
-        </div>
-
-        <button type="submit" class="btn btn-primary" style="width:100%; padding:12px; font-size:15px; font-weight:800; border-radius:12px;">
-          <i class="fas fa-check-circle"></i> Save Portfolio Updates
-        </button>
-      </form>
-    </div>
-  </div>
-</div>
 
 <!-- ADD PET MODAL -->
 <div id="addPetModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'addPetModal')">
@@ -1621,12 +1602,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-<script src="social_db.js"></script>
-<script src="community.js"></script>
-<script src="profile.js"></script>
-<script src="messaging.js"></script>
-<script src="cv_engine.js"></script>
-<script src="app.js?v=10003"></script>
+<script src="social_db.js?v=10004"></script>
+<script src="community.js?v=10004"></script>
+<script src="profile.js?v=10004"></script>
+<script src="messaging.js?v=10004"></script>
+<script src="cv_engine.js?v=10004"></script>
+<script src="app.js?v=10004"></script>
 
 <!-- AI SCANNER MODAL -->
 <div id="aiScannerModal" class="modal-backdrop" style="display:none;z-index:9999;background:rgba(10,15,30,0.92);align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;backdrop-filter:blur(8px);">

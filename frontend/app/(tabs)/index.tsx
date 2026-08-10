@@ -9,6 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Radius, Shadow, FontSize } from "@/constants/theme";
 import { useTheme } from "../../context/ThemeContext";
 import { animals } from "@/data/animals";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width } = Dimensions.get("window");
 
@@ -41,6 +42,23 @@ export default function HomeScreen() {
     return "Good Evening";
   });
 
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const raw = await AsyncStorage.getItem("@ecotrack_user_session");
+        if (raw) {
+          const sess = JSON.parse(raw);
+          if (sess && sess.avatar) {
+            setAvatarUrl(sess.avatar);
+          }
+        }
+      } catch (e) {}
+    };
+    loadSession();
+  }, []);
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.bgLight} />
@@ -58,7 +76,13 @@ export default function HomeScreen() {
             <Text style={styles.tagline}>Your smart animal companion</Text>
           </View>
           <TouchableOpacity onPress={() => router.push("/profile")} style={styles.avatarWrapper}>
-            <Image source={{ uri: "https://randomuser.me/api/portraits/men/1.jpg" }} style={styles.avatar} />
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="person" size={20} color="#fff" />
+              </View>
+            )}
             <View style={styles.onlineDot} />
           </TouchableOpacity>
         </View>

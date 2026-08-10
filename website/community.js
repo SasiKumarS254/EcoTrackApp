@@ -18,7 +18,7 @@ async function initCommunityFeed() {
     </div>
   `;
 
-  const currentUserId = window.currentUser ? window.currentUser.id : 'usr1';
+  const currentUserId = window.currentUser ? window.currentUser.id : null;
   const posts = await window.EcoSocialDB.fetchPosts({
     current_user_id: currentUserId,
     filter: activeFeedFilter,
@@ -34,8 +34,8 @@ async function loadSuggestedUsers() {
   const container = document.getElementById('suggestedUsersList');
   if (!container) return;
 
-  const currentUserId = window.currentUser ? window.currentUser.id : 'usr1';
-  const users = await window.EcoSocialDB.fetchRecommendations(currentUserId);
+  const currentUserId = window.currentUser ? window.currentUser.id : null;
+  const users = currentUserId ? await window.EcoSocialDB.fetchRecommendations() : [];
 
   if (!users || !users.length) {
     container.innerHTML = `<div style="font-size:12px; color:var(--text-muted);">No recommendations available.</div>`;
@@ -63,7 +63,8 @@ async function loadSuggestedUsers() {
 }
 
 async function toggleFollowUser(targetId, btnEl) {
-  const currentUserId = window.currentUser ? window.currentUser.id : 'usr1';
+  if (!window.currentUser) { showToast('Please sign in to follow users.', 'error'); return; }
+  const currentUserId = window.currentUser.id;
   const res = await window.EcoSocialDB.toggleFollow(currentUserId, targetId);
   if (btnEl) {
     if (res.is_pending) {
@@ -247,7 +248,7 @@ function renderPostCardHtml(post) {
         <div id="comments-section-${post.id}" class="comments-section hidden" style="display:none; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border-color);">
           <!-- Add Comment Form -->
           <div style="display:flex; gap:8px; margin-bottom:12px;">
-            <img src="${window.currentUser ? window.currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400'}" class="avatar-sm" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=Me&background=10b981&color=fff'">
+            <img src="${window.currentUser && window.currentUser.avatar ? window.currentUser.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(window.currentUser ? window.currentUser.name : 'Me')}&background=10b981&color=fff`}" class="avatar-sm" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=Me&background=10b981&color=fff'">
             <div style="flex:1; display:flex; gap:6px;">
               <input type="text" id="comment-input-${post.id}" class="form-input" placeholder="Add a public comment..." style="border-radius:20px; font-size:12px; padding:6px 12px;">
               <button class="btn btn-primary" style="border-radius:20px; padding:6px 14px; font-size:12px;" onclick="submitComment(${post.id})">Post</button>
@@ -265,8 +266,8 @@ function renderPostCardHtml(post) {
 }
 
 async function togglePostLike(postId, btnEl) {
-  const userId = window.currentUser ? window.currentUser.id : 'usr1';
-  const res = await window.EcoSocialDB.toggleLike(postId, userId);
+  if (!window.currentUser) { showToast('Please sign in to like posts.', 'error'); return; }
+  const res = await window.EcoSocialDB.toggleLike(postId);  // userId comes from auth token server-side
 
   // Surgical Update: only change the specific button and count
   const icon = btnEl.querySelector('i');
@@ -293,8 +294,9 @@ async function togglePostLike(postId, btnEl) {
 }
 
 async function togglePostBookmark(postId, btnEl) {
-  const userId = window.currentUser ? window.currentUser.id : 'usr1';
-  const res = await window.EcoSocialDB.toggleBookmark(postId, userId);
+  if (!window.currentUser) { showToast('Please sign in to bookmark posts.', 'error'); return; }
+  const res = await window.EcoSocialDB.toggleBookmark(postId);  // userId comes from auth token server-side
+  if (!res) { showToast('Bookmark failed. Please try again.', 'error'); return; }
 
   const icon = btnEl.querySelector('i');
   const countEl = btnEl.querySelector('span'); // The bookmark span for count
@@ -333,18 +335,28 @@ function toggleCommentsSection(postId) {
 }
 
 async function submitComment(postId) {
+  if (!window.currentUser) { showToast('Please sign in to comment.', 'error'); return; }
   const input = document.getElementById(`comment-input-${postId}`);
   if (!input || !input.value.trim()) return;
 
   const text = input.value.trim();
-  const userId = window.currentUser ? window.currentUser.id : 'usr1';
+  const userId = window.currentUser.id;
 
-  const res = await window.EcoSocialDB.addComment(postId, userId, text);
-  if (res.comment) {
+  const res = await window.EcoSocialDB.addComment(postId, text);  // userId comes from auth token server-side
+  if (res && res.comment_id) {
+    const commentEl = {
+      id: res.comment_id,
+      user_id: window.currentUser.id,
+      author_name: window.currentUser.name || '',
+      author_avatar: window.currentUser.avatar || '',
+      text: text,
+      created_at: new Date().toISOString(),
+      replies: []
+    };
     // Surgical Update: Append the new comment to the list
     const list = document.getElementById(`comments-list-${postId}`);
     if (list) {
-      const commentHtml = renderCommentItemHtml(res.comment, postId);
+      const commentHtml = renderCommentItemHtml(commentEl, postId);
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = commentHtml;
       list.prepend(tempDiv.firstElementChild);
@@ -352,9 +364,13 @@ async function submitComment(postId) {
 
     // Update count in UI
     const postCard = document.getElementById(`post-card-${postId}`);
-    const commentBtn = postCard.querySelector('button[onclick*="toggleCommentsSection"]');
-    const countSpan = commentBtn.querySelector('span');
-    if (countSpan) countSpan.textContent = res.comments_count;
+    if (postCard) {
+      const commentBtn = postCard.querySelector('button[onclick*="toggleCommentsSection"]');
+      if (commentBtn) {
+        const countSpan = commentBtn.querySelector('span');
+        if (countSpan) countSpan.textContent = parseInt(countSpan.textContent || '0') + 1;
+      }
+    }
 
     input.value = '';
     showToast('Comment posted!', 'success');
@@ -431,17 +447,23 @@ function toggleReplyBox(commentId) {
 }
 
 async function submitReply(commentId, postId) {
+  if (!window.currentUser) { showToast('Please sign in to reply.', 'error'); return; }
   const input = document.getElementById(`reply-input-${commentId}`);
   if (!input || !input.value.trim()) return;
 
   const text = input.value.trim();
-  const userId = window.currentUser ? window.currentUser.id : 'usr1';
+  const userId = window.currentUser.id;
 
-  const res = await window.EcoSocialDB.addReply(commentId, postId, userId, text);
-  if (res.reply) {
+  const res = await window.EcoSocialDB.addReply(commentId, postId, text);  // userId from auth token server-side
+  if (res) {
+    const replyData = {
+      author_name: window.currentUser ? window.currentUser.name : '',
+      author_avatar: window.currentUser ? window.currentUser.avatar : '',
+      text
+    };
     const container = document.getElementById(`replies-container-${commentId}`);
     if (container) {
-      const r = res.reply;
+      const r = replyData;
       const replyHtml = `
         <div style="display:flex; gap:8px; margin-top:8px; margin-left:20px; animation: slideInLow 0.3s ease-out;">
           <img src="${r.author_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.author_name || 'User')}&background=10b981&color=fff`}" class="avatar-xs">
@@ -533,11 +555,12 @@ async function handleCreatePostSubmit(e) {
   const hashtags = document.getElementById('createPostHashtags').value.trim();
   const mediaUrl = document.getElementById('createPostMediaUrl').value.trim();
 
-  const userId = window.currentUser ? window.currentUser.id : 'usr1';
+  if (!window.currentUser) { showToast('Please sign in to publish posts.', 'error'); return; }
+  const userId = window.currentUser.id;
 
   await window.EcoSocialDB.createPost({
     user_id: userId,
-    author_name: window.currentUser ? window.currentUser.name : 'Eco Explorer',
+    author_name: window.currentUser.name,
     content,
     post_type: postType,
     privacy_visibility: visibility,
@@ -665,3 +688,4 @@ window.closeShareModal = closeShareModal;
 window.copyPostLink = copyPostLink;
 window.sharePostToDirectMessage = sharePostToDirectMessage;
 window.shareToExternalSocial = shareToExternalSocial;
+window.renderPostCardHtml = renderPostCardHtml;  // Shared with profile.js post rendering

@@ -1,131 +1,62 @@
 /**
  * scanner/index.tsx — EcoTrack AI Scanner (Production CV Module)
  * ─────────────────────────────────────────────────────────────────────────────
- * Full-screen AI scanner with:
- *  - Real model loading with per-model status dashboard
- *  - Live camera feed with dynamic bounding box + AP-10K/COCO skeleton overlay
- *  - 8-stage pipeline state machine — halts honestly at each failed gate
- *  - Rep counter from actual joint displacement
- *  - Body visibility verification
- *  - Species selector from Training plan
- *  - Exercise selector from AI Trainer
- *  - Professional dark UI with glassmorphism panels
+ * Completely audited and fixed:
+ *  - Removed live webcam/camera.
+ *  - File upload only (supporting videos up to 500MB).
+ *  - Real progress tracking + cancel option (via XMLHttpRequest).
+ *  - Resizable panel using a corner drag handle.
+ *  - Full UI states: loading, error, empty, cancel, success.
  */
 
-import React, {
-  useState, useRef, useEffect, useCallback, useMemo,
-} from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
   ScrollView, Modal, TextInput, Animated, StatusBar,
-  SafeAreaView, Platform, ActivityIndicator, Alert,
+  SafeAreaView, Platform, ActivityIndicator, Alert, PanResponder, Image
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import Svg, { Circle, Line, Rect, Text as SvgText, G } from 'react-native-svg';
+import { Video, ResizeMode } from 'expo-av';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
 import { FontSize, Radius, Shadow } from '@/constants/theme';
-
-// CV Pipeline
-import {
-  getSkeletonForSpecies,
-  AP10K_SUPPORTED_SPECIES,
-  AP10K_KEYPOINT_MAP,
-  type SkeletonTemplate,
-} from '../../lib/skeletonTemplates';
-import {
-  detectSpecies, estimateKeypoints, analyzeMotion,
-  updateRepCount, checkBodyVisibility, checkImageQuality,
-  computeJointAngles, computeGrade, saveScanToBackend,
-  syncTrainingAnalytics, type PipelineStatus, type CompleteScanResult,
-  PIPELINE_INITIAL_STATE,
-} from '../../lib/aiPipeline';
 import { getExercisesForSpecies, getExerciseById } from '../../lib/exerciseTemplates';
-import { saveMotionResult } from '../../data/trainingAnalyticsStore';
+import { analyzeAllJoints } from '../../lib/jointAnalysis';
+import { generateDetailedReport } from '../../lib/reportGenerator';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
 interface ModelLoadStatus {
   name: string;
   status: 'checking' | 'loaded' | 'missing' | 'error';
   detail: string;
 }
 
-interface LiveScanState {
-  status: PipelineStatus;
-  stepLabel: string;
-  detection: { species: string; confidence: number; bbox: any } | null;
-  keypoints: Array<{ name: string; x: number; y: number; visibility: number; ap10k_idx?: number }>;
-  jointAngles: Record<string, number>;
-  jointStatuses: Record<string, 'correct' | 'warn' | 'incorrect'>;
-  formScore: number;
-  postureScore: number;
-  balanceScore: number;
-  repCount: number;
-  fps: number;
-  poseSource: string | null;
-  bodyVisible: boolean;
-  missingRegions: string[];
-  errorMessage: string | null;
-  skeleton: SkeletonTemplate | null;
-  frameQuality: number;
-  inferenceMs: number;
-}
-
-const LIVE_INITIAL: LiveScanState = {
-  status: 'IDLE', stepLabel: 'Ready',
-  detection: null, keypoints: [], jointAngles: {}, jointStatuses: {},
-  formScore: 0, postureScore: 0, balanceScore: 0, repCount: 0, fps: 0,
-  poseSource: null, bodyVisible: false, missingRegions: [],
-  errorMessage: null, skeleton: null, frameQuality: 0, inferenceMs: 0,
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Joint Status Colors
-// ─────────────────────────────────────────────────────────────────────────────
-const JOINT_COLOR = {
-  correct:   '#22c55e',
-  warn:      '#f59e0b',
-  incorrect: '#ef4444',
-  default:   '#a78bfa',
-  low_conf:  '#64748b',
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Component
-// ─────────────────────────────────────────────────────────────────────────────
 export default function AIScannerScreen() {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
   const params = useLocalSearchParams<{ species?: string; exerciseId?: string }>();
 
-  // Camera
-  const [permission, requestPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState<'front' | 'back'>('back');
-  const cameraRef = useRef<any>(null);
-
   // Auth
   const [userId, setUserId] = useState<string | null>(null);
+
+  // File Upload & Progress State
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [reports, setReports] = useState<any[]>([]);
+  const [selectedReportIdx, setSelectedReportIdx] = useState<number>(0);
+  const [status, setStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS' | 'ERROR' | 'CANCEL'>('IDLE');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
 
   // Model loading
   const [modelStatus, setModelStatus] = useState<ModelLoadStatus[]>([]);
   const [allModelsReady, setAllModelsReady] = useState(false);
   const [loadingModels, setLoadingModels] = useState(true);
-
-  // Scanner state
-  const [scanState, setScanState] = useState<LiveScanState>(LIVE_INITIAL);
-  const [isScanning, setIsScanning] = useState(false);
-  const scanningRef = useRef(false);
-  const repStateRef = useRef({ count: 0, lastPosition: -1, inDownPhase: false });
-  const frameCountRef = useRef(0);
-  const lastFpsRef = useRef(Date.now());
 
   // Species & Exercise selection
   const [selectedSpecies, setSelectedSpecies] = useState(params.species || 'human');
@@ -134,9 +65,8 @@ export default function AIScannerScreen() {
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [speciesSearch, setSpeciesSearch] = useState('');
 
-  // Animation values
-  const pulseAnim  = useRef(new Animated.Value(1)).current;
-  const statusAnim = useRef(new Animated.Value(0)).current;
+  // Resizable Panel States
+  const [panelSize, setPanelSize] = useState({ width: SW - 32, height: 280 });
 
   // ── Load user session ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -152,11 +82,10 @@ export default function AIScannerScreen() {
 
   const checkModelStatus = useCallback(async () => {
     setLoadingModels(true);
-
     const models: ModelLoadStatus[] = [
-      { name: 'Species Detector',      status: 'checking', detail: 'YOLOv8n — 80 COCO classes' },
-      { name: 'Human Pose (MediaPipe)',status: 'checking', detail: 'BlazePose 33-landmark' },
-      { name: 'YOLOv8 Pose',          status: 'checking', detail: 'COCO-17 human + animals' },
+      { name: 'Species Detector', status: 'checking', detail: 'YOLOv8n — 80 COCO classes' },
+      { name: 'Human Pose (MediaPipe)', status: 'checking', detail: 'BlazePose 33-landmark' },
+      { name: 'YOLOv8 Pose', status: 'checking', detail: 'COCO-17 human + animals' },
       { name: 'Animal Pose (AP-10K)', status: 'checking', detail: 'RTMPose-M 54 species, 17 kpts' },
     ];
     setModelStatus([...models]);
@@ -165,13 +94,11 @@ export default function AIScannerScreen() {
       const resp = await fetch('http://localhost:5001/model-status', {
         signal: AbortSignal.timeout(5000),
       });
-
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
-
       const ms = data.models;
 
-      models[0].status = ms.yolov8_detector?.loaded  ? 'loaded' : 'missing';
+      models[0].status = ms.yolov8_detector?.loaded ? 'loaded' : 'missing';
       models[0].detail = ms.yolov8_detector?.loaded
         ? `Loaded: ${ms.yolov8_detector.path?.split('\\').pop()}`
         : `Missing: ${ms.yolov8_detector?.error || 'yolov8n.pt not found'}`;
@@ -194,15 +121,12 @@ export default function AIScannerScreen() {
           ? `RTMPose-M loaded (AP-10K 54 species)`
           : `Not trained yet — run: python train_animal_pose.py --phase all`;
 
-      // Critical models: detector + at least one pose model
       const criticalReady = models[0].status === 'loaded' &&
         (models[1].status === 'loaded' || models[2].status === 'loaded');
 
       setAllModelsReady(criticalReady);
       setModelStatus([...models]);
-
     } catch (err: any) {
-      // Backend not reachable
       models.forEach(m => {
         m.status = 'error';
         m.detail = 'Backend AI service not running. Start with: python ai_service.py';
@@ -210,469 +134,186 @@ export default function AIScannerScreen() {
       setModelStatus([...models]);
       setAllModelsReady(false);
     }
-
     setLoadingModels(false);
   }, []);
 
-  // ── Pulse animation for scanning indicator ────────────────────────────────
-  useEffect(() => {
-    if (isScanning) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.15, duration: 800, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1.0,  duration: 800, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.stopAnimation();
-      pulseAnim.setValue(1);
-    }
-  }, [isScanning]);
-
-  // ── Main scan loop ────────────────────────────────────────────────────────
-  const runScanFrame = useCallback(async () => {
-    if (!scanningRef.current || !cameraRef.current) return;
-
-    const frameStart = Date.now();
-    frameCountRef.current += 1;
-
-    // FPS tracking
-    const now = Date.now();
-    let fps = scanState.fps;
-    if (now - lastFpsRef.current >= 1000) {
-      fps = frameCountRef.current;
-      frameCountRef.current = 0;
-      lastFpsRef.current = now;
-    }
-
+  // ── File Selection ────────────────────────────────────────────────────────
+  const handleSelectVideo = async () => {
     try {
-      // Capture frame
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.6,
-        base64: false,
-        skipProcessing: true,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        quality: 1.0,
       });
 
-      if (!photo?.uri || !scanningRef.current) return;
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+      const asset = result.assets[0];
 
-      setScanState(prev => ({ ...prev, status: 'DETECTING', stepLabel: 'Detecting species…', fps }));
-
-      // ── Stage 1: Species Detection ───────────────────────────────────────
-      const detection = await detectSpecies(photo.uri, selectedSpecies);
-
-      if (!detection.modelAvailable) {
-        setScanState(prev => ({
-          ...prev, status: 'ERROR',
-          errorMessage: 'Species detection model not loaded. Restart the AI service.',
-          stepLabel: 'Model Error',
-        }));
-        stopScanning();
+      // Validate max file size (500MB)
+      const sizeBytes = asset.fileSize || 0;
+      const maxBytes = 500 * 1024 * 1024;
+      if (sizeBytes > maxBytes) {
+        Alert.alert("File Too Large", "Please upload a video file under 500MB.");
         return;
       }
 
-      if (!detection.detected) {
-        setScanState(prev => ({
-          ...prev, status: 'SPECIES_NOT_FOUND',
-          detection: null,
-          stepLabel: `${selectedSpecies} not found`,
-          errorMessage: `Target species "${selectedSpecies}" not found in frame. Reposition the camera.`,
-          fps,
-        }));
-        setTimeout(() => { if (scanningRef.current) runScanFrame(); }, 800);
-        return;
-      }
-
-      const bbox = detection.boundingBox!;
-      const imgW  = detection.imageWidth  || 640;
-      const imgH  = detection.imageHeight || 480;
-
-      // ── Stage 2: Quality Check ───────────────────────────────────────────
-      const quality = checkImageQuality(bbox, imgW, imgH, detection.confidence);
-      const frameQuality = Math.round(
-        ((bbox.width * bbox.height) / (imgW * imgH)) * 100 * 5
-      );
-
-      if (!quality.passed) {
-        setScanState(prev => ({
-          ...prev, status: 'QUALITY_FAIL',
-          detection: { species: detection.className, confidence: detection.confidence, bbox },
-          stepLabel: 'Low frame quality',
-          errorMessage: quality.reasons.join(' '),
-          fps, frameQuality,
-        }));
-        setTimeout(() => { if (scanningRef.current) runScanFrame(); }, 600);
-        return;
-      }
-
-      // ── Stage 3: Body Visibility ─────────────────────────────────────────
-      const skeleton = getSkeletonForSpecies(selectedSpecies);
-
-      if (!skeleton) {
-        setScanState(prev => ({
-          ...prev, status: 'ERROR',
-          detection: { species: detection.className, confidence: detection.confidence, bbox },
-          stepLabel: 'Pose not supported',
-          errorMessage: `Pose estimation not available for "${selectedSpecies}". No anatomical model defined.`,
-          fps,
-        }));
-        setTimeout(() => { if (scanningRef.current) runScanFrame(); }, 2000);
-        return;
-      }
-
-      const visibility = checkBodyVisibility(bbox, imgW, imgH, skeleton);
-      setScanState(prev => ({
-        ...prev,
-        status: visibility.isFullBodyVisible ? 'ESTIMATING_POSE' : 'BODY_INCOMPLETE',
-        detection: { species: detection.className, confidence: detection.confidence, bbox },
-        bodyVisible: visibility.isFullBodyVisible,
-        missingRegions: visibility.missingRegions,
-        stepLabel: visibility.isFullBodyVisible ? 'Estimating pose…' : 'Body partially hidden',
-        errorMessage: visibility.isFullBodyVisible ? null : visibility.message,
-        skeleton,
-        fps, frameQuality,
-      }));
-
-      if (!visibility.isFullBodyVisible) {
-        setTimeout(() => { if (scanningRef.current) runScanFrame(); }, 500);
-        return;
-      }
-
-      // ── Stage 4: Pose Estimation ─────────────────────────────────────────
-      const poseResult = await estimateKeypoints(photo.uri, selectedSpecies, bbox);
-
-      if (!poseResult.success || poseResult.keypoints.length < 4) {
-        // Pose model failed but not because species is unsupported — retry
-        setTimeout(() => { if (scanningRef.current) runScanFrame(); }, 400);
-        return;
-      }
-
-      // ── Stage 5: Joint Angle Computation ─────────────────────────────────
-      const jointAngles = computeJointAngles(poseResult.keypoints, skeleton, bbox);
-
-      // ── Stage 6: Motion Analysis ─────────────────────────────────────────
-      const exercise = selectedExerciseId
-        ? getExerciseById(selectedExerciseId)
-        : null;
-
-      let jointStatuses: Record<string, 'correct' | 'warn' | 'incorrect'> = {};
-      let formScore     = 0;
-      let postureScore  = 0;
-      let balanceScore  = 0;
-      let repCount      = repStateRef.current.count;
-
-      if (exercise) {
-        setScanState(prev => ({ ...prev, stepLabel: 'Analyzing motion…', status: 'ANALYZING_MOTION' }));
-        const motion = analyzeMotion(jointAngles, exercise);
-        jointStatuses = motion.statuses;
-        formScore     = motion.formScore;
-        postureScore  = motion.postureScore;
-        balanceScore  = motion.balanceScore;
-
-        // Rep counting
-        repStateRef.current = updateRepCount(repStateRef.current, poseResult.keypoints, exercise);
-        repCount = repStateRef.current.count;
-      }
-
-      const inferenceMs = Date.now() - frameStart;
-
-      setScanState(prev => ({
-        ...prev,
-        status: 'SUCCESS',
-        stepLabel: exercise ? `${exercise.name} — ${repCount} reps` : 'Pose detected',
-        detection: { species: detection.className, confidence: detection.confidence, bbox },
-        keypoints: poseResult.keypoints,
-        jointAngles,
-        jointStatuses,
-        formScore,
-        postureScore,
-        balanceScore,
-        repCount,
-        poseSource: (poseResult as any).poseSource || null,
-        bodyVisible: true,
-        missingRegions: [],
-        errorMessage: null,
-        skeleton,
-        fps,
-        frameQuality: Math.min(100, frameQuality),
-        inferenceMs,
-      }));
-
-    } catch (err: any) {
-      console.warn('[Scanner] Frame error:', err?.message);
+      setSelectedVideo(asset);
+      setReports([]);
+      setStatus('IDLE');
+      setErrorMsg(null);
+    } catch (e: any) {
+      Alert.alert("Error picking video", e.message);
     }
+  };
 
-    // Schedule next frame
-    if (scanningRef.current) {
-      setTimeout(runScanFrame, 150);
-    }
-  }, [selectedSpecies, selectedExerciseId, scanState.fps]);
+  // ── Multipart Video Upload & CV Analysis ──────────────────────────────────
+  const handleStartAnalysis = () => {
+    if (!selectedVideo) return;
 
-  const startScanning = useCallback(async () => {
-    if (!allModelsReady) {
-      Alert.alert('Models Not Ready', 'Please wait for all models to load before scanning.');
-      return;
-    }
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) return;
-    }
-    repStateRef.current = { count: 0, lastPosition: -1, inDownPhase: false };
-    frameCountRef.current = 0;
-    lastFpsRef.current = Date.now();
-    scanningRef.current = true;
-    setIsScanning(true);
-    setScanState({ ...LIVE_INITIAL, status: 'DETECTING', stepLabel: 'Starting pipeline…' });
-    runScanFrame();
-  }, [allModelsReady, permission, runScanFrame]);
+    setStatus('LOADING');
+    setIsProcessing(true);
+    setUploadProgress(0);
+    setErrorMsg(null);
 
-  const stopScanning = useCallback(() => {
-    scanningRef.current = false;
-    setIsScanning(false);
-    setScanState(prev => ({ ...prev, status: 'IDLE', stepLabel: 'Scan stopped' }));
-  }, []);
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
 
-  const handleUploadImage = useCallback(async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets[0]) return;
+    // Use Express backend proxy which supports streaming multipart
+    xhr.open('POST', 'http://localhost:5000/api/ai/process-video');
 
-    const uri = result.assets[0].uri;
-    setScanState(prev => ({ ...prev, status: 'DETECTING', stepLabel: 'Analyzing uploaded image…' }));
-
-    try {
-      const detection = await detectSpecies(uri, selectedSpecies);
-      if (!detection.detected) {
-        setScanState(prev => ({
-          ...prev, status: 'SPECIES_NOT_FOUND',
-          errorMessage: `"${selectedSpecies}" not found in uploaded image.`,
-          stepLabel: 'Species not found',
-        }));
-        return;
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        setUploadProgress(percent);
       }
-
-      const skeleton = getSkeletonForSpecies(selectedSpecies);
-      if (!skeleton) {
-        setScanState(prev => ({
-          ...prev, status: 'ERROR',
-          errorMessage: `No pose model defined for "${selectedSpecies}".`,
-          stepLabel: 'Unsupported species',
-        }));
-        return;
-      }
-
-      const poseResult = await estimateKeypoints(uri, selectedSpecies, detection.boundingBox!);
-      const jointAngles = computeJointAngles(poseResult.keypoints, skeleton, detection.boundingBox!);
-      const exercise = selectedExerciseId ? getExerciseById(selectedExerciseId) : null;
-      let motion = { statuses: {}, formScore: 0, postureScore: 0, balanceScore: 0 } as any;
-      if (exercise && Object.keys(jointAngles).length > 0) {
-        motion = analyzeMotion(jointAngles, exercise);
-      }
-
-      const grade = computeGrade(motion.formScore);
-      const result: CompleteScanResult = {
-        scanId:              `scan_${Date.now()}`,
-        timestamp:           new Date().toISOString(),
-        analysisSource:      'backend_ai',
-        detectedSpecies:     detection.className,
-        detectedBreed:       null,
-        detectionConfidence: detection.confidence,
-        isFullBodyVisible:   true,
-        boundingBox:         detection.boundingBox,
-        keypoints:           poseResult.keypoints,
-        jointAngles,
-        jointStatuses:       motion.statuses,
-        formScore:           motion.formScore,
-        postureScore:        motion.postureScore,
-        balanceScore:        motion.balanceScore,
-        repsCompleted:       0,
-        grade,
-        feedback:            [],
-        exerciseName:        exercise?.name || 'Image Analysis',
-        exerciseId:          selectedExerciseId,
-        exerciseDurationSec: 0,
-      };
-
-      setScanState(prev => ({
-        ...prev,
-        status: 'SUCCESS',
-        detection: { species: detection.className, confidence: detection.confidence, bbox: detection.boundingBox },
-        keypoints: poseResult.keypoints,
-        jointAngles,
-        jointStatuses: motion.statuses,
-        formScore: motion.formScore,
-        postureScore: motion.postureScore,
-        balanceScore: motion.balanceScore,
-        skeleton,
-        bodyVisible: true,
-        missingRegions: [],
-        errorMessage: null,
-        stepLabel: 'Analysis complete',
-        poseSource: (poseResult as any).poseSource,
-      }));
-
-      await saveScanToBackend(result, userId || undefined);
-      router.push({ pathname: '/scanReport', params: { data: JSON.stringify(result) } });
-
-    } catch (err: any) {
-      setScanState(prev => ({
-        ...prev, status: 'ERROR',
-        errorMessage: `Analysis failed: ${err.message}`,
-        stepLabel: 'Error',
-      }));
-    }
-  }, [selectedSpecies, selectedExerciseId, userId]);
-
-  // ── Finish scan & navigate to report ─────────────────────────────────────
-  const finishScan = useCallback(async () => {
-    stopScanning();
-    const s = scanState;
-    if (!s.detection || s.keypoints.length === 0) return;
-
-    const exercise = selectedExerciseId ? getExerciseById(selectedExerciseId) : null;
-    const grade    = computeGrade(s.formScore);
-    const result: CompleteScanResult = {
-      scanId:              `scan_${Date.now()}`,
-      timestamp:           new Date().toISOString(),
-      analysisSource:      'backend_ai',
-      detectedSpecies:     s.detection.species,
-      detectedBreed:       null,
-      detectionConfidence: s.detection.confidence,
-      isFullBodyVisible:   s.bodyVisible,
-      boundingBox:         s.detection.bbox,
-      keypoints:           s.keypoints,
-      jointAngles:         s.jointAngles,
-      jointStatuses:       s.jointStatuses,
-      formScore:           s.formScore,
-      postureScore:        s.postureScore,
-      balanceScore:        s.balanceScore,
-      repsCompleted:       s.repCount,
-      grade,
-      feedback:            [],
-      exerciseName:        exercise?.name || 'Free Scan',
-      exerciseId:          selectedExerciseId,
-      exerciseDurationSec: 0,
     };
 
-    await saveScanToBackend(result, userId || undefined);
-    if (userId) await syncTrainingAnalytics(result, userId);
-    router.push({ pathname: '/scanReport', params: { data: JSON.stringify(result) } });
-  }, [scanState, selectedExerciseId, userId]);
+    xhr.onload = async () => {
+      setIsProcessing(false);
+      if (xhr.status === 200) {
+        try {
+          const res = JSON.parse(xhr.responseText);
+          if (res.success && res.reports && res.reports.length > 0) {
+            const exTemplate = getExerciseById(selectedExerciseId) || {
+              id: 'free_scan',
+              name: 'Free Scan',
+              description: 'Free scan',
+              joint_angles: {},
+              critical_joints: [],
+              completion_reps: 5
+            };
 
-  // ── Skeleton renderer ─────────────────────────────────────────────────────
-  const renderSkeleton = useCallback(() => {
-    const { skeleton, keypoints, jointStatuses, detection } = scanState;
-    if (!skeleton || keypoints.length === 0 || !detection?.bbox) return null;
+            const compiledReports = res.reports.map((r: any) => {
+              const jointAnalysis = analyzeAllJoints(
+                r.jointAngles || {},
+                (exTemplate.joint_angles || {}) as any,
+                exTemplate.critical_joints || [],
+                selectedSpecies
+              );
 
-    const bbox = detection.bbox;
+              return generateDetailedReport({
+                scanId: r.scanId,
+                timestamp: r.timestamp,
+                analysisSource: 'backend_ai',
+                detectedSpecies: selectedSpecies,
+                detectedBreed: null,
+                detectionConfidence: r.detectionConfidence,
+                exerciseTemplate: exTemplate as any,
+                jointAnalysis,
+                measuredAngles: r.jointAngles || {},
+                keypoints: r.keypoints || [],
+                repCount: r.repsCompleted || 0,
+                exerciseDurationSec: r.duration || 0,
+              });
+            });
 
-    // Build pixel coordinate map from normalized keypoints
-    const kpMap: Record<string, { px: number; py: number; vis: number }> = {};
-    for (const kp of keypoints) {
-      if (kp.visibility >= 0.3) {
-        kpMap[kp.name] = {
-          px: bbox.x + kp.x * bbox.width,
-          py: bbox.y + kp.y * bbox.height,
-          vis: kp.visibility,
-        };
+            setReports(compiledReports);
+            setSelectedReportIdx(0);
+            setStatus('SUCCESS');
+
+            // Auto-update user progress via training sync API
+            for (const report of compiledReports) {
+              await fetch('http://localhost:5000/api/ai/scan-save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ...report,
+                  user_id: userId || 'anonymous'
+                })
+              }).catch(() => console.warn("Failed to sync progress to database"));
+            }
+          } else {
+            setStatus('ERROR');
+            setErrorMsg("No target species detected in the video.");
+          }
+        } catch (e) {
+          setStatus('ERROR');
+          setErrorMsg("Failed to parse analysis results.");
+        }
+      } else {
+        setStatus('ERROR');
+        setErrorMsg(`Server responded with status ${xhr.status}`);
       }
+    };
+
+    xhr.onerror = () => {
+      setIsProcessing(false);
+      setStatus('ERROR');
+      setErrorMsg("Network error occurred during upload.");
+    };
+
+    const formData = new FormData();
+    formData.append('video', {
+      uri: selectedVideo.uri,
+      type: 'video/mp4',
+      name: 'scan_video.mp4'
+    } as any);
+    formData.append('species', selectedSpecies);
+    formData.append('exercise_id', selectedExerciseId);
+    formData.append('user_id', userId || 'anonymous');
+
+    xhr.send(formData);
+  };
+
+  const handleCancel = () => {
+    if (xhrRef.current) {
+      xhrRef.current.abort();
+      xhrRef.current = null;
     }
+    setIsProcessing(false);
+    setStatus('CANCEL');
+    setUploadProgress(0);
+  };
 
-    const elements: React.ReactElement[] = [];
+  const handleViewReport = (report: any) => {
+    router.push({
+      pathname: '/scanReport',
+      params: { data: JSON.stringify(report) }
+    });
+  };
 
-    // Draw bones
-    for (const [a, b] of skeleton.bones) {
-      const pa = kpMap[a], pb = kpMap[b];
-      if (!pa || !pb) continue;
-      const statusA = jointStatuses[a] || 'default';
-      const statusB = jointStatuses[b] || 'default';
-      const color   = statusA === 'incorrect' || statusB === 'incorrect'
-        ? JOINT_COLOR.incorrect
-        : statusA === 'warn' || statusB === 'warn'
-          ? JOINT_COLOR.warn
-          : JOINT_COLOR.correct;
+  // ── PanResponder for Panel Resizing ───────────────────────────────────────
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (evt, gestureState) => {
+        setPanelSize(prev => ({
+          width: Math.max(200, Math.min(SW - 32, prev.width + gestureState.dx)),
+          height: Math.max(150, Math.min(SH * 0.6, prev.height - gestureState.dy)),
+        }));
+      },
+    })
+  ).current;
 
-      elements.push(
-        <Line
-          key={`bone_${a}_${b}`}
-          x1={pa.px} y1={pa.py} x2={pb.px} y2={pb.py}
-          stroke={color} strokeWidth={2.5} strokeOpacity={0.85}
-        />
-      );
-    }
+  const exercises = getExercisesForSpecies(selectedSpecies);
+  const selectedExercise = selectedExerciseId ? getExerciseById(selectedExerciseId) : null;
+  const filteredSpecies = ['human', 'dog', 'cat', 'horse', 'bird', 'sheep', 'cow'];
 
-    // Draw joints
-    for (const [name, coords] of Object.entries(kpMap)) {
-      const status = jointStatuses[name];
-      const color  = status
-        ? JOINT_COLOR[status]
-        : coords.vis >= 0.65 ? JOINT_COLOR.default : JOINT_COLOR.low_conf;
-      const radius = coords.vis >= 0.65 ? 5 : 3;
-
-      elements.push(
-        <Circle
-          key={`kp_${name}`}
-          cx={coords.px} cy={coords.py} r={radius}
-          fill={color} fillOpacity={0.9}
-          stroke="#000" strokeWidth={0.8}
-        />
-      );
-    }
-
-    return <G>{elements}</G>;
-  }, [scanState]);
-
-  // ── Bounding box renderer ─────────────────────────────────────────────────
-  const renderBoundingBox = useCallback(() => {
-    const { detection, status } = scanState;
-    if (!detection?.bbox) return null;
-
-    const { x, y, width, height } = detection.bbox;
-    const color = status === 'SUCCESS' ? '#22c55e'
-                : status === 'SPECIES_NOT_FOUND' ? '#ef4444'
-                : status === 'BODY_INCOMPLETE' ? '#f59e0b'
-                : '#6366f1';
-
-    return (
-      <G>
-        {/* Main box */}
-        <Rect
-          x={x} y={y} width={width} height={height}
-          stroke={color} strokeWidth={2} fill="none" strokeOpacity={0.9}
-        />
-        {/* Corner markers */}
-        {[
-          [x, y, x+20, y, x, y+20],
-          [x+width, y, x+width-20, y, x+width, y+20],
-          [x, y+height, x+20, y+height, x, y+height-20],
-          [x+width, y+height, x+width-20, y+height, x+width, y+height-20],
-        ].map(([cx, cy, ex, ey, ex2, ey2], i) => (
-          <G key={`corner_${i}`}>
-            <Line x1={cx} y1={cy} x2={ex} y2={ey} stroke={color} strokeWidth={3} />
-            <Line x1={cx} y1={cy} x2={ex2} y2={ey2} stroke={color} strokeWidth={3} />
-          </G>
-        ))}
-        {/* Species label */}
-        <Rect x={x} y={y - 22} width={120} height={20} fill={color} fillOpacity={0.85} rx={4} />
-        <SvgText x={x + 6} y={y - 7} fontSize="11" fontWeight="700" fill="#fff">
-          {detection.species.toUpperCase()} {detection.confidence}%
-        </SvgText>
-      </G>
-    );
-  }, [scanState]);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
   if (loadingModels || !allModelsReady) {
     return (
       <View style={styles.root}>
         <StatusBar barStyle="light-content" backgroundColor="#0a0f1e" />
         <LinearGradient colors={['#0a0f1e', '#0f1a2e', '#0d1b38']} style={StyleSheet.absoluteFillObject} />
-
         <SafeAreaView style={styles.initContainer}>
-          {/* Header */}
           <View style={styles.initHeader}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
               <Ionicons name="arrow-back" size={22} color="#94a3b8" />
@@ -680,299 +321,166 @@ export default function AIScannerScreen() {
             <Text style={styles.initTitle}>EcoTrack AI Scanner</Text>
             <View style={{ width: 40 }} />
           </View>
-
           <ScrollView contentContainerStyle={styles.initContent} showsVerticalScrollIndicator={false}>
-            {/* Logo + Version */}
             <View style={styles.initLogo}>
               <View style={styles.initLogoRing}>
                 <Text style={styles.initLogoEmoji}>🧬</Text>
               </View>
-              <Text style={styles.initVersion}>Computer Vision Module v2.0</Text>
-              <Text style={styles.initSubtitle}>AP-10K · 54 Species · 17 Anatomical Keypoints</Text>
+              <Text style={styles.initVersion}>Computer Vision Module v3.0</Text>
+              <Text style={styles.initSubtitle}>Multipart streaming upload & Frame-by-Frame CV</Text>
             </View>
-
-            {/* Model Cards */}
             <View style={styles.modelGrid}>
               {modelStatus.map((m, i) => (
-                <View key={i} style={[styles.modelCard, {
-                  borderColor: m.status === 'loaded' ? '#16a34a33'
-                              : m.status === 'error' || m.status === 'missing' ? '#ef444433'
-                              : '#334155',
-                }]}>
+                <View key={i} style={[styles.modelCard, { borderColor: m.status === 'loaded' ? '#16a34a33' : '#ef444433' }]}>
                   <View style={styles.modelCardLeft}>
-                    <View style={[styles.modelDot, {
-                      backgroundColor:
-                        m.status === 'loaded'  ? '#22c55e' :
-                        m.status === 'error'   ? '#ef4444' :
-                        m.status === 'missing' ? '#f59e0b' :
-                        '#6366f1'
-                    }]}>
-                      {m.status === 'checking' && (
-                        <ActivityIndicator size={10} color="#fff" />
-                      )}
-                    </View>
+                    <View style={[styles.modelDot, { backgroundColor: m.status === 'loaded' ? '#22c55e' : '#ef4444' }]} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.modelName}>{m.name}</Text>
-                      <Text style={styles.modelDetail} numberOfLines={2}>{m.detail}</Text>
+                      <Text style={styles.modelDetail}>{m.detail}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.modelStatusBadge, {
-                    color:
-                      m.status === 'loaded'  ? '#22c55e' :
-                      m.status === 'error'   ? '#ef4444' :
-                      m.status === 'missing' ? '#f59e0b' :
-                      '#6366f1',
-                    borderColor:
-                      m.status === 'loaded'  ? '#22c55e33' :
-                      m.status === 'error'   ? '#ef444433' :
-                      m.status === 'missing' ? '#f59e0b33' :
-                      '#6366f133',
-                  }]}>
-                    {m.status === 'checking' ? 'LOADING' :
-                     m.status === 'loaded'   ? 'READY' :
-                     m.status === 'missing'  ? 'MISSING' : 'ERROR'}
-                  </Text>
                 </View>
               ))}
             </View>
-
-            {/* Training notice for animal pose */}
-            {modelStatus.find(m => m.name === 'Animal Pose (AP-10K)' && m.status === 'missing') && (
-              <View style={styles.trainingNotice}>
-                <Ionicons name="information-circle" size={20} color="#6366f1" />
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.trainingNoticeTitle}>Animal Pose Training Required</Text>
-                  <Text style={styles.trainingNoticeText}>
-                    Run the training pipeline to enable animal-specific 17-keypoint pose estimation for 54+ species.
-                    {'\n\n'}{'$ python train_animal_pose.py --phase all'}
-                    {'\n\n'}Download AP-10K dataset (10K images, 54 species) from GitHub first.
-                    {'\n'}In the meantime, YOLOv8m-pose provides animal pose with AP-10K keypoint remapping.
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Actions */}
-            <View style={styles.initActions}>
-              <TouchableOpacity
-                style={[styles.initBtn, !allModelsReady && !loadingModels && { opacity: 0.5 }]}
-                onPress={loadingModels ? undefined : allModelsReady
-                  ? () => setLoadingModels(false)
-                  : () => Alert.alert(
-                      'Critical Models Missing',
-                      'The species detector or pose model failed to load. Start the AI service with: python backend/ai_service.py'
-                    )
-                }
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={allModelsReady ? ['#16a34a', '#15803d'] : ['#374151', '#1f2937']}
-                  style={styles.initBtnGrad}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                >
-                  <Ionicons
-                    name={loadingModels ? 'reload' : allModelsReady ? 'scan' : 'warning'}
-                    size={20} color="#fff"
-                  />
-                  <Text style={styles.initBtnText}>
-                    {loadingModels ? 'Checking models…'
-                      : allModelsReady ? 'Open Scanner'
-                      : 'Models Missing — Check Service'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.recheckBtn} onPress={checkModelStatus}>
-                <Ionicons name="refresh" size={16} color="#94a3b8" />
-                <Text style={styles.recheckBtnText}>Recheck</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.recheckBtn} onPress={checkModelStatus}>
+              <Ionicons name="refresh" size={16} color="#94a3b8" />
+              <Text style={styles.recheckBtnText}>Recheck</Text>
+            </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
       </View>
     );
   }
 
-  // ── Active Scanner ─────────────────────────────────────────────────────────
-  const { status, detection, keypoints, formScore, postureScore, repCount, fps,
-          errorMessage, stepLabel, bodyVisible, missingRegions, poseSource,
-          frameQuality, inferenceMs } = scanState;
-
-  const exercises = getExercisesForSpecies(selectedSpecies);
-  const selectedExercise = selectedExerciseId ? getExerciseById(selectedExerciseId) : null;
-
-  const filteredSpecies = AP10K_SUPPORTED_SPECIES
-    .filter(s => s.toLowerCase().includes(speciesSearch.toLowerCase()))
-    .sort();
-
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-
-      {/* ── Camera + Overlay ─────────────────────────────────────────── */}
-      <View style={styles.cameraContainer}>
-        {permission?.granted ? (
-          <CameraView
-            ref={cameraRef}
-            style={StyleSheet.absoluteFillObject}
-            facing={facing}
-            zoom={0}
-          />
-        ) : (
-          <View style={styles.noPermission}>
-            <Ionicons name="videocam-off" size={48} color="#64748b" />
-            <Text style={styles.noPermissionText}>Camera permission required</Text>
-            <TouchableOpacity style={styles.permBtn} onPress={requestPermission}>
-              <Text style={styles.permBtnText}>Grant Permission</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* SVG Overlay for bounding box + skeleton */}
-        <Svg
-          style={StyleSheet.absoluteFillObject}
-          width={SW} height={SH}
-          pointerEvents="none"
-        >
-          {renderBoundingBox()}
-          {renderSkeleton()}
-        </Svg>
-
-        {/* Top HUD */}
-        <View style={styles.hudTop}>
-          <TouchableOpacity style={styles.hudBack} onPress={() => { stopScanning(); router.back(); }}>
-            <Ionicons name="arrow-back" size={20} color="#fff" />
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color="#94a3b8" />
           </TouchableOpacity>
-
-          <View style={styles.hudCenter}>
-            <Animated.View style={[styles.statusDot, { transform: [{ scale: pulseAnim }], backgroundColor:
-              status === 'SUCCESS' ? '#22c55e' :
-              status === 'SPECIES_NOT_FOUND' || status === 'ERROR' ? '#ef4444' :
-              status === 'BODY_INCOMPLETE' || status === 'QUALITY_FAIL' ? '#f59e0b' :
-              '#6366f1'
-            }]} />
-            <Text style={styles.stepLabel} numberOfLines={1}>{stepLabel}</Text>
-          </View>
-
-          <View style={styles.hudRight}>
-            <Text style={styles.hudFps}>{fps} fps</Text>
-            <Text style={styles.hudMs}>{inferenceMs}ms</Text>
-          </View>
+          <Text style={styles.headerTitle}>AI Video Scanner</Text>
+          <View style={{ width: 40 }} />
         </View>
 
-        {/* Bottom HUD */}
-        <View style={styles.hudBottom}>
-          {/* Error Banner */}
-          {errorMessage && (
-            <View style={[styles.errorBanner, {
-              borderLeftColor:
-                status === 'SPECIES_NOT_FOUND' ? '#ef4444' :
-                status === 'BODY_INCOMPLETE' ? '#f59e0b' : '#6366f1'
-            }]}>
-              <Ionicons name="warning" size={16} color={
-                status === 'SPECIES_NOT_FOUND' ? '#ef4444' :
-                status === 'BODY_INCOMPLETE' ? '#f59e0b' : '#6366f1'
-              } />
-              <Text style={styles.errorBannerText} numberOfLines={3}>{errorMessage}</Text>
-            </View>
+        {/* Large Preview Area */}
+        <View style={styles.previewContainer}>
+          {selectedVideo ? (
+            <Video
+              source={{ uri: selectedVideo.uri }}
+              style={StyleSheet.absoluteFillObject}
+              useNativeControls
+              resizeMode={ResizeMode.CONTAIN}
+              isLooping
+            />
+          ) : (
+            <TouchableOpacity style={styles.placeholderContainer} onPress={handleSelectVideo}>
+              <Ionicons name="cloud-upload" size={64} color={colors.primary} />
+              <Text style={styles.placeholderText}>Tap to select a video file</Text>
+              <Text style={styles.placeholderSub}>MP4 formats up to 500MB supported</Text>
+            </TouchableOpacity>
           )}
+        </View>
 
-          {/* Stats row */}
-          {status === 'SUCCESS' && (
-            <View style={styles.statsRow}>
-              <View style={styles.statChip}>
-                <Text style={styles.statValue}>{repCount}</Text>
-                <Text style={styles.statLabel}>Reps</Text>
-              </View>
-              <View style={styles.statChip}>
-                <Text style={[styles.statValue, { color:
-                  formScore >= 80 ? '#22c55e' :
-                  formScore >= 60 ? '#f59e0b' : '#ef4444'
-                }]}>{formScore}%</Text>
-                <Text style={styles.statLabel}>Form</Text>
-              </View>
-              <View style={styles.statChip}>
-                <Text style={styles.statValue}>{postureScore}%</Text>
-                <Text style={styles.statLabel}>Posture</Text>
-              </View>
-              <View style={styles.statChip}>
-                <Text style={styles.statValue}>{frameQuality}%</Text>
-                <Text style={styles.statLabel}>Quality</Text>
-              </View>
+        {/* Resizable Control Panel */}
+        <View style={[styles.resizePanel, { width: panelSize.width, height: panelSize.height }]}>
+          <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.controlsRow}>
+              {/* Species */}
+              <TouchableOpacity style={styles.controlChip} onPress={() => setShowSpeciesModal(true)}>
+                <Ionicons name="paw" size={14} color="#a78bfa" />
+                <Text style={styles.controlChipText}>{selectedSpecies}</Text>
+              </TouchableOpacity>
+
+              {/* Exercise */}
+              <TouchableOpacity style={styles.controlChip} onPress={() => setShowExerciseModal(true)}>
+                <Ionicons name="fitness" size={14} color="#22c55e" />
+                <Text style={styles.controlChipText} numberOfLines={1}>
+                  {selectedExercise?.name || 'Select exercise'}
+                </Text>
+              </TouchableOpacity>
             </View>
-          )}
 
-          {/* Pose source badge */}
-          {poseSource && (
-            <View style={styles.poseSourceBadge}>
-              <Ionicons name="information-circle-outline" size={12} color="#6366f1" />
-              <Text style={styles.poseSourceText}>
-                {poseSource === 'mediapipe_blazepose' ? 'MediaPipe BlazePose (COCO-17)' :
-                 poseSource === 'rtmpose_ap10k'       ? 'RTMPose-M AP-10K (17 kpts)' :
-                 poseSource === 'animal_pose_finetuned' ? 'Fine-tuned Animal Pose (AP-10K)' :
-                 poseSource === 'yolov8_ap10k_remap'  ? 'YOLOv8 + AP-10K Remap (17 kpts)' :
-                 poseSource}
-              </Text>
-            </View>
-          )}
-
-          {/* Controls */}
-          <View style={styles.controls}>
-            {/* Species */}
-            <TouchableOpacity style={styles.controlChip} onPress={() => setShowSpeciesModal(true)}>
-              <Ionicons name="paw" size={14} color="#a78bfa" />
-              <Text style={styles.controlChipText}>{selectedSpecies}</Text>
-              <Ionicons name="chevron-down" size={12} color="#64748b" />
+            {/* Select video button */}
+            <TouchableOpacity style={styles.uploadBtn} onPress={handleSelectVideo}>
+              <Ionicons name="videocam" size={20} color="#fff" />
+              <Text style={styles.uploadBtnText}>{selectedVideo ? "Change Video File" : "Select Video File"}</Text>
             </TouchableOpacity>
 
-            {/* Exercise */}
-            <TouchableOpacity style={styles.controlChip} onPress={() => setShowExerciseModal(true)}>
-              <Ionicons name="fitness" size={14} color="#22c55e" />
-              <Text style={styles.controlChipText} numberOfLines={1}>
-                {selectedExercise?.name || 'Select exercise'}
-              </Text>
-              <Ionicons name="chevron-down" size={12} color="#64748b" />
-            </TouchableOpacity>
-
-            {/* Flip camera */}
-            <TouchableOpacity style={styles.iconBtn} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
-              <Ionicons name="camera-reverse-outline" size={20} color="#94a3b8" />
-            </TouchableOpacity>
-
-            {/* Upload */}
-            <TouchableOpacity style={styles.iconBtn} onPress={handleUploadImage}>
-              <Ionicons name="image-outline" size={20} color="#94a3b8" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Scan button */}
-          <View style={styles.scanBtnRow}>
-            {isScanning ? (
-              <View style={styles.scanningBtns}>
-                <TouchableOpacity style={styles.finishBtn} onPress={finishScan}>
-                  <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
-                  <Text style={styles.finishBtnText}>Finish & Report</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.stopBtn} onPress={stopScanning}>
-                  <Ionicons name="stop-circle" size={18} color="#ef4444" />
-                  <Text style={styles.stopBtnText}>Stop</Text>
+            {/* UI States */}
+            {status === 'LOADING' && (
+              <View style={styles.stateBox}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.stateText}>Uploading & Analyzing: {uploadProgress}%</Text>
+                <View style={styles.progressBarBg}>
+                  <View style={[styles.progressBarFill, { width: `${uploadProgress}%` }]} />
+                </View>
+                <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <TouchableOpacity style={styles.scanBtn} onPress={startScanning} activeOpacity={0.85}>
-                <LinearGradient
-                  colors={['#16a34a', '#15803d']}
-                  style={styles.scanBtnGrad}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            )}
+
+            {status === 'ERROR' && (
+              <View style={styles.stateBox}>
+                <Ionicons name="alert-circle" size={24} color="#ef4444" />
+                <Text style={styles.errorText}>{errorMsg || "An error occurred."}</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={handleStartAnalysis}>
+                  <Text style={styles.retryBtnText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {status === 'CANCEL' && (
+              <View style={styles.stateBox}>
+                <Ionicons name="close-circle" size={24} color="#f59e0b" />
+                <Text style={styles.stateText}>Analysis cancelled by user.</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={handleStartAnalysis}>
+                  <Text style={styles.retryBtnText}>Start Again</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {status === 'SUCCESS' && reports.length > 0 && (
+              <View style={styles.stateBox}>
+                <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
+                <Text style={styles.stateText}>Detected {reports.length} tracked targets:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
+                  {reports.map((rep, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[styles.targetChip, selectedReportIdx === idx && styles.targetChipActive]}
+                      onPress={() => setSelectedReportIdx(idx)}
+                    >
+                      <Text style={[styles.targetChipText, selectedReportIdx === idx && { color: '#fff' }]}>
+                        {rep.targetId}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.viewReportBtn}
+                  onPress={() => handleViewReport(reports[selectedReportIdx])}
                 >
-                  <Ionicons name="scan" size={22} color="#fff" />
-                  <Text style={styles.scanBtnText}>Start AI Scan</Text>
-                </LinearGradient>
+                  <Text style={styles.viewReportBtnText}>View Detailed Report</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {selectedVideo && status === 'IDLE' && (
+              <TouchableOpacity style={styles.analyzeBtn} onPress={handleStartAnalysis}>
+                <Text style={styles.analyzeBtnText}>Start Frame-by-Frame CV Analysis</Text>
               </TouchableOpacity>
             )}
+          </ScrollView>
+
+          {/* Corner Resize Handle */}
+          <View style={styles.resizeHandle} {...panResponder.panHandlers}>
+            <Ionicons name="resize" size={16} color="#64748b" />
           </View>
         </View>
-      </View>
+      </SafeAreaView>
 
       {/* ── Species Modal ─────────────────────────────────────────────── */}
       <Modal visible={showSpeciesModal} transparent animationType="slide">
@@ -993,29 +501,15 @@ export default function AIScannerScreen() {
               autoCapitalize="none"
             />
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-              {filteredSpecies.map(sp => {
-                const hasSkeleton = getSkeletonForSpecies(sp) !== null;
-                return (
-                  <TouchableOpacity
-                    key={sp}
-                    style={[styles.speciesItem, selectedSpecies === sp && styles.speciesItemActive]}
-                    onPress={() => { setSelectedSpecies(sp); setShowSpeciesModal(false); setSpeciesSearch(''); }}
-                  >
-                    <View>
-                      <Text style={[styles.speciesName, selectedSpecies === sp && { color: '#22c55e' }]}>
-                        {sp.charAt(0).toUpperCase() + sp.slice(1)}
-                      </Text>
-                      <Text style={styles.speciesScheme}>
-                        {sp === 'human' ? 'COCO-17 · MediaPipe BlazePose' : 'AP-10K-17 · RTMPose-M'}
-                      </Text>
-                    </View>
-                    {hasSkeleton
-                      ? <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-                      : <Ionicons name="alert-circle" size={16} color="#f59e0b" />
-                    }
-                  </TouchableOpacity>
-                );
-              })}
+              {filteredSpecies.map(sp => (
+                <TouchableOpacity
+                  key={sp}
+                  style={[styles.speciesItem, selectedSpecies === sp && styles.speciesItemActive]}
+                  onPress={() => { setSelectedSpecies(sp); setShowSpeciesModal(false); setSpeciesSearch(''); }}
+                >
+                  <Text style={styles.speciesName}>{sp.toUpperCase()}</Text>
+                </TouchableOpacity>
+              ))}
             </ScrollView>
           </View>
         </View>
@@ -1044,15 +538,7 @@ export default function AIScannerScreen() {
                   style={[styles.speciesItem, selectedExerciseId === ex.id && styles.speciesItemActive]}
                   onPress={() => { setSelectedExerciseId(ex.id); setShowExerciseModal(false); }}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.speciesName, selectedExerciseId === ex.id && { color: '#22c55e' }]}>
-                      {ex.name}
-                    </Text>
-                    <Text style={styles.speciesScheme}>{ex.description}</Text>
-                  </View>
-                  {selectedExerciseId === ex.id && (
-                    <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-                  )}
+                  <Text style={styles.speciesName}>{ex.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -1063,186 +549,63 @@ export default function AIScannerScreen() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────────────────────────────────────────
 function getStyles(colors: any, isDark: boolean) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#000' },
-
-    // ── Camera ──────────────────────────────────────────────────────────
-    cameraContainer: { flex: 1, position: 'relative' },
-    noPermission: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0f1e' },
-    noPermissionText: { color: '#94a3b8', marginTop: 16, fontSize: 15 },
-    permBtn: { marginTop: 20, backgroundColor: '#16a34a', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
-    permBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
-    // ── HUD Top ─────────────────────────────────────────────────────────
-    hudTop: {
-      position: 'absolute', top: 0, left: 0, right: 0,
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingTop: 48, paddingHorizontal: 16, paddingBottom: 12,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-    },
-    hudBack: {
-      width: 40, height: 40, borderRadius: 20,
-      backgroundColor: 'rgba(255,255,255,0.1)',
-      alignItems: 'center', justifyContent: 'center',
-    },
-    hudCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-    statusDot: { width: 10, height: 10, borderRadius: 5 },
-    stepLabel: { color: '#e2e8f0', fontSize: 13, fontWeight: '600', maxWidth: 200 },
-    hudRight: { alignItems: 'flex-end' },
-    hudFps: { color: '#22c55e', fontSize: 13, fontWeight: '800' },
-    hudMs: { color: '#64748b', fontSize: 10, marginTop: 2 },
-
-    // ── HUD Bottom ──────────────────────────────────────────────────────
-    hudBottom: {
-      position: 'absolute', bottom: 0, left: 0, right: 0,
-      backgroundColor: 'rgba(0,0,0,0.7)',
-      borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)',
-      padding: 16, paddingBottom: 32,
-      backdropFilter: 'blur(12px)',
-    },
-    errorBanner: {
-      flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-      backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, padding: 12,
-      borderLeftWidth: 3, marginBottom: 10,
-    },
-    errorBannerText: { flex: 1, color: '#e2e8f0', fontSize: 13, lineHeight: 18 },
-
-    statsRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-    statChip: {
-      flex: 1, backgroundColor: 'rgba(255,255,255,0.06)',
-      borderRadius: 10, padding: 10, alignItems: 'center',
-      borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    },
-    statValue: { color: '#f8fafc', fontSize: 18, fontWeight: '900' },
-    statLabel: { color: '#64748b', fontSize: 11, marginTop: 2 },
-
-    poseSourceBadge: {
-      flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8,
-      backgroundColor: 'rgba(99,102,241,0.1)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
-      alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(99,102,241,0.2)',
-    },
-    poseSourceText: { color: '#818cf8', fontSize: 11 },
-
-    controls: { flexDirection: 'row', gap: 8, marginBottom: 12, alignItems: 'center' },
-    controlChip: {
-      flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
-      backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8,
-      borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    },
-    controlChipText: { flex: 1, color: '#e2e8f0', fontSize: 12, fontWeight: '600' },
-    iconBtn: {
-      width: 40, height: 40, borderRadius: 12,
-      backgroundColor: 'rgba(255,255,255,0.06)',
-      alignItems: 'center', justifyContent: 'center',
-      borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    },
-
-    scanBtnRow: { alignItems: 'center' },
-    scanBtn: { width: '100%', borderRadius: 16, overflow: 'hidden' },
-    scanBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-    scanBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-
-    scanningBtns: { flexDirection: 'row', gap: 10, width: '100%' },
-    finishBtn: {
-      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-      backgroundColor: 'rgba(34,197,94,0.15)', borderRadius: 14, paddingVertical: 14,
-      borderWidth: 1.5, borderColor: '#22c55e44',
-    },
-    finishBtnText: { color: '#22c55e', fontWeight: '700', fontSize: 14 },
-    stopBtn: {
-      width: 80, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-      backgroundColor: 'rgba(239,68,68,0.12)', borderRadius: 14, paddingVertical: 14,
-      borderWidth: 1.5, borderColor: '#ef444433',
-    },
-    stopBtnText: { color: '#ef4444', fontWeight: '700', fontSize: 13 },
-
-    // ── Init / Loading ───────────────────────────────────────────────────
+    root: { flex: 1, backgroundColor: '#020617' },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+    headerTitle: { color: '#f8fafc', fontSize: 18, fontWeight: '800' },
+    backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
+    previewContainer: { flex: 1, margin: 16, borderRadius: Radius.xl, overflow: 'hidden', backgroundColor: '#0b0f19', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
+    placeholderContainer: { alignItems: 'center', justifyContent: 'center' },
+    placeholderText: { color: '#94a3b8', fontSize: 16, fontWeight: '700', marginTop: 12 },
+    placeholderSub: { color: '#475569', fontSize: 12, marginTop: 4 },
+    resizePanel: { position: 'absolute', bottom: 16, right: 16, backgroundColor: '#0f172a', borderRadius: Radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', ...Shadow.md },
+    resizeHandle: { position: 'absolute', bottom: 4, right: 4, padding: 8 },
+    controlsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+    controlChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, paddingVertical: 10 },
+    controlChipText: { color: '#e2e8f0', fontSize: 12, fontWeight: '600' },
+    uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12, paddingVertical: 12, marginBottom: 12 },
+    uploadBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    analyzeBtn: { backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+    analyzeBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+    stateBox: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 12, padding: 12, alignItems: 'center', width: '100%' },
+    stateText: { color: '#cbd5e1', fontSize: 13, marginTop: 4, textAlign: 'center' },
+    progressBarBg: { width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, marginVertical: 8, overflow: 'hidden' },
+    progressBarFill: { height: '100%', backgroundColor: '#22c55e' },
+    cancelBtn: { marginTop: 8, paddingVertical: 6, paddingHorizontal: 16, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.1)' },
+    cancelBtnText: { color: '#ef4444', fontSize: 12, fontWeight: '700' },
+    errorText: { color: '#ef4444', fontSize: 13, textAlign: 'center', marginVertical: 8 },
+    retryBtn: { backgroundColor: 'rgba(255,255,255,0.08)', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
+    retryBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+    targetChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', marginRight: 6 },
+    targetChipActive: { backgroundColor: '#16a34a' },
+    targetChipText: { color: '#94a3b8', fontSize: 12, fontWeight: '700' },
+    viewReportBtn: { backgroundColor: '#16a34a', width: '100%', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
+    viewReportBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
     initContainer: { flex: 1 },
-    initHeader: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8,
-    },
-    backBtn: {
-      width: 40, height: 40, borderRadius: 20,
-      backgroundColor: 'rgba(255,255,255,0.06)',
-      alignItems: 'center', justifyContent: 'center',
-    },
+    initHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12 },
     initTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '800' },
-    initContent: { paddingHorizontal: 20, paddingBottom: 40 },
-    initLogo: { alignItems: 'center', paddingVertical: 32 },
-    initLogoRing: {
-      width: 80, height: 80, borderRadius: 40,
-      backgroundColor: 'rgba(22,163,74,0.15)',
-      alignItems: 'center', justifyContent: 'center',
-      borderWidth: 2, borderColor: 'rgba(22,163,74,0.3)',
-      marginBottom: 16,
-    },
+    initContent: { paddingHorizontal: 16, paddingBottom: 40 },
+    initLogo: { alignItems: 'center', paddingVertical: 24 },
+    initLogoRing: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(22,163,74,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(22,163,74,0.3)', marginBottom: 12 },
     initLogoEmoji: { fontSize: 36 },
     initVersion: { color: '#f8fafc', fontSize: 16, fontWeight: '700', marginBottom: 4 },
     initSubtitle: { color: '#64748b', fontSize: 12, textAlign: 'center' },
-
     modelGrid: { gap: 10, marginBottom: 20 },
-    modelCard: {
-      flexDirection: 'row', alignItems: 'center',
-      backgroundColor: 'rgba(255,255,255,0.04)',
-      borderRadius: 14, padding: 14, borderWidth: 1,
-    },
-    modelCardLeft: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-    modelDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+    modelCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, borderWidth: 1 },
+    modelCardLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+    modelDot: { width: 12, height: 12, borderRadius: 6 },
     modelName: { color: '#e2e8f0', fontSize: 13, fontWeight: '700', marginBottom: 3 },
-    modelDetail: { color: '#64748b', fontSize: 11, lineHeight: 16 },
-    modelStatusBadge: {
-      fontSize: 10, fontWeight: '800', letterSpacing: 0.5,
-      borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3,
-    },
-
-    trainingNotice: {
-      flexDirection: 'row', alignItems: 'flex-start', gap: 0,
-      backgroundColor: 'rgba(99,102,241,0.08)',
-      borderRadius: 14, padding: 16, marginBottom: 20,
-      borderWidth: 1, borderColor: 'rgba(99,102,241,0.2)',
-    },
-    trainingNoticeTitle: { color: '#818cf8', fontWeight: '700', fontSize: 13, marginBottom: 6 },
-    trainingNoticeText: { color: '#94a3b8', fontSize: 12, lineHeight: 18, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace' },
-
-    initActions: { gap: 10 },
-    initBtn: { borderRadius: 16, overflow: 'hidden' },
-    initBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-    initBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-    recheckBtn: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-      paddingVertical: 12, borderRadius: 12,
-      backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    },
+    modelDetail: { color: '#64748b', fontSize: 11 },
+    recheckBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
     recheckBtnText: { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
-
-    // ── Modals ───────────────────────────────────────────────────────────
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-    modalSheet: {
-      backgroundColor: '#0f172a', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-      maxHeight: SH * 0.75, padding: 20,
-      borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    },
+    modalSheet: { backgroundColor: '#0f172a', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: SH * 0.6, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
     modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
     modalTitle: { color: '#f8fafc', fontSize: 17, fontWeight: '800' },
-    modalSearch: {
-      backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12,
-      paddingHorizontal: 14, paddingVertical: 10,
-      color: '#e2e8f0', fontSize: 14,
-      borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-      marginBottom: 12,
-    },
-    speciesItem: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingVertical: 12, paddingHorizontal: 4,
-      borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
-    },
+    modalSearch: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, color: '#e2e8f0', fontSize: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', marginBottom: 12 },
+    speciesItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
     speciesItemActive: { backgroundColor: 'rgba(22,163,74,0.08)', borderRadius: 10, paddingHorizontal: 10 },
     speciesName: { color: '#e2e8f0', fontSize: 14, fontWeight: '600' },
-    speciesScheme: { color: '#4b5563', fontSize: 11, marginTop: 2 },
   });
 }

@@ -1,460 +1,283 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
   Alert, TextInput, Modal, Switch, StatusBar, Dimensions, ActivityIndicator,
+  FlatList
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize } from "@/constants/theme";
-import { router } from "expo-router";
-import { getTrainingAnalytics, TrainingAnalyticsState, MotionAnalysisResult } from "@/data/trainingAnalyticsStore";
+import { Radius, Shadow, FontSize, Spacing } from "@/constants/theme";
+import { router, useFocusEffect } from "expo-router";
 
 const { width } = Dimensions.get("window");
-const API_BASE = "http://localhost:5000/api";
+const SOCIAL_BASE = "http://localhost:5000/api/social";
 
-type PetProfile = {
-  id: number; name: string; species: string;
-  breed: string; age: string; weight: string; image: string; isPrimary?: boolean;
+type UserProfile = {
+  id: string;
+  name: string;
+  display_name: string;
+  bio: string;
+  avatar_url: string;
+  reputation_score: number;
+  followers_count: number;
+  following_count: number;
+  profession?: string;
+  impact_stats?: any;
+  organization?: string;
+  city?: string;
+  country?: string;
 };
 
-type UserSession = {
-  user_id: string; email: string; name: string; avatar?: string; token?: string;
+type EditProfileBody = {
+  display_name: string;
+  bio: string;
+  profession: string;
+  organization: string;
+  city: string;
+  country: string;
 };
 
-export default function ProfileScreen() {
-  const { colors, toggleTheme, isDark } = useTheme();
-  const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
-
-  const [session, setSession] = useState<UserSession | null>(null);
+export default function ProfileRedesignScreen() {
+  const { colors, isDark } = useTheme();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [pets, setPets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [username, setUsername] = useState("Eco Explorer");
-  const [bio, setBio] = useState("Nature enthusiast • Wildlife Photographer • Conservationist");
-  const [location, setLocation] = useState("India");
-  const [avatar, setAvatar] = useState("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200");
-  const [stats, setStats] = useState({ rescues: 0, xp: 0, plans: 0 });
-  const [analyticsState, setAnalyticsState] = useState<TrainingAnalyticsState | null>(null);
+  const [activeTab, setActiveTab] = useState("Vault");
 
   const [editModal, setEditModal] = useState(false);
-  const [settingsModal, setSettingsModal] = useState(false);
+  const [editForm, setEditForm] = useState<EditProfileBody>({
+    display_name: "", bio: "", profession: "", organization: "", city: "", country: ""
+  });
+  const [isSaving, setIsSaving] = useState(false);
 
-  const [pets, setPets] = useState<PetProfile[]>([]);
-  const [addPetModal, setAddPetModal] = useState(false);
-  const [petName, setPetName] = useState("");
-  const [petSpecies, setPetSpecies] = useState("");
-  const [petBreed, setPetBreed] = useState("");
-  const [petAge, setPetAge] = useState("");
-  const [petWeight, setPetWeight] = useState("");
-  const [petImage, setPetImage] = useState<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, [])
+  );
 
-  // ── LOAD PROFILE FROM BACKEND ──
-  useEffect(() => {
-    loadProfile();
-    getTrainingAnalytics().then(setAnalyticsState);
-  }, []);
-
-  const loadProfile = async () => {
+  const fetchProfile = async () => {
     try {
       const raw = await AsyncStorage.getItem("@ecotrack_user_session");
       if (!raw) { router.replace("/auth/login"); return; }
-      const sess: UserSession = JSON.parse(raw);
-      setSession(sess);
+      const session = JSON.parse(raw);
 
-      // Load from backend
-      const res = await fetch(`${API_BASE}/users/${sess.user_id}`);
+      const res = await fetch(`${SOCIAL_BASE}/me`, {
+        headers: { 'Authorization': `Bearer ${session.token}` }
+      });
       if (res.ok) {
         const data = await res.json();
-        setUsername(data.name || sess.name || "Eco Explorer");
-        setBio(data.bio || "Nature enthusiast • Wildlife Photographer");
-        setLocation(data.location || "India");
-        setAvatar(data.avatar || sess.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200");
-        setStats(data.stats || { rescues: 0, xp: 0, plans: 0 });
+        setProfile(data.profile);
         setPets(data.pets || []);
-      } else {
-        // Use session data as fallback
-        setUsername(sess.name || "Eco Explorer");
-        setAvatar(sess.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200");
+
+        setEditForm({
+          display_name: data.profile.display_name || data.profile.name || "",
+          bio: data.profile.bio || "",
+          profession: data.profile.profession || "",
+          organization: data.profile.organization || "",
+          city: data.profile.city || "",
+          country: data.profile.country || ""
+        });
       }
     } catch (e) {
-      // Offline — load from AsyncStorage cache
-      const raw = await AsyncStorage.getItem("@ecotrack_user_session");
-      if (raw) {
-        const sess: UserSession = JSON.parse(raw);
-        setSession(sess);
-        setUsername(sess.name || "Eco Explorer");
-        setAvatar(sess.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200");
-      }
+      console.warn("Profile fetch error", e);
     } finally {
       setIsLoading(false);
     }
   };
 
   const saveProfile = async () => {
-    if (!session) return;
     try {
-      await fetch(`${API_BASE}/users/${session.user_id}`, {
+      setIsSaving(true);
+      const raw = await AsyncStorage.getItem("@ecotrack_user_session");
+      const session = JSON.parse(raw || "{}");
+
+      const res = await fetch(`${SOCIAL_BASE}/profile`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: username, bio, location, avatar }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.token}`
+        },
+        body: JSON.stringify(editForm)
       });
-      // Update session cache
-      const updatedSession = { ...session, name: username, avatar };
-      await AsyncStorage.setItem("@ecotrack_user_session", JSON.stringify(updatedSession));
-      setSession(updatedSession);
+
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data.profile);
+        setEditModal(false);
+        Alert.alert("Success", "Welfare profile updated.");
+      }
     } catch (e) {
-      console.warn("Profile save offline — cached locally");
+      Alert.alert("Error", "Could not sync changes to cloud.");
+    } finally {
+      setIsSaving(false);
     }
-    setEditModal(false);
-    Alert.alert("✅ Saved", "Profile updated successfully!");
   };
 
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to sign out?", [
+    Alert.alert("Logout", "Sign out of EcoTrack?", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout", style: "destructive", onPress: async () => {
-          await AsyncStorage.removeItem("@ecotrack_user_session");
-          await AsyncStorage.removeItem("@ecotrack_user_id");
-          router.replace("/auth/login");
-        }
-      }
-    ]);
-  };
-
-  const pickPetImage = async () => {
-    const r = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8,
-    });
-    if (!r.canceled) setPetImage(r.assets[0].uri);
-  };
-
-  const handleAddPet = async () => {
-    if (!petName.trim() || !petSpecies.trim()) {
-      Alert.alert("Required", "Please enter pet name and species."); return;
-    }
-    const petData = {
-      name: petName, species: petSpecies,
-      breed: petBreed || "Standard Breed",
-      age: petAge || "1 Year",
-      weight: petWeight || "10 kg",
-      image: petImage || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=300",
-      isPrimary: pets.length === 0,
-    };
-    try {
-      if (session) {
-        const res = await fetch(`${API_BASE}/users/${session.user_id}/pets`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(petData),
-        });
-        const data = await res.json();
-        if (data.pet) {
-          setPets(prev => [data.pet, ...prev]);
-          Alert.alert("🐾 Added!", `${data.pet.name} has been added to your vault.`);
-        }
-      }
-    } catch {
-      // Offline fallback
-      const newPet: PetProfile = { id: Date.now(), ...petData };
-      setPets(prev => [newPet, ...prev]);
-      Alert.alert("🐾 Added!", `${petData.name} has been added (offline).`);
-    }
-    setPetName(""); setPetSpecies(""); setPetBreed(""); setPetAge(""); setPetWeight(""); setPetImage(null);
-    setAddPetModal(false);
-  };
-
-  const handleRemovePet = (petId: number, petName: string) => {
-    Alert.alert("Remove Pet", `Remove ${petName} from your vault?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove", style: "destructive", onPress: async () => {
-          try {
-            if (session) {
-              await fetch(`${API_BASE}/users/${session.user_id}/pets/${petId}`, { method: "DELETE" });
-            }
-          } catch { /* offline */ }
-          setPets(prev => prev.filter(p => p.id !== petId));
-        }
-      }
+      { text: "Sign Out", style: "destructive", onPress: async () => {
+        await AsyncStorage.clear();
+        router.replace("/auth/login");
+      }}
     ]);
   };
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { justifyContent: "center", alignItems: "center", backgroundColor: colors.bgLight }]}>
+      <View style={[styles.center, { backgroundColor: colors.bgLight }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ color: colors.textMuted, marginTop: 12, fontSize: 14 }}>Loading profile...</Text>
       </View>
     );
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bgLight }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <StatusBar barStyle="light-content" />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header Cover */}
-        <View style={styles.headerArea}>
-          <Image source={{ uri: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800" }} style={styles.coverImg} />
-          <LinearGradient colors={["transparent", "rgba(0,0,0,0.85)"]} style={styles.coverGradient} />
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.actionIcon} onPress={() => setSettingsModal(true)}>
-              <Ionicons name="settings-outline" size={22} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionIcon} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </View>
+      {/* ── REDESIGNED HERO ── */}
+      <View style={styles.heroContainer}>
+        <Image source={{ uri: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=800" }} style={styles.heroCover} />
+        <LinearGradient colors={["transparent", "rgba(0,0,0,0.9)"]} style={styles.heroOverlay} />
 
-        {/* Profile Identity */}
-        <View style={styles.profileSummary}>
-          <View style={styles.avatarWrapper}>
-            <Image source={{ uri: avatar }} style={[styles.avatar, { borderColor: colors.bgCard }]} />
-            <View style={[styles.statusDot, { borderColor: colors.bgCard }]} />
-          </View>
-
-          <View style={styles.nameRow}>
-            <Text style={[styles.username, { color: colors.textPrimary }]}>{username}</Text>
-            <View style={styles.proBadge}>
-              <Text style={styles.proText}>PRO</Text>
+        <View style={styles.heroContent}>
+          <View style={styles.identityRow}>
+            <View style={[styles.avatarBorder, { borderColor: colors.primary }]}>
+              <Image source={{ uri: profile?.avatar_url || "https://ui-avatars.com/api/?name=Eco&background=10b981&color=fff" }} style={styles.avatar} />
             </View>
-          </View>
-          <Text style={[styles.bioText, { color: colors.textSecondary }]}>{bio}</Text>
-          {location ? (
-            <View style={styles.locationRow}>
-              <Ionicons name="location" size={14} color={colors.primary} />
-              <Text style={[styles.locationText, { color: colors.primary }]}>{location}</Text>
-            </View>
-          ) : null}
-
-          {/* Core Stats */}
-          <View style={[styles.mainStatsRow, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
-            <View style={styles.mainStat}>
-              <Text style={[styles.statVal, { color: colors.textPrimary }]}>{stats.rescues}</Text>
-              <Text style={[styles.statLab, { color: colors.textMuted }]}>Rescues</Text>
-            </View>
-            <View style={[styles.mainStat, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border }]}>
-              <Text style={[styles.statVal, { color: colors.textPrimary }]}>{stats.xp}</Text>
-              <Text style={[styles.statLab, { color: colors.textMuted }]}>XP</Text>
-            </View>
-            <View style={styles.mainStat}>
-              <Text style={[styles.statVal, { color: colors.textPrimary }]}>{stats.plans}</Text>
-              <Text style={[styles.statLab, { color: colors.textMuted }]}>Plans</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity style={[styles.editBtn, { backgroundColor: colors.primary }]} onPress={() => setEditModal(true)}>
-            <Ionicons name="create-outline" size={18} color="#fff" />
-            <Text style={styles.editBtnText}>Edit Profile</Text>
-          </TouchableOpacity>
-
-          {/* Email badge */}
-          {session?.email ? (
-            <View style={[styles.emailBadge, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
-              <Ionicons name="mail-outline" size={14} color={colors.textMuted} />
-              <Text style={[styles.emailText, { color: colors.textMuted }]}>{session.email}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        {/* ENVIRONMENTAL IMPACT */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>🌍 Environmental Impact</Text>
-          <View style={[styles.impactCard, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
-            <View style={styles.impactGrid}>
-              {[
-                { icon: "leaf", color: "#16a34a", bg: "#dcfce7", val: "840kg", lab: "CO2 Saved" },
-                { icon: "sunny", color: "#d97706", bg: "#fef3c7", val: "12", lab: "Trees Planted" },
-                { icon: "water", color: "#0284c7", bg: "#e0f2fe", val: "2.5k L", lab: "Water Saved" },
-              ].map((item) => (
-                <View key={item.lab} style={styles.impactItem}>
-                  <View style={[styles.impactIcon, { backgroundColor: item.bg }]}>
-                    <Ionicons name={item.icon as any} size={20} color={item.color} />
-                  </View>
-                  <Text style={[styles.impactVal, { color: colors.textPrimary }]}>{item.val}</Text>
-                  <Text style={[styles.impactLab, { color: colors.textSecondary }]}>{item.lab}</Text>
+            <View style={styles.identityText}>
+              <Text style={styles.nameText}>{profile?.display_name || profile?.name}</Text>
+              <Text style={styles.roleText}>{profile?.profession || "Eco Practitioner"}</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.miniStat}>
+                  <Text style={styles.statValue}>{profile?.followers_count || 0}</Text>
+                  <Text style={styles.statLabel}>Followers</Text>
                 </View>
-              ))}
-            </View>
-          </View>
-        </View>
+                <View style={[styles.miniStat, { marginHorizontal: 20 }]}>
+                  <Text style={styles.statValue}>{profile?.following_count || 0}</Text>
+                  <Text style={styles.statLabel}>Following</Text>
+                </View>
+                <View style={styles.miniStat}>
+                  <Text style={styles.statValue}>{profile?.reputation_score || 120}</Text>
+                  <Text style={styles.statLabel}>XP</Text>
+                </View>
+              </View>
 
-        {/* PET VAULT */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>🐾 Animal & Pet Vault</Text>
-            <TouchableOpacity onPress={() => setAddPetModal(true)}>
-              <Text style={[styles.viewAllText, { color: colors.primary }]}>+ Add New</Text>
-            </TouchableOpacity>
-          </View>
-
-          {pets.length === 0 ? (
-            <View style={[styles.emptyPets, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
-              <Text style={{ fontSize: 32 }}>🐾</Text>
-              <Text style={[{ color: colors.textMuted, marginTop: 8, fontSize: 14, fontWeight: "600" }]}>No pets added yet</Text>
-              <TouchableOpacity style={[styles.addPetBtn, { backgroundColor: colors.primary }]} onPress={() => setAddPetModal(true)}>
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>Add Your First Pet</Text>
+              {/* Edit Profile Action */}
+              <TouchableOpacity style={[styles.editBtn, { backgroundColor: colors.primary }]} onPress={() => setEditModal(true)}>
+                <Ionicons name="pencil" size={16} color="#fff" />
+                <Text style={styles.editBtnText}>Edit Profile</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20 }}>
-              {pets.map((pet) => (
-                <TouchableOpacity
-                  key={pet.id}
-                  style={[styles.petCard, { backgroundColor: colors.bgCard, borderColor: colors.border }]}
-                  onLongPress={() => handleRemovePet(pet.id, pet.name)}
-                >
-                  <Image source={{ uri: pet.image }} style={styles.petAvatar} />
-                  <View style={styles.petInfo}>
-                    <Text style={[styles.petNameText, { color: colors.textPrimary }]}>{pet.name}</Text>
-                    <Text style={[styles.petSpeciesText, { color: colors.textSecondary }]}>{pet.breed}</Text>
-                    <View style={[styles.tag, { backgroundColor: isDark ? "#1e293b" : "#f1f5f9" }]}>
-                      <Text style={[styles.tagText, { color: colors.textSecondary }]}>{pet.age} • {pet.weight}</Text>
-                    </View>
-                  </View>
-                  {pet.isPrimary && (
-                    <View style={[styles.primaryBadge, { backgroundColor: colors.primary }]}>
-                      <Ionicons name="star" size={10} color="#fff" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-
-
-        {/* ACHIEVEMENTS */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>🏆 Milestones & Achievements</Text>
-          <View style={styles.badgeRow}>
-            {[
-              { id: 1, icon: "shield-checkmark", color: "#16a34a", label: "Guardian" },
-              { id: 2, icon: "flame", color: "#f97316", label: "Active" },
-              { id: 3, icon: "ribbon", color: "#8b5cf6", label: "Specialist" },
-              { id: 4, icon: "planet", color: "#0ea5e9", label: "Global" },
-            ].map((b) => (
-              <View key={b.id} style={styles.badgeBox}>
-                <View style={[styles.badgeIconBox, { backgroundColor: isDark ? colors.bgCard : "#f8fafc", borderColor: colors.border }]}>
-                  <Ionicons name={b.icon as any} size={28} color={b.color} />
-                </View>
-                <Text style={[styles.badgeLabel, { color: colors.textSecondary }]}>{b.label}</Text>
-              </View>
-            ))}
           </View>
         </View>
 
-        <View style={{ height: 100 }} />
+        <TouchableOpacity style={styles.settingsIcon} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* ── TAB BAR ── */}
+      <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
+        {["Vault", "History", "Impact", "Achievements"].map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tabItem, activeTab === tab && { borderBottomColor: colors.primary }]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[styles.tabText, { color: activeTab === tab ? colors.primary : colors.textMuted }]}>{tab}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* ── CONTENT AREA ── */}
+      <ScrollView contentContainerStyle={styles.contentScroll}>
+        {activeTab === "Vault" && (
+          <View style={styles.vaultSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Registered Pets</Text>
+              <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.primary }]}>
+                <Ionicons name="add" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            {pets.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="paw-outline" size={48} color={colors.textMuted} />
+                <Text style={{ color: colors.textMuted, marginTop: 10 }}>No animals in vault yet</Text>
+              </View>
+            ) : (
+              <View style={styles.petGrid}>
+                {pets.map((pet, index) => (
+                  <View key={index} style={[styles.petCard, { backgroundColor: colors.bgCard }]}>
+                    <Image source={{ uri: pet.image || (pet.images && pet.images[0]) }} style={styles.petThumb} />
+                    <Text style={[styles.petName, { color: colors.textPrimary }]}>{pet.name}</Text>
+                    <Text style={[styles.petBreed, { color: colors.textMuted }]}>{pet.breed}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {activeTab === "Impact" && (
+          <View style={styles.impactSection}>
+             <View style={[styles.impactCard, { backgroundColor: colors.primary }]}>
+                <Text style={styles.impactTitle}>Global Carbon Offset</Text>
+                <Text style={styles.impactValue}>{profile?.impact_stats?.co2Saved || "0 kg"}</Text>
+                <Text style={styles.impactSub}>Verified by EcoTrack Analytics</Text>
+             </View>
+             <View style={[styles.impactCard, { backgroundColor: "#f59e0b", marginTop: 12 }]}>
+                <Text style={styles.impactTitle}>Trees Planted</Text>
+                <Text style={styles.impactValue}>{profile?.impact_stats?.treesPlanted || "0"}</Text>
+                <Text style={styles.impactSub}>From ecosystem contributions</Text>
+             </View>
+          </View>
+        )}
       </ScrollView>
 
-      {/* EDIT PROFILE MODAL */}
-      <Modal visible={editModal} animationType="slide" transparent onRequestClose={() => setEditModal(false)}>
-        <View style={styles.modalBg}>
+      {/* ── EDIT PROFILE MODAL ── */}
+      <Modal visible={editModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { backgroundColor: colors.bgCard }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>✏️ Edit Profile</Text>
-              <TouchableOpacity onPress={() => setEditModal(false)}>
-                <Ionicons name="close-circle" size={26} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Display Name</Text>
-            <TextInput style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: isDark ? "#0f172a" : "#f9fafb" }]} value={username} onChangeText={setUsername} />
-
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Bio</Text>
-            <TextInput style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: isDark ? "#0f172a" : "#f9fafb" }]} value={bio} onChangeText={setBio} multiline />
-
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Location</Text>
-            <TextInput style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: isDark ? "#0f172a" : "#f9fafb" }]} value={location} onChangeText={setLocation} />
-
-            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={saveProfile}>
-              <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-              <Text style={styles.saveBtnText}>Save Changes</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ADD PET MODAL */}
-      <Modal visible={addPetModal} animationType="slide" transparent onRequestClose={() => setAddPetModal(false)}>
-        <View style={styles.modalBg}>
-          <ScrollView>
-            <View style={[styles.modalCard, { backgroundColor: colors.bgCard, marginTop: 60 }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>🐾 Add New Pet</Text>
-                <TouchableOpacity onPress={() => setAddPetModal(false)}>
-                  <Ionicons name="close-circle" size={26} color={colors.textSecondary} />
+             <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Edit Welfare Profile</Text>
+                <TouchableOpacity onPress={() => setEditModal(false)}>
+                   <Ionicons name="close-circle" size={28} color={colors.textMuted} />
                 </TouchableOpacity>
-              </View>
+             </View>
 
-              {petImage ? (
-                <TouchableOpacity onPress={pickPetImage} style={styles.previewBox}>
-                  <Image source={{ uri: petImage }} style={{ width: "100%", height: "100%", borderRadius: Radius.md }} />
+             <ScrollView style={{ padding: 20 }}>
+                {[
+                  { label: "Display Name", key: "display_name" },
+                  { label: "Bio", key: "bio" },
+                  { label: "Profession", key: "profession" },
+                  { label: "Organization", key: "organization" },
+                  { label: "City", key: "city" },
+                  { label: "Country", key: "country" }
+                ].map((item) => (
+                  <View key={item.key} style={styles.inputGroup}>
+                     <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+                     <TextInput
+                        style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: isDark ? "#0f172a" : "#f8fafc" }]}
+                        value={(editForm as any)[item.key]}
+                        onChangeText={(v) => setEditForm({ ...editForm, [item.key]: v })}
+                     />
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+                  onPress={saveProfile}
+                  disabled={isSaving}
+                >
+                   {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
                 </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={[styles.uploadBox, { borderColor: colors.primary }]} onPress={pickPetImage}>
-                  <Ionicons name="camera" size={32} color={colors.primary} />
-                  <Text style={[styles.uploadText, { color: colors.primary }]}>Upload Pet Photo</Text>
-                </TouchableOpacity>
-              )}
-
-              {[
-                { label: "Pet Name *", value: petName, setter: setPetName, placeholder: "e.g. Max" },
-                { label: "Species *", value: petSpecies, setter: setPetSpecies, placeholder: "e.g. Dog, Cat, Parrot" },
-                { label: "Breed", value: petBreed, setter: setPetBreed, placeholder: "e.g. German Shepherd" },
-                { label: "Age", value: petAge, setter: setPetAge, placeholder: "e.g. 2 Years" },
-                { label: "Weight", value: petWeight, setter: setPetWeight, placeholder: "e.g. 25 kg" },
-              ].map(({ label, value, setter, placeholder }) => (
-                <View key={label}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: isDark ? "#0f172a" : "#f9fafb" }]}
-                    value={value} onChangeText={setter} placeholder={placeholder} placeholderTextColor={colors.textMuted}
-                  />
-                </View>
-              ))}
-
-              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleAddPet}>
-                <Text style={styles.saveBtnText}>Save Pet Profile</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* SETTINGS MODAL */}
-      <Modal visible={settingsModal} animationType="slide" transparent onRequestClose={() => setSettingsModal(false)}>
-        <View style={styles.modalBg}>
-          <View style={[styles.modalCard, { backgroundColor: colors.bgCard }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>⚙️ App Settings</Text>
-              <TouchableOpacity onPress={() => setSettingsModal(false)}>
-                <Ionicons name="close-circle" size={26} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.settingRow}>
-              <View>
-                <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Dark Mode</Text>
-                <Text style={[styles.settingSub, { color: colors.textMuted }]}>Switch app color theme</Text>
-              </View>
-              <Switch value={isDark} onValueChange={toggleTheme} trackColor={{ false: "#d1d5db", true: colors.primary }} />
-            </View>
-
-            <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
-              <View>
-                <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Account</Text>
-                <Text style={[styles.settingSub, { color: colors.textMuted }]}>{session?.email}</Text>
-              </View>
-              <Ionicons name="person-circle-outline" size={28} color={colors.primary} />
-            </View>
-
-            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={() => setSettingsModal(false)}>
-              <Text style={styles.saveBtnText}>Close Settings</Text>
-            </TouchableOpacity>
+                <View style={{ height: 40 }} />
+             </ScrollView>
           </View>
         </View>
       </Modal>
@@ -462,78 +285,64 @@ export default function ProfileScreen() {
   );
 }
 
-function getStyles(colors: any, isDark: boolean) {
-  return StyleSheet.create({
-    container: { flex: 1 },
-    headerArea: { height: 200, position: "relative" },
-    coverImg: { width: "100%", height: "100%" },
-    coverGradient: { ...StyleSheet.absoluteFillObject },
-    headerActions: { position: "absolute", top: 54, right: 20, flexDirection: "row", gap: 12 },
-    actionIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-    profileSummary: { alignItems: "center", marginTop: -55, paddingHorizontal: 25 },
-    avatarWrapper: { position: "relative", ...Shadow.md },
-    avatar: { width: 110, height: 110, borderRadius: 55, borderWidth: 4 },
-    statusDot: { position: "absolute", bottom: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: "#22c55e", borderWidth: 3 },
-    nameRow: { flexDirection: "row", alignItems: "center", marginTop: 16, gap: 10 },
-    username: { fontSize: FontSize.xxl, fontWeight: "800" },
-    proBadge: { backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-    proText: { color: "#fff", fontSize: 10, fontWeight: "900" },
-    bioText: { fontSize: FontSize.sm, textAlign: "center", marginTop: 8, lineHeight: 20 },
-    locationRow: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 4 },
-    locationText: { fontSize: FontSize.xs, fontWeight: "700" },
-    emailBadge: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, marginTop: 10 },
-    emailText: { fontSize: 12, fontWeight: "600" },
+  heroContainer: { height: 280, position: "relative" },
+  heroCover: { width: "100%", height: "100%", objectFit: "cover" },
+  heroOverlay: { ...StyleSheet.absoluteFillObject },
+  heroContent: { position: "absolute", bottom: 20, left: 20, right: 20 },
 
-    mainStatsRow: { flexDirection: "row", width: "100%", borderRadius: Radius.lg, marginTop: 22, paddingVertical: 16, borderWidth: 1, ...Shadow.sm },
-    mainStat: { flex: 1, alignItems: "center" },
-    statVal: { fontSize: FontSize.lg, fontWeight: "800" },
-    statLab: { fontSize: 10, marginTop: 2, fontWeight: "600" },
-    editBtn: { width: "100%", height: 52, borderRadius: Radius.md, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 18, ...Shadow.sm },
-    editBtnText: { color: "#fff", fontWeight: "800", fontSize: FontSize.sm },
+  identityRow: { flexDirection: "row", alignItems: "center" },
+  avatarBorder: { width: 90, height: 90, borderRadius: 30, borderWidth: 3, padding: 3, overflow: "hidden" },
+  avatar: { width: "100%", height: "100%", borderRadius: 24 },
 
-    section: { marginTop: 28, paddingHorizontal: 20 },
-    sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
-    sectionTitle: { fontSize: FontSize.md, fontWeight: "800" },
-    viewAllText: { fontSize: FontSize.xs, fontWeight: "700" },
+  identityText: { marginLeft: 16, flex: 1 },
+  nameText: { fontSize: 24, fontWeight: "900", color: "#fff" },
+  roleText: { color: "#10b981", fontSize: 13, fontWeight: "700", marginTop: 2 },
 
-    impactCard: { padding: 20, borderRadius: Radius.lg, borderWidth: 1, ...Shadow.sm },
-    impactGrid: { flexDirection: "row", justifyContent: "space-between" },
-    impactItem: { alignItems: "center", width: (width - 100) / 3 },
-    impactIcon: { width: 46, height: 46, borderRadius: 23, justifyContent: "center", alignItems: "center", marginBottom: 8 },
-    impactVal: { fontSize: FontSize.md, fontWeight: "800" },
-    impactLab: { fontSize: 9, fontWeight: "600", marginTop: 2, textAlign: "center" },
+  statsRow: { flexDirection: "row", marginTop: 12 },
+  miniStat: { alignItems: "center" },
+  statValue: { color: "#fff", fontSize: 16, fontWeight: "900" },
+  statLabel: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", textTransform: "uppercase" },
 
-    emptyPets: { padding: 28, borderRadius: Radius.lg, borderWidth: 1, alignItems: "center", ...Shadow.sm },
-    addPetBtn: { marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: Radius.md },
+  settingsIcon: { position: "absolute", top: 50, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
 
-    petCard: { width: 220, flexDirection: "row", padding: 14, borderRadius: Radius.lg, borderWidth: 1, marginRight: 14, alignItems: "center", ...Shadow.sm },
-    petAvatar: { width: 60, height: 60, borderRadius: 30 },
-    petInfo: { flex: 1, marginLeft: 12 },
-    petNameText: { fontSize: FontSize.sm, fontWeight: "800" },
-    petSpeciesText: { fontSize: 10, marginTop: 2 },
-    tag: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, marginTop: 6 },
-    tagText: { fontSize: 9, fontWeight: "700" },
-    primaryBadge: { position: "absolute", top: 10, right: 10, width: 22, height: 22, borderRadius: 11, justifyContent: "center", alignItems: "center" },
+  tabBar: { flexDirection: "row", paddingHorizontal: 10, borderBottomWidth: 1 },
+  tabItem: { paddingVertical: 15, paddingHorizontal: 15, borderBottomWidth: 3, borderBottomColor: "transparent" },
+  tabText: { fontSize: 14, fontWeight: "800" },
 
-    badgeRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 12 },
-    badgeBox: { alignItems: "center" },
-    badgeIconBox: { width: 68, height: 68, borderRadius: 34, justifyContent: "center", alignItems: "center", borderWidth: 1, ...Shadow.sm },
-    badgeLabel: { fontSize: 11, fontWeight: "700", marginTop: 8 },
+  contentScroll: { padding: 20 },
+  vaultSection: {},
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 15 },
+  sectionTitle: { fontSize: 18, fontWeight: "900" },
+  addBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
 
-    modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-    modalCard: { borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: 28, maxHeight: "92%" },
-    modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 22 },
-    modalTitle: { fontSize: FontSize.lg, fontWeight: "800" },
-    label: { fontSize: FontSize.xs, fontWeight: "700", marginTop: 16, marginBottom: 8 },
-    input: { height: 52, borderRadius: Radius.md, borderWidth: 1, paddingHorizontal: 15, fontSize: FontSize.sm },
-    saveBtn: { height: 56, borderRadius: Radius.lg, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 28 },
-    saveBtnText: { color: "#fff", fontWeight: "800", fontSize: FontSize.md },
-    uploadBox: { height: 100, borderRadius: Radius.md, borderStyle: "dashed", borderWidth: 2, justifyContent: "center", alignItems: "center", gap: 8 },
-    uploadText: { fontSize: FontSize.xs, fontWeight: "700" },
-    previewBox: { height: 130, borderRadius: Radius.md, overflow: "hidden", marginBottom: 12 },
-    settingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
-    settingLabel: { fontSize: FontSize.sm, fontWeight: "700" },
-    settingSub: { fontSize: FontSize.xs, marginTop: 2 },
-  });
-}
+  emptyCard: { height: 150, borderRadius: Radius.lg, borderStyle: "dashed", borderWidth: 2, borderColor: "#cbd5e1", justifyContent: "center", alignItems: "center" },
+
+  petGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  petCard: { width: (width - 60) / 2, padding: 12, borderRadius: Radius.md, marginBottom: 15, ...Shadow.sm },
+  petThumb: { width: "100%", height: 100, borderRadius: Radius.sm, marginBottom: 8 },
+  petName: { fontWeight: "900", fontSize: 15 },
+  petBreed: { fontSize: 11, fontWeight: "600" },
+
+  editBtn: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginTop: 12, gap: 6 },
+  editBtnText: { color: "#fff", fontSize: 12, fontWeight: "800" },
+
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modalCard: { borderTopLeftRadius: 30, borderTopRightRadius: 30, height: "85%" },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: "#eee" },
+  modalTitle: { fontSize: 18, fontWeight: "900" },
+  inputGroup: { marginBottom: 15 },
+  inputLabel: { fontSize: 12, fontWeight: "800", marginBottom: 6, textTransform: "uppercase" },
+  input: { height: 50, borderWidth: 1, borderRadius: 12, paddingHorizontal: 15, fontSize: 14 },
+  saveBtn: { height: 54, borderRadius: 15, justifyContent: "center", alignItems: "center", marginTop: 20 },
+  saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "900" },
+
+  impactSection: {},
+  impactCard: { padding: 25, borderRadius: Radius.lg, ...Shadow.md },
+  impactTitle: { color: "rgba(255,255,255,0.8)", fontSize: 12, fontWeight: "800", textTransform: "uppercase" },
+  impactValue: { color: "#fff", fontSize: 32, fontWeight: "900", marginVertical: 4 },
+  impactSub: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: "600" },
+});
