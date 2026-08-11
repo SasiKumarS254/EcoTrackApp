@@ -21,6 +21,8 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    # The environment must be manually created/configured in GitHub Settings -> Environments
+    # AND GitHub Pages must be set to "GitHub Actions" under Settings -> Pages
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -28,14 +30,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Build Web Application
         run: |
           echo "Preparing EcoTrack Web Assets..."
-          # Ensuring directories exist for deployment
           mkdir -p website/assets
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
@@ -51,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for Deployment Propagation
-        run: sleep 45
+        run: sleep 60
 
       - name: HTTP Readiness Check
         run: |
@@ -60,6 +66,7 @@ jobs:
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
           if [ "$STATUS" -ne 200 ]; then
             echo "Deployment Error: HTTP $STATUS"
+            echo "Diagnostic: Ensure GitHub Pages is enabled in Settings -> Pages -> Build and deployment -> Source: GitHub Actions"
             exit 1
           fi
           echo "Deployment verified successfully!"
