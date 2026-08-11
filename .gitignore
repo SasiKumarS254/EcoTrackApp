@@ -81,6 +81,6 @@ website/dist/
 
 # Test Reports
 automation/
-testing/EcoTrack_Test_Suite_Report.*
+testing/
 junit_results.xml
 *.log
