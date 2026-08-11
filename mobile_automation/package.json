@@ -1,0 +1,18 @@
+{
+  "name": "ecotrack-appium-automation",
+  "version": "1.0.0",
+  "description": "Appium E2E automation for EcoTrackApp Android",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha tests/**/*.test.js --timeout 120000",
+    "report:excel": "node utils/excelReport.js"
+  },
+  "dependencies": {
+    "webdriverio": "^8.13.0",
+    "@wdio/appium-service": "^8.13.0",
+    "mocha": "^10.2.0",
+    "chai": "^4.3.7",
+    "exceljs": "^4.3.0",
+    "dotenv": "^16.3.1"
+  }
+}

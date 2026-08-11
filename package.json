@@ -1,0 +1,16 @@
+{
+  "name": "ecotrack-automation-root",
+  "version": "1.0.0",
+  "scripts": {
+    "test:web": "cd automation && npm test",
+    "test:mobile": "cd mobile_automation && npm test",
+    "test:security": "node automated_test/security/scanner.js",
+    "test:performance": "node automated_test/performance/loadTest.js",
+    "report:summary": "node scripts/generate_summary.js && node scripts/historical_metrics.js",
+    "test:all": "npm run test:web && npm run test:mobile && npm run test:security && npm run test:performance && npm run report:summary"
+  },
+  "dependencies": {
+    "exceljs": "^4.3.0",
+    "axios": "^1.4.0"
+  }
+}

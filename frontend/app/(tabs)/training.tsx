@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, StatusBar, Dimensions, Modal, ActivityIndicator,
 } from "react-native";
-import { useFocusEffect, router } from "expo-router";
+import { useFocusEffect, router, useLocalSearchParams } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Radius, Shadow, FontSize } from "@/constants/theme";
 import { useTheme } from "../../context/ThemeContext";
@@ -21,6 +21,8 @@ const { width } = Dimensions.get("window");
 export default function TrainingScreen() {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
+
+  const params = useLocalSearchParams<{ species?: string; goal?: string; breed?: string }>();
 
   const [animalName, setAnimalName] = useState("");
   const [breed, setBreed] = useState("");
@@ -60,6 +62,36 @@ export default function TrainingScreen() {
       getTrainingAnalytics().then((st) => {
         setCurrentLevel(st.currentLevel);
         setAnalyticsState(st);
+      });
+
+      // Consume redirection parameters from profile logs
+      AsyncStorage.getItem("@ecotrack_active_log_redirect").then(async (raw) => {
+        if (raw) {
+          await AsyncStorage.removeItem("@ecotrack_active_log_redirect");
+          const data = JSON.parse(raw);
+          if (data.species) {
+            setAnimalName(data.species);
+            if (data.goal) setGoal(data.goal);
+            if (data.breed) setBreed(data.breed);
+
+            const generatedPlan = generateSpeciesTrainingPlan(
+              data.species,
+              data.breed || "",
+              2, // default age
+              15, // default weight
+              data.goal || "",
+              1, // default level
+              7 // default days
+            );
+
+            setPlan(generatedPlan);
+            setMetrics(generatedPlan.metrics.map((m) => m.value));
+            setCompletedMilestones({});
+            setSelectedDayTab(1);
+            setGenerated(true);
+            setIsSessionActive(false);
+          }
+        }
       });
     }, [])
   );

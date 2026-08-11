@@ -1132,11 +1132,38 @@ module.exports = {
       milestones: pt.milestones ? JSON.parse(pt.milestones) : []
     }));
     
-    const achievements = sdb.prepare(`SELECT * FROM Achievements WHERE user_id = ?`).all(userId);
-
     // Aggregate counts from real tables to ensure accuracy
     const totalScans = sdb.prepare(`SELECT COUNT(*) as count FROM FullScans WHERE user_id = ?`).get(userId).count;
     const totalPlans = sdb.prepare(`SELECT COUNT(*) as count FROM AITrainerPrograms WHERE user_id = ?`).get(userId).count;
+    const followingCount = sdb.prepare(`SELECT COUNT(*) as count FROM Followers WHERE follower_id = ? AND status = 'Approved'`).get(userId).count;
+    const postsCount = sdb.prepare(`SELECT COUNT(*) as count FROM Posts WHERE user_id = ?`).get(userId).count;
+
+    // Auto-unlock achievements based on actual stats
+    try {
+      const earnedAchievements = sdb.prepare(`SELECT badge_name FROM Achievements WHERE user_id = ?`).all(userId).map(a => a.badge_name);
+      
+      const achievementsToTrack = [
+        { code: "AI_PIONEER", name: "AI Bio-Scanner Pioneer", icon: "🔬", category: "Technology", desc: "Perform 3 or more AI pose estimation scans.", check: () => totalScans >= 3 },
+        { code: "SPECIES_ANALYST", name: "Elite Species Analyst", icon: "🧬", category: "Technology", desc: "Perform 15 or more AI pose estimation scans.", check: () => totalScans >= 15 },
+        { code: "CERTIFIED_TRAINER", name: "Certified Trainer", icon: "🏋️", category: "Training", desc: "Register 3 custom AI training programs.", check: () => totalPlans >= 3 },
+        { code: "WELFARE_COACH", name: "Master Welfare Coach", icon: "🎓", category: "Training", desc: "Register 8 or more AI training programs.", check: () => totalPlans >= 8 },
+        { code: "COMMUNITY_CONNECTOR", name: "Community Connector", icon: "🤝", category: "Social", desc: "Follow 8 or more members in the EcoTrack network.", check: () => followingCount >= 8 },
+        { code: "WELFARE_AMBASSADOR", name: "Welfare Ambassador", icon: "📢", category: "Social", desc: "Publish 10 or more community feed posts.", check: () => postsCount >= 10 }
+      ];
+
+      achievementsToTrack.forEach(ach => {
+        if (ach.check() && !earnedAchievements.includes(ach.name)) {
+          sdb.prepare(`
+            INSERT INTO Achievements (user_id, badge_code, badge_name, icon, category, description, unlocked_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).run(userId, ach.code, ach.name, ach.icon, ach.category, ach.desc, new Date().toISOString());
+        }
+      });
+    } catch (e) {
+      console.error("[DB/Profile] Achievements check error:", e.message);
+    }
+
+    const achievements = sdb.prepare(`SELECT * FROM Achievements WHERE user_id = ?`).all(userId);
 
     // Ensure impactStats reflects the maximum of impact log or table counts
     impactStats.scannerAnalyses = Math.max(impactStats.scannerAnalyses, totalScans);
@@ -1949,6 +1976,12 @@ module.exports = {
       VALUES (?, ?, ?, 0)
     `).run(msgData.from_user_id, msgData.to_user_id, msgData.text);
     return sdb.prepare(`SELECT * FROM Messages WHERE id = ?`).get(result.lastInsertRowid);
+  },
+  deleteMessage: (messageId, userId) => {
+    const sdb = getSocialDB();
+    return sdb.prepare(`
+      DELETE FROM Messages WHERE id = ? AND (sender_id = ? OR receiver_id = ?)
+    `).run(messageId, userId, userId);
   },
   getUserConversations: (userId) => {
     const sdb = getSocialDB();

@@ -1,0 +1,15 @@
+{
+  "baseUrl": "http://localhost:5000/api",
+  "authTokens": {
+    "admin": "ecotrack_YWRtaW46YWRtaW5AZWNvdHJhY2suYXBw",
+    "user": "ecotrack_dXNlcjp1c2VyQGVjb3RyYWNrLmFwcA=="
+  },
+  "scanScope": [
+    "Authentication",
+    "Social",
+    "Commerce",
+    "Data",
+    "AI",
+    "RBAC"
+  ]
+}

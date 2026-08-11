@@ -348,14 +348,32 @@ function renderPostCardHtml(post) {
     categoryBadgeHtml = `<span class="category-badge ${css}">${label}</span>`;
   }
 
-  // Media gallery
+  // Media gallery - improved multi-image layout
   let mediaHtml = '';
   if (post.media_urls && post.media_urls.length) {
-    mediaHtml = `
-      <div class="post-media-grid" style="margin-top:12px; border-radius:14px; overflow:hidden; border:1px solid var(--border-color); background:var(--bg-main);">
-        ${post.media_urls.map(url => `<img src="${url}" alt="Post media" style="width:100%; max-height:340px; object-fit:cover;" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=600'">`).join('')}
-      </div>
-    `;
+    const count = post.media_urls.length;
+    const gridStyle = count === 1
+      ? 'display:block;'
+      : count === 2
+        ? 'display:grid; grid-template-columns:1fr 1fr; gap:2px;'
+        : count === 3
+          ? 'display:grid; grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; gap:2px;'
+          : 'display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:2px;';
+
+    const mediaItems = post.media_urls.slice(0, 4).map((url, i) => {
+      const isVideo = post.media_types && post.media_types[i] === 'video';
+      const isFirst = i === 0;
+      const spanStyle = count === 3 && i === 0 ? 'grid-row: span 2;' : '';
+      if (isVideo) {
+        return `<div style="${spanStyle} overflow:hidden; max-height:${count === 1 ? '400px' : '220px'};"><video src="${url}" controls style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'"></video></div>`;
+      }
+      return `<div style="${spanStyle} overflow:hidden; max-height:${count === 1 ? '400px' : '220px'}; position:relative;">
+        <img src="${url}" alt="Post media" style="width:100%; height:100%; object-fit:cover; display:block;" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=600'">
+        ${i === 3 && post.media_urls.length > 4 ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;">+${post.media_urls.length - 4}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    mediaHtml = `<div style="margin-top:12px; border-radius:14px; overflow:hidden; border:1px solid var(--border-color); background:var(--bg-main); ${gridStyle}">${mediaItems}</div>`;
   }
 
   // Attachments (Training Certificate, Rescue Record)
@@ -374,6 +392,14 @@ function renderPostCardHtml(post) {
       </div>
     `;
   }
+
+  // Check if this post is from another user (not current user)
+  const isOwnPost = window.currentUser && post.user_id === window.currentUser.id;
+  const messageBtnHtml = !isOwnPost ? `
+    <button class="post-action-btn scale-hover" onclick="event.stopPropagation(); if(window.openDirectMessageModal) window.openDirectMessageModal('${post.user_id}', '${escapeHtml(post.author_name).replace(/'/g,"\\'")}');" style="display:flex; align-items:center; gap:4px; cursor:pointer; color:var(--text-muted); font-size:12px; padding:0; border:none; background:none;">
+      <i class="far fa-comment-dots" style="font-size:13px; color:var(--primary);"></i>
+    </button>
+  ` : '';
 
   return `
     <div class="card post-card" id="post-card-${post.id}" style="border-radius:20px; border:1px solid var(--border-color); background:var(--bg-card); padding:20px; display:flex; flex-direction:column; justify-content:space-between; transition:transform 0.2s ease, box-shadow 0.2s ease;">
@@ -437,6 +463,8 @@ function renderPostCardHtml(post) {
             <i class="${post.saved_by_me ? 'fas' : 'far'} fa-bookmark"></i>
             <span style="font-weight:800;">Save</span>
           </button>
+
+          ${messageBtnHtml}
 
           <button class="post-action-btn scale-hover" onclick="openShareModal(${post.id})" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
             <i class="far fa-paper-plane"></i>
@@ -908,8 +936,19 @@ function copyPostLink(postId) {
 
 function sharePostToDirectMessage(postId) {
   closeShareModal();
-  if (window.openMessagingDrawer) window.openMessagingDrawer();
-  showToast('Select a contact to send this post link!', 'info');
+  const post = loadedPosts.find(p => p.id === postId);
+  // If we know the author, open DM directly with them
+  if (post && post.user_id && window.currentUser && post.user_id !== window.currentUser.id) {
+    if (window.openDirectMessageModal) {
+      window.openDirectMessageModal(post.user_id, post.author_name);
+    } else if (window.openMessagingDrawer) {
+      window.openMessagingDrawer(post.user_id);
+    }
+    showToast(`Opening direct message with ${escapeHtml(post.author_name)}...`, 'success');
+  } else {
+    if (window.openMessagingDrawer) window.openMessagingDrawer();
+    showToast('Select a contact to send this post!', 'info');
+  }
 }
 
 function shareToExternalSocial(platform, postId) {

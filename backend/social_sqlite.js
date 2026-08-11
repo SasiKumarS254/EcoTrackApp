@@ -82,6 +82,8 @@ function initTables(db) {
       reputation_score INTEGER DEFAULT 120,
       profile_completion_pct INTEGER DEFAULT 85,
       pinned_post_id INTEGER,
+      profession TEXT,
+      organization TEXT,
       FOREIGN KEY(user_id) REFERENCES Users(id) ON DELETE CASCADE
     );
 

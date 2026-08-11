@@ -190,23 +190,31 @@ except Exception as e:
     print(f"[INIT] ERROR loading pose model: {e}")
 
 # Load Fine-tuned Animal Pose (if available — produced by train_animal_pose.py)
-print("[INIT] Checking for fine-tuned animal pose model...")
 animal_pose_model = None
-for candidate in ["animal_pose_v1.pt", "animal_pose_best.pt"]:
-    path = MODELS_DIR / candidate
-    if path.exists():
-        try:
-            animal_pose_model = YOLO(str(path))
-            MODEL_STATUS["animal_pose_finetuned"]["loaded"] = True
-            MODEL_STATUS["animal_pose_finetuned"]["path"]   = str(path)
-            print(f"[INIT] Fine-tuned animal pose model loaded: {path}")
-            break
-        except Exception as e:
-            MODEL_STATUS["animal_pose_finetuned"]["error"] = str(e)
-            print(f"[INIT] Could not load {path}: {e}")
+
+def get_animal_pose_model():
+    global animal_pose_model
+    if animal_pose_model is None:
+        for candidate in ["animal_pose_v1.pt", "animal_pose_best.pt"]:
+            path = MODELS_DIR / candidate
+            if path.exists():
+                try:
+                    animal_pose_model = YOLO(str(path))
+                    MODEL_STATUS["animal_pose_finetuned"]["loaded"] = True
+                    MODEL_STATUS["animal_pose_finetuned"]["path"]   = str(path)
+                    MODEL_STATUS["animal_pose_finetuned"]["error"]  = None
+                    print(f"[DYNAMIC] Fine-tuned animal pose model loaded: {path}")
+                    break
+                except Exception as e:
+                    MODEL_STATUS["animal_pose_finetuned"]["error"] = str(e)
+                    print(f"[DYNAMIC] Could not load {path}: {e}")
+    return animal_pose_model
+
+print("[INIT] Checking for fine-tuned animal pose model...")
+get_animal_pose_model()
 
 if not animal_pose_model:
-    MODEL_STATUS["animal_pose_finetuned"]["error"] = "Model not found. Run 'python train_animal_pose.py --phase prepare' first."
+    MODEL_STATUS["animal_pose_finetuned"]["error"] = "Model not found. Run 'python train_animal_pose.py --phase train' first."
     print("[INIT] No fine-tuned animal pose model found. Using yolov8m-pose fallback.")
 
 # Load RTMPose checkpoint (if MMPose is installed)
@@ -326,9 +334,10 @@ def decode_base64_image(image_base64: str):
 @app.route('/model-status', methods=['GET'])
 def model_status():
     """Report which models are loaded and ready."""
+    get_animal_pose_model()
     overall_ready = (
         MODEL_STATUS["yolov8_detector"]["loaded"] and
-        MODEL_STATUS["yolov8_pose"]["loaded"]
+        (MODEL_STATUS["animal_pose_finetuned"]["loaded"] or MODEL_STATUS["yolov8_pose"]["loaded"])
     )
     return jsonify({
         "overall_ready": overall_ready,
@@ -528,10 +537,10 @@ def pose():
 
     # ── ANIMAL: Fine-tuned → RTMPose → YOLOv8 fallback ──────────────────────
     else:
-        # Priority 1: Fine-tuned animal pose model (from train_animal_pose.py)
-        if animal_pose_model and not keypoints:
+        curr_animal_model = get_animal_pose_model()
+        if curr_animal_model and not keypoints:
             try:
-                results = animal_pose_model(crop_img, verbose=False)[0]
+                results = curr_animal_model(crop_img, verbose=False)[0]
                 if len(results.keypoints) > 0:
                     kps = results.keypoints[0].data[0].tolist()
                     species_labels = SPECIES_JOINT_LABELS.get(species, {})
@@ -876,7 +885,8 @@ def process_video():
                                 pass
 
                         if not keypoints:
-                            pose_model = animal_pose_model if not is_human and animal_pose_model else yolo_pose
+                            curr_model = get_animal_pose_model()
+                            pose_model = curr_model if not is_human and curr_model else yolo_pose
                             if pose_model:
                                 try:
                                     r = pose_model(crop, verbose=False)[0]

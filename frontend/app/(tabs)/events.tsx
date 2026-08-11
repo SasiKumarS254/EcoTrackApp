@@ -189,15 +189,15 @@ export default function EventsScreen() {
           if (currentUid) {
             const regs = await fetchRegisteredEvents(currentUid);
             if (isMounted && regs) {
-              const regIds = regs.map((r: any) => r.event_id);
+              const regIds = regs.map((r: any) => r.id);
               setRegistered(regIds);
 
               const mappedTickets = regs.map((r: any) => {
                 return {
-                  eventId: r.event_id,
-                  serialNumber: r.ticket_id,
-                  qrData: `ECOTRACK-${r.event_id}-${r.ticket_id}`,
-                  purchaseDate: r.registered_at ? new Date(r.registered_at).toLocaleDateString() : new Date().toLocaleDateString()
+                  eventId: r.id,
+                  serialNumber: r.user_registration?.ticket_id || "ET-PENDING",
+                  qrData: `ECOTRACK-${r.id}-${r.user_registration?.ticket_id || "PENDING"}`,
+                  purchaseDate: r.user_registration?.registered_at ? new Date(r.user_registration.registered_at).toLocaleDateString() : new Date().toLocaleDateString()
                 };
               });
               setTickets(mappedTickets);
@@ -646,34 +646,40 @@ export default function EventsScreen() {
             {filteredEvents.map((e) => {
               const isRegistered = registered.includes(e.id);
               return (
-                <TouchableOpacity
+                <View
                   key={e.id}
                   style={styles.eventCard}
-                  onPress={() => setSelectedEventDetails(e)}
                 >
-                  <View style={styles.imageBox}>
-                    <Image source={{ uri: e.image }} style={styles.eventImg} />
-                    <View style={styles.badgeRow}>
-                      {e.category && (
-                        <View style={styles.catBadge}>
-                          <Text style={styles.catBadgeText}>{e.category}</Text>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => setSelectedEventDetails(e)}
+                  >
+                    <View style={styles.imageBox}>
+                      <Image source={{ uri: e.image }} style={styles.eventImg} />
+                      <View style={styles.badgeRow}>
+                        {e.category && (
+                          <View style={styles.catBadge}>
+                            <Text style={styles.catBadgeText}>{e.category}</Text>
+                          </View>
+                        )}
+                        <View style={styles.freeBadge}>
+                          <Text style={styles.freeBadgeText}>{e.isFree ? "Free Entry" : `₹${e.price}`}</Text>
                         </View>
-                      )}
-                      <View style={styles.freeBadge}>
-                        <Text style={styles.freeBadgeText}>{e.isFree ? "Free Entry" : `₹${e.price}`}</Text>
                       </View>
                     </View>
-                  </View>
 
-                  <View style={styles.eventBody}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={styles.eventTitle}>{e.title}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+                    <View style={[styles.eventBody, { paddingBottom: 0 }]}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={styles.eventTitle}>{e.title}</Text>
+                        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+                      </View>
+                      <Text style={styles.eventDate}>📅 {e.date}</Text>
+                      <Text style={styles.eventLoc}>📍 {e.location}</Text>
+                      <Text style={styles.eventDesc} numberOfLines={2}>{e.description}</Text>
                     </View>
-                    <Text style={styles.eventDate}>📅 {e.date}</Text>
-                    <Text style={styles.eventLoc}>📍 {e.location}</Text>
-                    <Text style={styles.eventDesc} numberOfLines={2}>{e.description}</Text>
+                  </TouchableOpacity>
 
+                  <View style={[styles.eventBody, { paddingTop: 8 }]}>
                     <View style={styles.cardFooter}>
                       <View style={styles.attendeeChip}>
                         <Ionicons name="people" size={14} color={colors.primary} />
@@ -689,7 +695,7 @@ export default function EventsScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                </TouchableOpacity>
+                </View>
               );
             })}
           </View>

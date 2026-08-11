@@ -6,6 +6,17 @@
 let activeChatPartnerId = null;
 
 async function openMessagingDrawer(partnerId) {
+  const targetId = partnerId || 'usr_admin_001';
+  const targetName = partnerId === 'usr_admin_001' || !partnerId ? 'Eco Explorer' : 'Member';
+  
+  if (typeof openChatModal === 'function') {
+    openChatModal(targetId, targetName);
+    return;
+  } else if (window.openChatModal) {
+    window.openChatModal(targetId, targetName);
+    return;
+  }
+
   const modal = document.getElementById('messagingDrawerModal');
   if (!modal) return;
   modal.classList.remove('hidden');
@@ -18,6 +29,13 @@ async function openMessagingDrawer(partnerId) {
 }
 
 function closeMessagingDrawer() {
+  if (typeof closeChatModal === 'function') {
+    closeChatModal();
+    return;
+  } else if (window.closeChatModal) {
+    window.closeChatModal();
+    return;
+  }
   const modal = document.getElementById('messagingDrawerModal');
   if (modal) {
     modal.classList.add('hidden');
@@ -36,7 +54,7 @@ async function loadConversationsList() {
   }
 
   try {
-    const res = await fetch(`http://localhost:5000/api/social/messages/conversations`);
+    const res = await fetch(`http://localhost:5000/api/social/messages/conversations`, { headers: window.EcoSocialDB.getAuthHeader() });
     if (res.ok) {
       const data = await res.json();
       renderConversations(data.conversations || [], container);
@@ -81,7 +99,7 @@ async function selectChatConversation(partnerId, partnerName) {
   let nameDisp = partnerName || '';
   if (!nameDisp) {
     try {
-      const res = await fetch(`http://localhost:5000/api/social/profile/${partnerId}`);
+      const res = await fetch(`http://localhost:5000/api/social/profile/${partnerId}`, { headers: window.EcoSocialDB.getAuthHeader() });
       if (res.ok) {
         const data = await res.json();
         nameDisp = data.profile.display_name || data.profile.name;
@@ -106,7 +124,7 @@ async function selectChatConversation(partnerId, partnerName) {
   if (!session) return;
 
   try {
-    const res = await fetch(`http://localhost:5000/api/social/messages/${partnerId}`);
+    const res = await fetch(`http://localhost:5000/api/social/messages/${partnerId}`, { headers: window.EcoSocialDB.getAuthHeader() });
     if (res.ok) {
       const data = await res.json();
       renderMessageThread(data.messages || [], chatThread);
@@ -165,7 +183,7 @@ async function sendChatMessage() {
   try {
     const res = await fetch('http://localhost:5000/api/social/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: window.EcoSocialDB.getAuthHeader(),
       body: JSON.stringify({
         receiver_id: activeChatPartnerId,
         text
@@ -181,6 +199,13 @@ async function sendChatMessage() {
 }
 
 function openDirectMessageModal(partnerId, partnerName) {
+  if (typeof openChatModal === 'function') {
+    openChatModal(partnerId, partnerName);
+    return;
+  } else if (window.openChatModal) {
+    window.openChatModal(partnerId, partnerName);
+    return;
+  }
   openMessagingDrawer(partnerId);
   if (partnerId) {
     selectChatConversation(partnerId, partnerName);

@@ -277,9 +277,23 @@ export async function fetchSocialProfile(userId: string) {
 export async function fetchMySocialProfile() {
   try {
     const res = await customFetch(`${API_BASE_URL}/social/me`);
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.profile) {
+        await AsyncStorage.setItem("@ecotrack_social_profile", JSON.stringify(data));
+      }
+      return data;
+    }
   } catch (e) {
-    console.warn("Fetch my social profile offline", e);
+    console.warn("Fetch my social profile offline, checking local storage", e);
+  }
+  try {
+    const cached = await AsyncStorage.getItem("@ecotrack_social_profile");
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    console.warn("Error reading cached profile", e);
   }
   return null;
 }
@@ -291,9 +305,38 @@ export async function updateSocialProfile(profileData: any) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(profileData),
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.profile) {
+        // Fetch current cached data and update it
+        const cached = await AsyncStorage.getItem("@ecotrack_social_profile");
+        let updatedCache = { profile: data.profile, pets: [], achievements: [] };
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          updatedCache = {
+            ...parsed,
+            profile: { ...parsed.profile, ...data.profile }
+          };
+        }
+        await AsyncStorage.setItem("@ecotrack_social_profile", JSON.stringify(updatedCache));
+      }
+      return data;
+    }
   } catch (e) {
-    console.warn("Update social profile offline");
+    console.warn("Update social profile offline, falling back to local storage update", e);
+  }
+  // Offline fallback
+  try {
+    const cached = await AsyncStorage.getItem("@ecotrack_social_profile");
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      const updatedProfile = { ...parsed.profile, ...profileData };
+      const updatedCache = { ...parsed, profile: updatedProfile };
+      await AsyncStorage.setItem("@ecotrack_social_profile", JSON.stringify(updatedCache));
+      return { profile: updatedProfile };
+    }
+  } catch (err) {
+    console.warn("Offline profile save failed", err);
   }
   return null;
 }
@@ -466,9 +509,62 @@ export async function registerForEvent(eventId: number) {
 export async function fetchRegisteredEvents(userId: string) {
   try {
     const res = await customFetch(`${API_BASE_URL}/events/registrations/${userId}`);
+    if (res.ok) {
+      const data = await res.json();
+      await AsyncStorage.setItem(`@ecotrack_registered_events_${userId}`, JSON.stringify(data));
+      return data;
+    }
+  } catch (e) {
+    console.warn("Fetch registered events offline, using cache", e);
+  }
+  try {
+    const cached = await AsyncStorage.getItem(`@ecotrack_registered_events_${userId}`);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (err) {}
+  return [];
+}
+
+export async function fetchScanHistory(userId: string) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/ai/scan-history?user_id=${userId}`);
     if (res.ok) return await res.json();
   } catch (e) {
-    console.warn("Fetch registered events offline");
+    console.warn("Fetch scan history offline", e);
   }
-  return null;
+  return [];
+}
+
+export async function fetchFollowers(userId: string) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/followers/${userId}`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Fetch followers offline", e);
+  }
+  return [];
+}
+
+export async function fetchFollowing(userId: string) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/following/${userId}`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Fetch following offline", e);
+  }
+  return [];
+}
+
+export async function fetchSavedPosts() {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/posts?saved_only=true`);
+    if (res.ok) {
+      const data = await res.json();
+      return data.posts || [];
+    }
+  } catch (e) {
+    console.warn("Fetch saved posts offline", e);
+  }
+  return [];
 }

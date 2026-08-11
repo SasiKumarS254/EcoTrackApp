@@ -966,15 +966,33 @@ app.post('/api/messages', (req, res) => {
   if (!to_user_id) return res.status(400).json({ error: "to_user_id is required" });
   if (!text && !media_url) return res.status(400).json({ error: "text or media_url required" });
   
-  const msg = db.sendMessage({
-    from_user_id: req.user.id,
-    to_user_id,
-    text: text || '',
-    media_url: media_url || null,
-    media_type: media_type || null,
-    listing_id: listing_id || null
-  });
-  res.json({ message: "Message sent", msg, data: msg });
+  try {
+    const msg = db.sendMessage({
+      from_user_id: req.user.id,
+      to_user_id,
+      text: text || '',
+      media_url: media_url || null,
+      media_type: media_type || null,
+      listing_id: listing_id || null
+    });
+    res.json({ message: "Message sent", msg, data: msg });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/messages/:id', (req, res) => {
+  try {
+    const messageId = parseInt(req.params.id, 10);
+    const userId = req.user.id;
+    const result = db.deleteMessage(messageId, userId);
+    if (result.changes === 0) {
+      return res.status(404).json({ error: "Message not found or unauthorized" });
+    }
+    res.json({ message: "Message deleted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ══════════════════════════════════════════════
