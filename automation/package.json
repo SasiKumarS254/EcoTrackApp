@@ -1,0 +1,12 @@
+{
+  "name": "ecotrack-automation",
+  "version": "1.0.0",
+  "description": "Enterprise-grade automation suite for EcoTrack",
+  "main": "run_pipeline.js",
+  "dependencies": {
+    "fs-extra": "^11.1.0",
+    "path": "^0.12.7",
+    "selenium-webdriver": "^4.10.0",
+    "chromedriver": "^114.0.0"
+  }
+}
