@@ -80,7 +80,7 @@ frontend/dist/
 website/dist/
 
 # Test Reports
-automation/reports/
+automation/
 testing/EcoTrack_Test_Suite_Report.*
 junit_results.xml
 *.log
