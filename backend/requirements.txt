@@ -1,0 +1,14 @@
+flask
+flask-cors
+ultralytics>=8.2.0
+mediapipe
+numpy
+opencv-python
+requests
+tqdm
+pillow
+scikit-learn
+matplotlib
+gdown
+# mmpose requires mim for correct installation on some systems
+# run: pip install openmim && python -m mim install mmengine mmcv mmpose
