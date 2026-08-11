@@ -855,43 +855,43 @@ function initDB() {
     }
   }
 
-  // Ensure the 3 target users always exist in JSON database
+  // Ensure the target users exist without resetting their passwords if already present
   const targetUsers = [
     {
+      id: "usr1",
+      ecotrack_id: "ECO-948123",
+      email: "user@ecotrack.org",
+      name: "Eco Explorer",
+      role: "admin",
+      password_hash: "demo",
+      created_at: new Date().toISOString()
+    },
+    {
       id: "usr_user1",
+      ecotrack_id: "VET-882104",
       email: "user1@ecotrack.org",
       name: "Alice Green",
-      bio: "Professional Veterinarian & Pet Welfare Volunteer",
-      location: "Chennai, India",
-      avatar: "https://randomuser.me/api/portraits/women/45.jpg",
       role: "user",
       password_hash: "password123",
-      created_at: new Date().toISOString(),
-      stats: { rescues: 24, xp: 1200, plans: 3, scans: 14, streak: 3 }
+      created_at: new Date().toISOString()
     },
     {
       id: "usr_user2",
+      ecotrack_id: "RGR-302194",
       email: "user2@ecotrack.org",
       name: "Bob Forester",
-      bio: "Wildlife Conservationist & Forest Ranger",
-      location: "Coimbatore, India",
-      avatar: "https://randomuser.me/api/portraits/men/32.jpg",
       role: "user",
       password_hash: "password123",
-      created_at: new Date().toISOString(),
-      stats: { rescues: 48, xp: 2500, plans: 8, scans: 22, streak: 5 }
+      created_at: new Date().toISOString()
     },
     {
       id: "usr_user3",
+      ecotrack_id: "TRN-441209",
       email: "user3@ecotrack.org",
       name: "Charlie Eco",
-      bio: "Master Canine Agility Coach & Behaviorist",
-      location: "Chennai, India",
-      avatar: "https://randomuser.me/api/portraits/men/55.jpg",
       role: "user",
       password_hash: "password123",
-      created_at: new Date().toISOString(),
-      stats: { rescues: 12, xp: 600, plans: 2, scans: 5, streak: 1 }
+      created_at: new Date().toISOString()
     }
   ];
 
@@ -901,12 +901,11 @@ function initDB() {
       db.users.push(tu);
       db.profiles[tu.id] = { ...tu };
     } else {
-      // Keep details synchronized with targets
+      // Sync only stable metadata, preserve password_hash from current DB state
       db.users[existingIdx].id = tu.id;
-      db.users[existingIdx].name = tu.name;
-      db.users[existingIdx].password_hash = tu.password_hash;
+      db.users[existingIdx].ecotrack_id = tu.ecotrack_id;
       db.users[existingIdx].role = tu.role;
-      db.profiles[tu.id] = { ...db.users[existingIdx] };
+      // If db.users[existingIdx].password_hash exists, we don't overwrite it with the default
     }
     if (!db.carts[tu.id]) db.carts[tu.id] = [];
     if (!db.pets[tu.id]) db.pets[tu.id] = [];
@@ -985,46 +984,84 @@ module.exports = {
   createUser: (email, name, password) => {
     const sdb = getSocialDB();
     const cleanEmail = email.toLowerCase().trim();
+
+    // Check SQLite first
     const existing = sdb.prepare(`SELECT * FROM Users WHERE email = ?`).get(cleanEmail);
-    if (existing) return { error: "Email already registered", user: null };
-    const role = cleanEmail === 'user@ecotrack.org' ? 'admin' : 'user';
+    if (existing) return { error: "Email address is already registered. Please sign in instead.", user: null };
     
+    const role = cleanEmail === 'user@ecotrack.org' ? 'admin' : 'user';
     const id = 'usr_' + crypto.randomBytes(8).toString('hex');
     const ecotrack_id = 'USR-' + Math.floor(100000 + Math.random() * 900000);
 
-    sdb.prepare(`
-      INSERT INTO Users (id, ecotrack_id, email, name, password_hash, role)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, ecotrack_id, cleanEmail, name || cleanEmail.split('@')[0], password, role);
-    
-    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name || email.split('@')[0])}&background=10b981&color=fff&size=200`;
-    sdb.prepare(`
-      INSERT INTO Profiles (user_id, display_name, ecotrack_id, avatar_url, bio, privacy_setting)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, name || email.split('@')[0], ecotrack_id, avatar, 'EcoTrack member • Wildlife enthusiast', 'Public');
+    try {
+      // 1. Persist to SQLite (Source of Truth)
+      sdb.prepare(`
+        INSERT INTO Users (id, ecotrack_id, email, name, password_hash, role)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(id, ecotrack_id, cleanEmail, name || cleanEmail.split('@')[0], password, role);
 
-    sdb.prepare(`INSERT OR IGNORE INTO UserSettings (user_id) VALUES (?)`).run(id);
+      const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name || cleanEmail.split('@')[0])}&background=10b981&color=fff&size=200`;
+      sdb.prepare(`
+        INSERT INTO Profiles (user_id, display_name, ecotrack_id, avatar_url, bio, privacy_setting)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(id, name || cleanEmail.split('@')[0], ecotrack_id, avatar, 'EcoTrack member • Wildlife enthusiast', 'Public');
 
-    const user = sdb.prepare(`SELECT * FROM Users WHERE id = ?`).get(id);
-    const profile = sdb.prepare(`SELECT * FROM Profiles WHERE user_id = ?`).get(id);
+      sdb.prepare(`INSERT OR IGNORE INTO UserSettings (user_id) VALUES (?)`).run(id);
 
-    // Sync to JSON DB memory
-    const safeUser = { ...user, avatar: profile.avatar_url, bio: profile.bio };
-    db.users.push(safeUser);
-    db.profiles[id] = { ...safeUser, ...profile };
-    saveUserData();
+      const user = sdb.prepare(`SELECT * FROM Users WHERE id = ?`).get(id);
+      const profile = sdb.prepare(`SELECT * FROM Profiles WHERE user_id = ?`).get(id);
 
-    return { error: null, user: safeUser };
+      // 2. Sync to JSON memory & file (Legacy compatibility)
+      const safeUser = {
+        ...user,
+        avatar: profile.avatar_url,
+        bio: profile.bio,
+        created_at: user.created_at,
+        stats: { rescues: 0, xp: 120, plans: 0, scans: 0, streak: 0 }
+      };
+
+      db.users.push(safeUser);
+      db.profiles[id] = { ...safeUser, ...profile };
+      if (!db.carts[id]) db.carts[id] = [];
+      if (!db.pets[id]) db.pets[id] = [];
+      if (!db.training_programs[id]) db.training_programs[id] = [];
+      if (!db.saved_encyclopedia[id]) db.saved_encyclopedia[id] = [];
+
+      saveUserData();
+
+      console.log(`✅ User Registered: ${cleanEmail} (${id})`);
+      return { error: null, user: safeUser };
+    } catch (err) {
+      console.error("❌ Registration Error:", err.message);
+      return { error: "Failed to create account database record.", user: null };
+    }
   },
   loginUser: (email, password) => {
     const sdb = getSocialDB();
-    const user = sdb.prepare(`SELECT * FROM Users WHERE email = ?`).get(email.toLowerCase().trim());
+    const cleanEmail = email.toLowerCase().trim();
+    const user = sdb.prepare(`SELECT * FROM Users WHERE email = ?`).get(cleanEmail);
+
     if (!user) return { error: "No account found with this email address. Please sign up.", user: null };
     if (user.password_hash !== password) {
       return { error: "Incorrect password. Please verify your password and try again.", user: null };
     }
+
     const profile = sdb.prepare(`SELECT * FROM Profiles WHERE user_id = ?`).get(user.id);
-    return { error: null, user: { ...user, avatar: profile ? profile.avatar_url : null, bio: profile ? profile.bio : null } };
+    const safeUser = {
+      ...user,
+      avatar: profile ? (profile.avatar_url || profile.avatar) : null,
+      bio: profile ? profile.bio : null,
+      display_name: profile ? profile.display_name : user.name,
+      name: user.name || 'Universal Member'
+    };
+
+    // Ensure in-memory sync for login session
+    const existingIdx = db.users.findIndex(u => u.id === user.id);
+    if (existingIdx === -1) {
+      db.users.push(safeUser);
+    }
+
+    return { error: null, user: safeUser };
   },
   resetUserPassword: (email, newPassword) => {
     const sdb = getSocialDB();
@@ -1042,12 +1079,16 @@ module.exports = {
     return { error: null, user };
   },
 
-  // ── USER PROFILE ──
   getUserProfile: (userId) => {
     const sdb = getSocialDB();
     const user = sdb.prepare(`SELECT * FROM Users WHERE id = ?`).get(userId);
     if (!user) return null;
     let profile = sdb.prepare(`SELECT * FROM Profiles WHERE user_id = ?`).get(userId);
+    if (!profile) {
+      // Auto-create missing profile
+      sdb.prepare(`INSERT INTO Profiles (user_id, display_name, ecotrack_id) VALUES (?, ?, ?)`).run(userId, user.name, user.ecotrack_id);
+      profile = sdb.prepare(`SELECT * FROM Profiles WHERE user_id = ?`).get(userId);
+    }
 
     // Impact Stats aggregation - Summation from SQLite
     const impactStats = {
@@ -1077,15 +1118,6 @@ module.exports = {
           else if (imp.activity_type === 'scanner') impactStats.scannerAnalyses = Math.round(val);
           else if (imp.activity_type === 'volunteer') impactStats.volunteerHours = Math.round(val);
         });
-      } else if (userId === 'usr1' || user.email === 'user@ecotrack.org') {
-        // SPECIAL FALLBACK for main admin if SQLite impact is missing
-        console.log("[DB/Profile] Using high-fidelity stats for user@ecotrack.org");
-        impactStats.rescues = 124;
-        impactStats.trainingsCompleted = 24;
-        impactStats.scannerAnalyses = 45;
-        impactStats.co2Saved = "120.5 kg";
-        impactStats.treesPlanted = "15.0 trees";
-        impactStats.volunteerHours = 38.5;
       }
     } catch (e) { console.error("[DB/Profile] Impact stats error:", e.message); }
 
@@ -1114,11 +1146,11 @@ module.exports = {
       ...user,
       ...(profile || {}),
       id: user.id,
-      name: user.name || 'Eco Explorer',
-      display_name: (profile && profile.display_name) ? profile.display_name : (user.name || 'Eco Explorer'),
+      name: user.name || 'Universal Member',
+      display_name: (profile && profile.display_name) ? profile.display_name : (user.name || 'Universal Member'),
       email: user.email,
       avatar_url: (profile && profile.avatar_url) ? profile.avatar_url : (user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200'),
-      bio: (profile && profile.bio) ? profile.bio : (user.bio || 'Professional Wildlife Conservationist & AI Welfare Architect. Dedicated to species preservation and digital tracking ecosystem development.'),
+      bio: (profile && profile.bio) ? profile.bio : (user.bio || 'Welfare intelligence professional.'),
       profession: (profile && profile.profession) ? profile.profession : (user.role === 'admin' ? 'System Administrator & Conservation Lead' : 'Welfare Explorer'),
       organization: (profile && profile.organization) ? profile.organization : (user.role === 'admin' ? 'EcoTrack Foundation' : 'Independent Volunteer'),
       country: (profile && profile.country) ? profile.country : (user.location ? user.location.split(',')[1]?.trim() : 'India'),
@@ -1528,9 +1560,9 @@ module.exports = {
     const sdb = getSocialDB();
     const scans = sdb.prepare(`SELECT * FROM FullScans WHERE user_id = ? ORDER BY created_at DESC`).all(userId);
     
-    const obedience = scans.length > 0 ? Math.round(scans.reduce((a, b) => a + (b.posture_score || 85), 0) / scans.length) : 85;
-    const focus = scans.length > 0 ? Math.round(scans.reduce((a, b) => a + (b.balance_score || 90), 0) / scans.length) : 90;
-    const avgScore = scans.length > 0 ? Math.round(scans.reduce((a, b) => a + (b.form_score || 80), 0) / scans.length) : 80;
+    const obedience = scans.length > 0 ? Math.round(scans.reduce((a, b) => a + (b.posture_score || 0), 0) / scans.length) : 0;
+    const focus = scans.length > 0 ? Math.round(scans.reduce((a, b) => a + (b.balance_score || 0), 0) / scans.length) : 0;
+    const avgScore = scans.length > 0 ? Math.round(scans.reduce((a, b) => a + (b.form_score || 0), 0) / scans.length) : 0;
     
     const history = scans.map(s => ({
       id: s.id,
@@ -1547,9 +1579,9 @@ module.exports = {
     return {
       obedience,
       focus,
-      socialization: 88,
+      socialization: 0,
       privacy_setting: 'Public',
-      vitality: 92,
+      vitality: 0,
       avgScore,
       level: Math.floor(history.length / 5) + 1,
       totalScans: history.length,
@@ -1594,13 +1626,20 @@ module.exports = {
   addPost: (postData) => {
     const sdb = getSocialDB();
     const result = sdb.prepare(`
-      INSERT INTO Posts (user_id, content, media_urls, media_types, post_type)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO Posts (user_id, content, media_urls, media_types, post_type, scanner_report, training_achievement, encyclopedia_discovery, event_participation, location_tag, animal_tag, hashtags)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       postData.user_id, postData.content, 
       postData.media_urls ? JSON.stringify(postData.media_urls) : null,
       postData.media_types ? JSON.stringify(postData.media_types) : null,
-      postData.post_type || 'general'
+      postData.post_type || 'general',
+      postData.scanner_report || null,
+      postData.training_achievement || null,
+      postData.encyclopedia_discovery || null,
+      postData.event_participation || null,
+      postData.location_tag || null,
+      postData.animal_tag || null,
+      postData.hashtags || null
     );
     return sdb.prepare(`SELECT * FROM Posts WHERE id = ?`).get(result.lastInsertRowid);
   },
@@ -1749,10 +1788,11 @@ module.exports = {
   },
   addService: (data) => {
     const sdb = getSocialDB();
+    if (!data.user_id) throw new Error("user_id required to add service");
     const result = sdb.prepare(`
       INSERT INTO Services (user_id, name, phone, type, description, address)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(data.user_id || 'usr1', data.name, data.phone, data.type || 'Veterinary', data.description || '', data.address || '');
+    `).run(data.user_id, data.name, data.phone, data.type || 'Veterinary', data.description || '', data.address || '');
     return sdb.prepare(`SELECT * FROM Services WHERE id = ?`).get(result.lastInsertRowid);
   },
 
@@ -1760,7 +1800,8 @@ module.exports = {
   saveScanFull: (scanData) => {
     const sdb = getSocialDB();
     const scanId = scanData.scanId || `scan_${Date.now()}`;
-    const userId = scanData.user_id || 'anonymous';
+    const userId = scanData.user_id;
+    if (!userId) throw new Error("user_id required to save scan");
     const timestamp = scanData.timestamp || new Date().toISOString();
 
     sdb.prepare(`

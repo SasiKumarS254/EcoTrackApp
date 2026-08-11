@@ -229,4 +229,29 @@ const pdfReportPath = path.join(__dirname, 'EcoTrack_Test_Suite_Report.pdf');
 fs.writeFileSync(pdfReportPath, pdfReportContent, 'utf8');
 console.log(`✅ PDF Summary Report generated successfully at: ${pdfReportPath}`);
 
+// D. JUnit XML Report (.xml)
+let junitContent = `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="EcoTrack AI Test Suite" tests="${totalTests}" failures="${failTests}" errors="0" skipped="0" time="0">
+  <testsuite name="All Tests" tests="${totalTests}" failures="${failTests}" errors="0" skipped="0" timestamp="${new Date().toISOString()}" time="0">`;
+
+testResults.forEach(r => {
+  const time = (r.durationMs / 1000).toFixed(3);
+  junitContent += `
+    <testcase className="${r.category.replace(/ /g, '.')}" name="${r.module}: ${r.testCase}" time="${time}">`;
+  if (r.status === 'FAIL') {
+    junitContent += `
+      <failure message="${r.expectedResult}">${r.actualResult}</failure>`;
+  }
+  junitContent += `
+    </testcase>`;
+});
+
+junitContent += `
+  </testsuite>
+</testsuites>`;
+
+const junitReportPath = path.join(__dirname, 'EcoTrack_Test_Suite_Report.xml');
+fs.writeFileSync(junitReportPath, junitContent, 'utf8');
+console.log(`✅ JUnit XML Report generated successfully at: ${junitReportPath}`);
+
 console.log('\n🎉 ALL QA, APPIUM, SELENIUM, DATABASE, LOAD & SECURITY TESTS PASSED CLEANLY (100% SUCCESS RATE)!');

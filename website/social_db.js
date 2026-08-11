@@ -12,7 +12,7 @@ const EcoSocialDB = {
   // ── Helper: get auth token from session ──
   getAuthHeader() {
     try {
-      const raw = localStorage.getItem('@ecotrack_web_session');
+      const raw = localStorage.getItem(AUTH_CONFIG.sessionKey);
       if (raw) {
         const sess = JSON.parse(raw);
         if (sess && sess.token) {
@@ -42,6 +42,22 @@ const EcoSocialDB = {
       console.warn('fetchPosts API unavailable:', e.message);
     }
     return [];  // NO localStorage fallback — prevents cross-user data leakage
+  },
+
+  async fetchComments(postId) {
+    try {
+      const res = await fetch(`${this.apiBase}/posts/${postId}/comments`, {
+        headers: this.getAuthHeader()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.comments || [];
+      }
+      console.warn('fetchComments: HTTP', res.status);
+    } catch (e) {
+      console.warn('fetchComments API failed:', e.message);
+    }
+    return [];
   },
 
   async createPost(postData) {
@@ -230,7 +246,7 @@ const EcoSocialDB = {
             ...freshUser,
             token: existingSession.token  // preserve the auth token
           };
-          localStorage.setItem('@ecotrack_web_session', JSON.stringify(window.currentUser));
+          localStorage.setItem(AUTH_CONFIG.sessionKey, JSON.stringify(window.currentUser));
           return window.currentUser;
         }
       }
@@ -301,6 +317,19 @@ const EcoSocialDB = {
       if (res.ok) return await res.json();
     } catch (e) {
       console.warn('removePet API failed:', e.message);
+    }
+    return null;
+  },
+
+  async deletePost(postId) {
+    try {
+      const res = await fetch(`${this.apiBase}/posts/${postId}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeader()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('deletePost API failed:', e.message);
     }
     return null;
   },
@@ -404,7 +433,7 @@ const EcoSocialDB = {
    */
   clearSession() {
     window.currentUser = null;
-    localStorage.removeItem('@ecotrack_web_session');
+    localStorage.removeItem(AUTH_CONFIG.sessionKey);
   }
 };
 

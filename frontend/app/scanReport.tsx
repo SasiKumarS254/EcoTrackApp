@@ -23,12 +23,15 @@ import {
   Dimensions, Animated, SafeAreaView, StatusBar,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path, Text as SvgText, G } from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import Toast from 'react-native-toast-message';
 import { useTheme } from '../context/ThemeContext';
 import type { DetailedScanReport } from '../lib/reportGenerator';
 import type { JointBiomechanicsResult } from '../lib/jointAnalysis';
 import { getSeverityLabel } from '../lib/jointAnalysis';
+import { createCommunityPost } from '../services/api';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -406,6 +409,51 @@ export default function ScanReportScreen() {
   }, [params.report, params.data]);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'joints' | 'recs' | 'rehab'>('overview');
+  const [isSharing, setIsSharing] = useState(false);
+
+  const handleShare = useCallback(async () => {
+    if (!report) return;
+    setIsSharing(true);
+    try {
+      const userSession = await AsyncStorage.getItem('@ecotrack_user_session');
+      const userId = userSession ? JSON.parse(userSession).user_id : 'anonymous';
+
+      const content = `📊 AI Scan Result: Just completed ${report.exerciseName} with a score of ${report.overallPerformanceScore}%! 🧬 #EcoTrack #AIScanner #${report.detectedSpecies}`;
+
+      const res = await createCommunityPost({
+        user_id: userId,
+        content,
+        post_type: 'scanner',
+        scanner_report: JSON.stringify({
+          scanId: report.scanId,
+          score: report.overallPerformanceScore,
+          grade: report.grade,
+          species: report.detectedSpecies,
+          exercise: report.exerciseName,
+          repCount: report.repCount,
+          duration: report.exerciseDurationSec
+        }),
+        category: 'Training Tips'
+      });
+
+      if (res) {
+        Toast.show({
+          type: 'success',
+          text1: 'Shared to Community!',
+          text2: 'Your analysis report has been posted to the feed.',
+        });
+      }
+    } catch (err) {
+      console.error("Share error:", err);
+      Toast.show({
+        type: 'error',
+        text1: 'Share Failed',
+        text2: 'Could not connect to the social feed.',
+      });
+    } finally {
+      setIsSharing(false);
+    }
+  }, [report]);
 
   const bg = isDark ? '#0f172a' : '#f0fdf4';
   const cardBg = isDark ? '#1e293b' : '#ffffff';
@@ -462,10 +510,21 @@ export default function ScanReportScreen() {
           </Text>
         </View>
         <TouchableOpacity
+          style={[styles.shareBtn, { backgroundColor: 'rgba(255,255,255,0.08)' }]}
+          onPress={handleShare}
+          disabled={isSharing}
+        >
+          <Ionicons name="share-social-outline" size={16} color={textPrimary} />
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.motionBtn, { backgroundColor: colors.primary }]}
           onPress={() => router.push({
             pathname: '/motionGenerator' as any,
-            params: { species: report.detectedSpecies, exerciseId: report.exerciseId }
+            params: {
+              species: report.detectedSpecies,
+              exerciseId: report.exerciseId,
+              jointAngles: JSON.stringify(report.jointAngles)
+            }
           })}
         >
           <Ionicons name="cube-outline" size={16} color="#fff" />
@@ -931,6 +990,7 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   headerTitle: { fontSize: 17, fontWeight: '800' },
   headerSub: { fontSize: 12, marginTop: 1 },
+  shareBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   motionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
   motionBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   scroll: { padding: 16, paddingBottom: 60 },

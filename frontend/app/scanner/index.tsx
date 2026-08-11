@@ -27,6 +27,8 @@ import { getExercisesForSpecies, getExerciseById } from '../../lib/exerciseTempl
 import { analyzeAllJoints } from '../../lib/jointAnalysis';
 import { generateDetailedReport } from '../../lib/reportGenerator';
 
+import { fetchTaxonomySpecies, saveScanFull } from '../../services/api';
+
 const { width: SW, height: SH } = Dimensions.get('window');
 
 interface ModelLoadStatus {
@@ -232,13 +234,9 @@ export default function AIScannerScreen() {
 
             // Auto-update user progress via training sync API
             for (const report of compiledReports) {
-              await fetch('http://localhost:5000/api/ai/scan-save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  ...report,
-                  user_id: userId || 'anonymous'
-                })
+              await saveScanFull({
+                ...report,
+                user_id: userId || 'anonymous'
               }).catch(() => console.warn("Failed to sync progress to database"));
             }
           } else {

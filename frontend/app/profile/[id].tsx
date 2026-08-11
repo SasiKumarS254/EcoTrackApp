@@ -9,9 +9,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
 import { Radius, Shadow, FontSize } from "@/constants/theme";
 import { router, useLocalSearchParams } from "expo-router";
+import { fetchSocialProfile, toggleFollow } from "../../services/api";
 
 const { width } = Dimensions.get("window");
-const SOCIAL_BASE = "http://localhost:5000/api/social";
 
 type Pet = { id: number; name: string; species: string; breed: string; age: string; images: string };
 
@@ -38,13 +38,10 @@ export default function OtherProfileScreen() {
   const loadOtherProfile = async () => {
     try {
       setIsLoading(true);
-      const raw = await AsyncStorage.getItem("@ecotrack_user_session");
-      if (!raw) {
-        router.replace("/auth/login");
-        return;
-      }
-      const sess = JSON.parse(raw);
-      setSession(sess);
+
+      const sessionRaw = await AsyncStorage.getItem("@ecotrack_user_session");
+      if (!sessionRaw) { router.replace("/auth/login"); return; }
+      const sess = JSON.parse(sessionRaw);
 
       // Check if viewing self
       if (sess.user_id === id) {
@@ -52,11 +49,8 @@ export default function OtherProfileScreen() {
         return;
       }
 
-      const res = await fetch(`${SOCIAL_BASE}/profile/${id}`, {
-        headers: { "Authorization": `Bearer ${sess.token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await fetchSocialProfile(id as string);
+      if (data) {
         const p = data.profile || {};
         setProfile(p);
         setFollowStatus(data.followStatus || "None");
@@ -85,18 +79,10 @@ export default function OtherProfileScreen() {
   };
 
   const handleFollowToggle = async () => {
-    if (!session || !profile) return;
+    if (!id) return;
     try {
-      const res = await fetch(`${SOCIAL_BASE}/follow/toggle`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.token}`
-        },
-        body: JSON.stringify({ following_id: profile.user_id }),
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await toggleFollow(id as string);
+      if (data) {
         if (data.status === "Unfollowed") {
           setFollowStatus("None");
           setFollowersCount(prev => Math.max(0, prev - 1));

@@ -4,40 +4,6 @@
 
 const API_BASE = "http://localhost:5000/api";
 
-// Global fetch interceptor to inject Authorization header
-(function() {
-  const originalFetch = window.fetch;
-  window.fetch = async function(resource, options = {}) {
-    const urlStr = typeof resource === 'string' ? resource : resource.url;
-    if (urlStr.includes('localhost:5000') || urlStr.startsWith('/api') || urlStr.includes('/api/')) {
-      const rawSession = localStorage.getItem("@ecotrack_web_session");
-      if (rawSession) {
-        try {
-          const sessionObj = JSON.parse(rawSession);
-          if (sessionObj && sessionObj.token) {
-            options.headers = options.headers || {};
-            if (options.headers instanceof Headers) {
-              options.headers.set('Authorization', `Bearer ${sessionObj.token}`);
-            } else if (Array.isArray(options.headers)) {
-              const existingIndex = options.headers.findIndex(h => h[0].toLowerCase() === 'authorization');
-              if (existingIndex !== -1) {
-                options.headers[existingIndex] = ['Authorization', `Bearer ${sessionObj.token}`];
-              } else {
-                options.headers.push(['Authorization', `Bearer ${sessionObj.token}`]);
-              }
-            } else {
-              options.headers['Authorization'] = `Bearer ${sessionObj.token}`;
-            }
-          }
-        } catch (e) {
-          console.error("Fetch interceptor session parsing error:", e);
-        }
-      }
-    }
-    return originalFetch(resource, options);
-  };
-})();
-
 // ── GLOBAL STATE ──
 let activeTab = "dashboard";
 let activeMarketTab = "animals";
@@ -56,6 +22,7 @@ let userPets = [];
 // TOAST NOTIFICATION SYSTEM
 // ══════════════════════════════════════════════════
 function showToast(message, type = "success", duration = 3500) {
+  console.log(`[Toast ${type.toUpperCase()}] ${message}`);
   const icons = { success: "✅", error: "❌", info: "ℹ️", warning: "⚠️" };
   const container = document.getElementById("toastContainer");
   if (!container) return;
@@ -79,36 +46,8 @@ function showToast(message, type = "success", duration = 3500) {
 let otpTimerInterval = null;
 let currentOtpState = { email: "", otp: "", expiresAt: 0, verified: false };
 
-function getRegisteredAccounts() {
-  // No default accounts — all accounts must come from the backend
-  // The only defaults we allow are read from localStorage (previously backend-registered users)
-  const defaultAccounts = {};
-  try {
-    const raw = localStorage.getItem("@ecotrack_registered_accounts");
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (err) {
-    console.error("Error reading registered accounts:", err);
-  }
-  return defaultAccounts;
-}
-
-function saveRegisteredAccount(email, password, name = "") {
-  const accounts = getRegisteredAccounts();
-  const lowerEmail = email.toLowerCase().trim();
-  accounts[lowerEmail] = {
-    id: "web_" + lowerEmail.replace(/[^a-z0-9]/gi, "_"),
-    email: lowerEmail,
-    password: password,
-    name: name || lowerEmail.split("@")[0],
-    bio: "EcoTrack member",
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name || lowerEmail.split("@")[0])}&background=10b981&color=fff`,
-    stats: { rescues: 0, xp: 0, plans: 0, scans: 0 }
-  };
-  localStorage.setItem("@ecotrack_registered_accounts", JSON.stringify(accounts));
-  return accounts[lowerEmail];
-}
+function getRegisteredAccounts() { return {}; }
+function saveRegisteredAccount() { return; }
 
 function updateRegisteredPassword(email, newPassword) {
   const accounts = getRegisteredAccounts();
@@ -126,7 +65,7 @@ function switchLoginTab(tab) {
   document.getElementById("signupForm")?.classList.toggle("hidden", tab !== "signup");
   document.getElementById("forgotForm")?.classList.toggle("hidden", tab !== "forgot");
   document.getElementById("otpForm")?.classList.toggle("hidden", tab !== "otp");
-  document.getElementById("resetPasswordForm")?.classList.toggle("hidden", tab !== "reset");
+  document.getElementById("resetForm")?.classList.toggle("hidden", tab !== "reset");
 
   const tabsNav = document.querySelector(".login-tabs");
   if (tabsNav) {
@@ -142,15 +81,22 @@ function switchLoginTab(tab) {
   }
 }
 
+/**
+ * EcoTrack Premium Login & Authentication System v3.0
+ * Responsive UI, Real Persistence, Secure Sessions
+ */
+
 async function handleSignIn(e) {
   e.preventDefault();
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPassword").value;
-  if (!email) { showToast("Please enter your email address.", "error"); return; }
-  if (!password) { showToast("Please enter your password.", "error"); return; }
+  if (!email || !password) { showToast("Please enter your email and password.", "error"); return; }
 
-  const btn = document.getElementById("signInBtnText");
-  if (btn) btn.textContent = "Signing In...";
+  const btn = document.getElementById("signInBtn");
+  const btnText = document.getElementById("signInBtnText");
+  const originalText = btnText ? btnText.textContent : "Sign In to EcoTrack";
+
+  setLoadingState(btn, btnText, true, "Authenticating...");
 
   try {
     const res = await fetch(`${API_BASE}/auth/login`, {
@@ -159,34 +105,18 @@ async function handleSignIn(e) {
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
+
     if (!res.ok) {
-      showToast(data.error || "Login failed. Please check your credentials.", "error");
-      if (btn) btn.textContent = "Sign In to EcoTrack";
-      return;
+      throw new Error(data.error || "Login failed. Please check your credentials.");
     }
-    saveRegisteredAccount(email, password, data.user.name);
+
     completeLogin(data.user, data.token);
+    showToast(`Welcome back, ${data.user.name}!`, "success");
   } catch (err) {
-    const lowerEmail = email.toLowerCase();
-    const accounts = getRegisteredAccounts();
-
-    if (!accounts[lowerEmail]) {
-      showToast(`No account found with "${email}". Please sign up first.`, "error");
-      if (btn) btn.textContent = "Sign In to EcoTrack";
-      return;
-    }
-
-    const acc = accounts[lowerEmail];
-    if (acc.password && password !== acc.password && (acc.password !== "demo" || password !== "demo")) {
-      showToast("Incorrect password. Please verify and try again.", "error");
-      if (btn) btn.textContent = "Sign In to EcoTrack";
-      return;
-    }
-
-    completeLogin(acc, "offline_token");
-    showToast(`Welcome back, ${acc.name}!`, "success");
+    console.error("Login Error:", err);
+    showToast(err.message, "error");
   } finally {
-    if (btn) btn.textContent = "Sign In to EcoTrack";
+    setLoadingState(btn, btnText, false, originalText);
   }
 }
 
@@ -195,11 +125,15 @@ async function handleSignUp(e) {
   const name = document.getElementById("signupName").value.trim();
   const email = document.getElementById("signupEmail").value.trim();
   const password = document.getElementById("signupPassword").value;
+
   if (!email || !password) { showToast("Email and password are required.", "error"); return; }
   if (password.length < 6) { showToast("Password must be at least 6 characters.", "error"); return; }
 
-  const btn = document.getElementById("signUpBtnText");
-  if (btn) btn.textContent = "Creating Account...";
+  const btn = document.getElementById("signUpBtn");
+  const btnText = document.getElementById("signUpBtnText");
+  const originalText = btnText ? btnText.textContent : "Create My Account";
+
+  setLoadingState(btn, btnText, true, "Creating Account...");
 
   try {
     const res = await fetch(`${API_BASE}/auth/signup`, {
@@ -208,20 +142,40 @@ async function handleSignUp(e) {
       body: JSON.stringify({ email, name: name || email.split("@")[0], password })
     });
     const data = await res.json();
+
     if (!res.ok) {
-      showToast(data.error || "Signup failed.", "error");
-      if (btn) btn.textContent = "Create My Account";
-      return;
+      throw new Error(data.error || "Signup failed.");
     }
-    saveRegisteredAccount(email, password, data.user.name);
+
     completeLogin(data.user, data.token);
     showToast(`🎉 Welcome to EcoTrack, ${data.user.name}!`, "success");
-  } catch {
-    const acc = saveRegisteredAccount(email, password, name);
-    completeLogin(acc, "offline_token");
-    showToast("Account created successfully.", "success");
+  } catch (err) {
+    console.error("Signup Error:", err);
+    showToast(err.message, "error");
   } finally {
-    if (btn) btn.textContent = "Create My Account";
+    setLoadingState(btn, btnText, false, originalText);
+  }
+}
+
+function setLoadingState(btn, textEl, isLoading, loadingText = "Processing...") {
+  if (!btn) return;
+  btn.disabled = isLoading;
+  if (textEl) {
+    if (isLoading) {
+      textEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> ${loadingText}`;
+    } else {
+      textEl.textContent = loadingText;
+    }
+  }
+}
+
+function togglePasswordVisibility(inputId, iconId) {
+  const input = document.getElementById(inputId);
+  const icon = document.getElementById(iconId);
+  if (input && icon) {
+    const isVisible = input.type === "text";
+    input.type = isVisible ? "password" : "text";
+    icon.className = isVisible ? "fas fa-eye" : "fas fa-eye-slash";
   }
 }
 
@@ -233,11 +187,11 @@ async function handleSendOtp(e) {
   const email = emailInput ? emailInput.value.trim() : "";
   if (!email) { showToast("Please enter a valid email address.", "error"); return; }
 
+  const btn = document.getElementById("sendOtpBtn");
   const btnText = document.getElementById("sendOtpBtnText");
-  if (btnText) btnText.textContent = "Generating OTP...";
+  const originalText = btnText ? btnText.textContent : "Send Verification OTP";
 
-  let otpCode = "";
-  let expiresInSec = 300;
+  setLoadingState(btn, btnText, true, "Sending OTP...");
 
   try {
     const res = await fetch(`${API_BASE}/auth/forgot-password`, {
@@ -248,40 +202,113 @@ async function handleSendOtp(e) {
     const data = await res.json();
 
     if (!res.ok) {
-      showToast(data.error || "Unable to send OTP. Email may not be registered.", "error");
-      if (btnText) btnText.textContent = "Send Verification OTP";
-      return;
-    }
-    otpCode = data.otp;
-  } catch {
-    const lowerEmail = email.toLowerCase();
-    const accounts = getRegisteredAccounts();
-
-    if (!accounts[lowerEmail]) {
-      showToast(`The email "${email}" is not registered with EcoTrack.`, "error");
-      if (btnText) btnText.textContent = "Send Verification OTP";
-      return;
+      throw new Error(data.error || "Unable to send OTP.");
     }
 
-    otpCode = "OFFLINE_MODE";
+    currentOtpState = {
+      email: email.toLowerCase(),
+      otp: "SERVER_VALIDATED", // Backend checks this
+      expiresAt: Date.now() + (data.expiresInSeconds || 300) * 1000,
+      verified: false
+    };
+
+    const targetEmailEl = document.getElementById("otpTargetEmail");
+    if (targetEmailEl) targetEmailEl.textContent = email;
+    const otpInput = document.getElementById("otpCodeInput");
+    if (otpInput) otpInput.value = "";
+
+    switchLoginTab("otp");
+    startOtpCountdown();
+    showToast(`📧 A security code has been sent to ${email}!`, "info", 6000);
+  } catch (err) {
+    console.error("OTP Send Error:", err);
+    showToast(err.message, "error");
   } finally {
-    if (btnText) btnText.textContent = "Send Verification OTP";
+    setLoadingState(btn, btnText, false, originalText);
   }
+}
 
-  currentOtpState = {
-    email: email.toLowerCase(),
-    otp: otpCode,
-    expiresAt: Date.now() + expiresInSec * 1000,
-    verified: false
-  };
+async function handleVerifyOtp(e) {
+  if (e) e.preventDefault();
+  const otpCode = document.getElementById("otpCodeInput").value.trim();
+  if (otpCode.length !== 6) { showToast("Please enter the 6-digit code.", "warning"); return; }
 
-  const targetEmailEl = document.getElementById("otpTargetEmail");
-  if (targetEmailEl) targetEmailEl.textContent = email;
-  const otpInput = document.getElementById("otpCodeInput");
-  if (otpInput) otpInput.value = "";
+  const btn = document.getElementById("verifyOtpBtn");
+  const btnText = document.getElementById("verifyOtpBtnText");
+  const originalText = btnText ? btnText.textContent : "Verify OTP Code";
 
-  switchLoginTab("otp");
-  showToast(`📧 A security code has been sent to your email! (Check your inbox or spam)`, "info", 8000);
+  setLoadingState(btn, btnText, true, "Verifying...");
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: currentOtpState.email, otp: otpCode })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Verification failed.");
+    }
+
+    currentOtpState.verified = true;
+    currentOtpState.otp = otpCode; // Save verified code for final reset
+
+    switchLoginTab("reset");
+    showToast("✅ Identity verified. Please set your new password.", "success");
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    setLoadingState(btn, btnText, false, originalText);
+  }
+}
+
+async function handleResetPassword(e) {
+  if (e) e.preventDefault();
+  const newPassword = document.getElementById("newPasswordInput").value;
+  const confirmPassword = document.getElementById("confirmPasswordInput").value;
+
+  if (newPassword.length < 6) { showToast("Password must be at least 6 characters.", "warning"); return; }
+  if (newPassword !== confirmPassword) { showToast("Passwords do not match.", "error"); return; }
+
+  const btn = document.getElementById("resetPassBtn");
+  const btnText = document.getElementById("resetPassBtnText");
+  const originalText = btnText ? btnText.textContent : "Reset My Password";
+
+  setLoadingState(btn, btnText, true, "Updating Password...");
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: currentOtpState.email,
+        otp: currentOtpState.otp,
+        newPassword
+      })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Password reset failed.");
+    }
+
+    showToast("🎉 Password updated successfully! Please sign in.", "success");
+    const loginEmailInput = document.getElementById("loginEmail");
+    if (loginEmailInput) loginEmailInput.value = currentOtpState.email;
+    const loginPassInput = document.getElementById("loginPassword");
+    if (loginPassInput) { loginPassInput.value = ""; loginPassInput.focus(); }
+
+    currentOtpState = { email: "", otp: "", expiresAt: 0, verified: false };
+    switchLoginTab("signin");
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    setLoadingState(btn, btnText, false, originalText);
+  }
+}
+
+function startOtpCountdown() {
   startOtpTimer();
 }
 
@@ -327,110 +354,7 @@ function handleResendOtp() {
   handleSendOtp(null);
 }
 
-async function handleVerifyOtp(e) {
-  e.preventDefault();
-  const enteredOtp = document.getElementById("otpCodeInput").value.trim();
-  if (!enteredOtp || enteredOtp.length !== 6) {
-    showToast("Please enter the 6-digit OTP code.", "error");
-    return;
-  }
 
-  if (Date.now() > currentOtpState.expiresAt) {
-    showToast("❌ OTP has expired after 5 minutes. Please click 'Resend OTP'.", "error");
-    return;
-  }
-
-  const btnText = document.getElementById("verifyOtpBtnText");
-  if (btnText) btnText.textContent = "Verifying...";
-
-  try {
-    const res = await fetch(`${API_BASE}/auth/verify-otp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: currentOtpState.email, otp: enteredOtp })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showToast(data.error || "Invalid OTP code.", "error");
-      if (btnText) btnText.textContent = "Verify OTP & Continue";
-      return;
-    }
-  } catch {
-    if (enteredOtp !== currentOtpState.otp) {
-      showToast("❌ Invalid OTP code. Please check the code sent to your email.", "error");
-      if (btnText) btnText.textContent = "Verify OTP & Continue";
-      return;
-    }
-  } finally {
-    if (btnText) btnText.textContent = "Verify OTP & Continue";
-  }
-
-  currentOtpState.verified = true;
-  if (otpTimerInterval) {
-    clearInterval(otpTimerInterval);
-    otpTimerInterval = null;
-  }
-
-  showToast("✅ OTP verified successfully! Create your new password.", "success");
-  switchLoginTab("reset");
-}
-
-async function handleResetPassword(e) {
-  e.preventDefault();
-  const newPass = document.getElementById("newPasswordInput").value;
-  const confirmPass = document.getElementById("confirmPasswordInput").value;
-
-  if (!newPass || newPass.length < 6) {
-    showToast("New password must be at least 6 characters.", "error");
-    return;
-  }
-  if (newPass !== confirmPass) {
-    showToast("Passwords do not match. Please verify.", "error");
-    return;
-  }
-
-  if (!currentOtpState.verified || Date.now() > currentOtpState.expiresAt) {
-    showToast("Session expired or unverified. Please restart Forgot Password.", "error");
-    switchLoginTab("forgot");
-    return;
-  }
-
-  const btnText = document.getElementById("resetPasswordBtnText");
-  if (btnText) btnText.textContent = "Updating Password...";
-
-  try {
-    const res = await fetch(`${API_BASE}/auth/reset-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: currentOtpState.email,
-        otp: currentOtpState.otp,
-        newPassword: newPass
-      })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showToast(data.error || "Failed to reset password.", "error");
-      if (btnText) btnText.textContent = "Update Password & Sign In";
-      return;
-    }
-    updateRegisteredPassword(currentOtpState.email, newPass);
-  } catch {
-    updateRegisteredPassword(currentOtpState.email, newPass);
-  } finally {
-    if (btnText) btnText.textContent = "Update Password & Sign In";
-  }
-
-  showToast("🎉 Password updated successfully! Please sign in with your new password.", "success");
-
-  const loginEmailInput = document.getElementById("loginEmail");
-  if (loginEmailInput) loginEmailInput.value = currentOtpState.email;
-  const loginPassInput = document.getElementById("loginPassword");
-  if (loginPassInput) { loginPassInput.value = ""; loginPassInput.focus(); }
-
-  currentOtpState = { email: "", otp: "", expiresAt: 0, verified: false };
-  switchLoginTab("signin");
-}
 
 function completeLogin(user, token) {
   // Clear any previous user's in-memory state to prevent cross-user leakage
@@ -439,12 +363,20 @@ function completeLogin(user, token) {
   cart = [];
   favorites = [];
   chatHistory = {};
+  registeredEventIds = [];
+  userEventTickets = [];
 
   currentUser = { ...user, token };
   window.currentUser = currentUser;
 
   const session = { ...user, token, loggedInAt: new Date().toISOString() };
-  localStorage.setItem("@ecotrack_web_session", JSON.stringify(session));
+  localStorage.setItem(AUTH_CONFIG.sessionKey, JSON.stringify(session));
+
+  // Sync UI immediately with shared logic
+  syncUserInterface(currentUser);
+
+  // Re-initialize modules that rely on user-scoped local storage
+  initEventsModule();
 
   // Reset rendered training container for clean user session
   const container = document.getElementById("trainingResultContainer");
@@ -513,38 +445,15 @@ function showMainApp() {
 }
 
 function handleLogout() {
-  if (!confirm("Are you sure you want to sign out?")) return;
-  localStorage.removeItem("@ecotrack_web_session");
-  currentUser = null;
-  window.currentUser = null;
-  // Clear all in-memory user state
-  cart = []; favorites = []; chatHistory = {};
-  COMMUNITY_POSTS = []; userPets = [];
-
-  // Clean DOM elements and forms for next user session
-  const container = document.getElementById("trainingResultContainer");
-  if (container) container.innerHTML = "";
-  setElVal("trainSpecies", "Dog");
-  setElVal("trainBreed", "German Shepherd");
-  setElVal("trainAge", "2");
-  setElVal("trainWeight", "28");
-  setElVal("trainGoal", "Obedience & Agility");
-
-  showLoginPage();
-  showToast("Signed out successfully.", "info");
+  performLogout();
 }
 
 async function checkAuthOnLoad() {
   initTheme();
-  const raw = localStorage.getItem("@ecotrack_web_session");
-  if (raw) {
-    try {
-      const session = JSON.parse(raw);
-      if (session && session.id && session.email) {
-        await completeLogin(session, session.token);
-        return;
-      }
-    } catch { /* invalid session */ }
+  const session = getSession();
+  if (session) {
+    await completeLogin(session, session.token);
+    return;
   }
   showLoginPage();
 }
@@ -562,6 +471,7 @@ function initApp() {
   renderServicesGrid();
   loadProfileTab();
   loadTrainingAnalytics();
+  fetchDashboardMetrics();
 
   const targetHash = (window.location.hash || '').replace('#', '');
   if (targetHash && document.getElementById(targetHash)) {
@@ -577,23 +487,7 @@ function initApp() {
 }
 
 function updateSidebarUser() {
-  if (!currentUser) return;
-  const name = currentUser.name || (currentUser.email ? currentUser.email.split('@')[0] : 'User');
-  const email = currentUser.email || "";
-  const initial = name.charAt(0).toUpperCase();
-
-  setEl("sidebarUserName", name);
-  setEl("sidebarUserEmail", email);
-  setEl("topUserName", name);
-
-  const avatarEl = document.getElementById("sidebarAvatar");
-  if (avatarEl) {
-    if (currentUser.avatar && currentUser.avatar.startsWith("http")) {
-      avatarEl.innerHTML = `<img src="${currentUser.avatar}" alt="${name}">`;
-    } else {
-      avatarEl.textContent = initial;
-    }
-  }
+  syncUserInterface(currentUser);
 }
 
 window.switchTab = switchTab;
@@ -628,6 +522,10 @@ function switchTab(tabId) {
     profile:   ["My Profile", "Manage your account, pets & achievements"]
   };
 
+  if (tabId === "profile") {
+    if (window.loadProfileTab) window.loadProfileTab();
+  }
+
   const h = TITLES[tabId];
   if (h) {
     setEl("topPageTitle", h[0]);
@@ -648,7 +546,7 @@ function switchTab(tabId) {
 // THEME MANAGEMENT
 // ══════════════════════════════════════════════════
 function initTheme() {
-  const saved = localStorage.getItem("@ecotrack_theme") || "light";
+  const saved = localStorage.getItem(AUTH_CONFIG.themeKey) || "light";
   document.documentElement.setAttribute("data-theme", saved);
   updateThemeIcon(saved);
 }
@@ -657,7 +555,7 @@ function toggleTheme() {
   const cur = document.documentElement.getAttribute("data-theme");
   const next = cur === "dark" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", next);
-  localStorage.setItem("@ecotrack_theme", next);
+  localStorage.setItem(AUTH_CONFIG.themeKey, next);
   updateThemeIcon(next);
 }
 
@@ -1265,6 +1163,209 @@ async function loadTrainingAnalytics() {
   } catch { /* offline fallback */ }
 }
 
+async function fetchDashboardMetrics() {
+  const container = document.getElementById("dashboardActivitySection");
+  if (!container) return;
+
+  const session = getSession();
+  if (!session) {
+    container.innerHTML = "";
+    return;
+  }
+
+  const userId = session.id;
+  const token = session.token;
+  const headers = { 'Authorization': `Bearer ${token}` };
+
+  try {
+    // 1. Fetch scan history
+    const scans = await fetch(`${API_BASE}/ai/scan-history?user_id=${userId}`, { headers })
+      .then(r => r.ok ? r.json() : [])
+      .catch(() => []);
+
+    // 2. Fetch training programs
+    const programs = await fetch(`${API_BASE}/training/programs/${userId}`, { headers })
+      .then(r => r.ok ? r.json() : [])
+      .catch(() => []);
+
+    // 3. Read registered events
+    let registeredEvents = [];
+    if (window.registeredEventIds && Array.isArray(window.registeredEventIds) && window.registeredEventIds.length > 0) {
+      const list = window.eventsList || [];
+      window.registeredEventIds.forEach(id => {
+        const ev = list.find(e => e.id === id);
+        if (ev) registeredEvents.push(ev);
+      });
+    }
+
+    renderDashboardActivity(scans, programs, registeredEvents);
+  } catch (err) {
+    console.error("Error loading dashboard metrics:", err);
+    renderDashboardActivity([], [], []);
+  }
+}
+
+function renderDashboardActivity(scans, programs, registeredEvents) {
+  const container = document.getElementById("dashboardActivitySection");
+  if (!container) return;
+
+  const activePrograms = (programs || []).filter(p => p.status === 'Active' || p.progress < 100);
+  const activeProgram = activePrograms.length > 0 ? activePrograms[0] : null;
+  const latestScan = (scans && scans.length > 0) ? scans[0] : null;
+
+  if (!latestScan && !activeProgram && registeredEvents.length === 0) {
+    container.innerHTML = `
+      <div class="activity-welcome-card">
+        <div class="activity-welcome-title">Welcome to EcoTrack! 👋</div>
+        <div class="activity-welcome-desc">
+          Get started by training your animal species with our weight-scaled AI trainer, 
+          scanning coordinates/postures in real-time, or joining upcoming community events.
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `<div class="activity-grid">`;
+
+  // 1. Latest AI Scan Card
+  if (latestScan) {
+    const scanDate = new Date(latestScan.timestamp || latestScan.date || Date.now()).toLocaleDateString('en-IN', {
+      day: 'numeric', month: 'short', year: 'numeric'
+    });
+    const species = latestScan.detectedSpecies || latestScan.species || "Unknown Species";
+    const score = latestScan.formScore || latestScan.score || 0;
+    const scoreText = score > 0 ? `Form Score: <strong>${score}%</strong>` : 'Scan processed successfully';
+
+    html += `
+      <div class="activity-card">
+        <div>
+          <div class="activity-card-header">
+            <i class="fas fa-microscope"></i>
+            <span>Latest AI Scan</span>
+          </div>
+          <div class="activity-card-body" style="margin-top: 0.75rem;">
+            <p style="font-weight: 800; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 0.25rem;">${species}</p>
+            <p style="margin-bottom: 0.5rem;">${scoreText}</p>
+            <p style="font-size: 0.8rem; color: var(--text-muted);"><i class="far fa-clock"></i> Scanned on ${scanDate}</p>
+          </div>
+        </div>
+        <div class="activity-card-footer">
+          <button class="btn btn-secondary" style="font-size:12px; padding: 6px 12px; width: 100%;" onclick="window.location.href='aiscanner.html'">
+            <i class="fas fa-camera"></i> Run New Scan
+          </button>
+        </div>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="activity-card">
+        <div>
+          <div class="activity-card-header">
+            <i class="fas fa-microscope"></i>
+            <span>Latest AI Scan</span>
+          </div>
+          <div class="activity-card-body" style="margin-top: 0.75rem;">
+            <p style="margin-bottom: 0.5rem; color: var(--text-muted);">No scan records found in your vault.</p>
+            <p style="font-size: 0.825rem;">Use our offline vision scanner to track animal posture, evaluate joints, and estimate gait metrics.</p>
+          </div>
+        </div>
+        <div class="activity-card-footer">
+          <button class="btn btn-primary" style="font-size:12px; padding: 6px 12px; width: 100%;" onclick="window.location.href='aiscanner.html'">
+            <i class="fas fa-camera"></i> Scan First Animal
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // 2. Active Training Progress Card
+  if (activeProgram) {
+    const progPercent = Math.round(activeProgram.progress || 0);
+    const progSpecies = activeProgram.species || "Species";
+    const progDrill = activeProgram.programName || activeProgram.drillName || "General Conditioning";
+    const progDate = new Date(activeProgram.startedAt || activeProgram.date || Date.now()).toLocaleDateString('en-IN', {
+      day: 'numeric', month: 'short', year: 'numeric'
+    });
+
+    html += `
+      <div class="activity-card">
+        <div>
+          <div class="activity-card-header">
+            <i class="fas fa-dumbbell"></i>
+            <span>Active Training</span>
+          </div>
+          <div class="activity-card-body" style="margin-top: 0.75rem;">
+            <p style="font-weight: 800; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 0.25rem;">${progSpecies} - ${progDrill}</p>
+            <div style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 8px;">
+              <div style="flex: 1; height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden;">
+                <div style="width: ${progPercent}%; height: 100%; background: var(--primary); border-radius: 3px;"></div>
+              </div>
+              <span style="font-weight: 800; color: var(--primary); font-size: 0.85rem;">${progPercent}%</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted);"><i class="far fa-clock"></i> Started ${progDate}</p>
+          </div>
+        </div>
+        <div class="activity-card-footer">
+          <button class="btn btn-secondary" style="font-size:12px; padding: 6px 12px; width: 100%;" onclick="switchTab('training')">
+            <i class="fas fa-play"></i> Resume Training
+          </button>
+        </div>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="activity-card">
+        <div>
+          <div class="activity-card-header">
+            <i class="fas fa-dumbbell"></i>
+            <span>Active Training</span>
+          </div>
+          <div class="activity-card-body" style="margin-top: 0.75rem;">
+            <p style="margin-bottom: 0.5rem; color: var(--text-muted);">No active training program found.</p>
+            <p style="font-size: 0.825rem;">Generate customized, posture-improving training routines tailored to your animal's age and weight metrics.</p>
+          </div>
+        </div>
+        <div class="activity-card-footer">
+          <button class="btn btn-primary" style="font-size:12px; padding: 6px 12px; width: 100%;" onclick="switchTab('training')">
+            <i class="fas fa-plus"></i> Generate Program
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // 3. Upcoming Event Card
+  if (registeredEvents.length > 0) {
+    const nextEvent = registeredEvents[0];
+    html += `
+      <div class="activity-card">
+        <div>
+          <div class="activity-card-header">
+            <i class="fas fa-calendar-alt"></i>
+            <span>Upcoming Registered Event</span>
+          </div>
+          <div class="activity-card-body" style="margin-top: 0.75rem;">
+            <p style="font-weight: 800; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 0.25rem;">${nextEvent.title}</p>
+            <p style="margin-bottom: 0.5rem; font-size: 0.85rem;"><i class="fas fa-location-dot" style="color: var(--primary); margin-right: 4px;"></i> ${nextEvent.location}</p>
+            <p style="font-size: 0.8rem; color: var(--text-muted);"><i class="far fa-calendar"></i> Starts ${nextEvent.date}</p>
+          </div>
+        </div>
+        <div class="activity-card-footer">
+          <button class="btn btn-secondary" style="font-size:12px; padding: 6px 12px; width: 100%;" onclick="switchTab('events'); activeEventsTab='tickets'; renderEvents();">
+            <i class="fas fa-ticket-simple"></i> View Entry Pass
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+window.fetchDashboardMetrics = fetchDashboardMetrics;
+
 
 // ══════════════════════════════════════════════════
 // MARKETPLACE & COMMERCE
@@ -1311,8 +1412,8 @@ async function fetchMarketplaceListings() {
             breed: item.breed || "",
             description: item.description || "Verified EcoTrack listing.",
             specs: item.specs || "Standard Quality",
-            lat: item.lat || (13.0827 + (Math.random() - 0.5) * 0.1), // Jitter slightly for demo
-            lng: item.lng || (80.2707 + (Math.random() - 0.5) * 0.1)
+            lat: item.lat || 13.0827,
+            lng: item.lng || 80.2707
           };
 
           const isAnimal = (item.category === "Pets" || item.type === "sale" || item.type === "adoption" || item.breed || item.species) && item.category !== "Accessories" && item.category !== "Supplies" && item.category !== "Food" && item.category !== "Gear" && item.category !== "Medical";
@@ -2049,10 +2150,8 @@ async function loadCommunityPosts() {
   } catch { /* offline */ }
 
   if (!COMMUNITY_POSTS.length) {
-    COMMUNITY_POSTS = [
-      { id:301, user_id:"usr1", user:"Dr. Ananya (Veterinarian)", avatar:"https://randomuser.me/api/portraits/women/45.jpg", image:"https://images.unsplash.com/photo-1583337130417-3346a1be7dee?q=85&w=1200", caption:"🏥 Health Tip: For minor cuts, flush with 0.9% sterile saline immediately and apply sterile bandage. Avoid alcohol on open cuts!", likes:42, liked:false, liked_by:[], comments:[{ user:"Rohan", text:"Thank you Dr. Ananya! Super helpful." }], timestamp:new Date(Date.now()-7200000).toISOString() },
-      { id:302, user_id:"usr2", user:"Marcus (Agility Coach)", avatar:"https://randomuser.me/api/portraits/men/32.jpg", image:"https://images.unsplash.com/photo-1534361960057-19889db9621e?q=85&w=1200", caption:"🏆 Consistent positive reinforcement during leash drills produces 300% faster recall speed!", likes:89, liked:false, liked_by:[], comments:[], timestamp:new Date(Date.now()-18000000).toISOString() }
-    ];
+    // Zero-mock fallback: empty state preferred over hardcoded users
+    COMMUNITY_POSTS = [];
   }
   renderCommunityPosts();
 }
@@ -2425,15 +2524,16 @@ let registeredEventIds = [];
 let userEventTickets = [];
 
 function initEventsModule() {
+  if (!currentUser) return;
   try {
     const savedEvents = localStorage.getItem("@ecotrack_events_list");
     if (savedEvents) eventsList = JSON.parse(savedEvents);
 
-    const savedReg = localStorage.getItem("@ecotrack_events_registered");
-    if (savedReg) registeredEventIds = JSON.parse(savedReg);
+    const savedReg = localStorage.getItem(`@ecotrack_events_registered_${currentUser.id}`);
+    registeredEventIds = savedReg ? JSON.parse(savedReg) : [];
 
-    const savedTickets = localStorage.getItem("@ecotrack_events_tickets");
-    if (savedTickets) userEventTickets = JSON.parse(savedTickets);
+    const savedTickets = localStorage.getItem(`@ecotrack_events_tickets_${currentUser.id}`);
+    userEventTickets = savedTickets ? JSON.parse(savedTickets) : [];
   } catch {}
 
   updateEventsBadges();
@@ -2441,9 +2541,10 @@ function initEventsModule() {
 }
 
 function saveEventsState() {
-  localStorage.setItem("@ecotrack_events_list", JSON.stringify(eventsList));
-  localStorage.setItem("@ecotrack_events_registered", JSON.stringify(registeredEventIds));
-  localStorage.setItem("@ecotrack_events_tickets", JSON.stringify(userEventTickets));
+  if (!currentUser) return;
+  localStorage.setItem("@ecotrack_events_list", JSON.stringify(eventsList)); // List is global/cache
+  localStorage.setItem(`@ecotrack_events_registered_${currentUser.id}`, JSON.stringify(registeredEventIds));
+  localStorage.setItem(`@ecotrack_events_tickets_${currentUser.id}`, JSON.stringify(userEventTickets));
   updateEventsBadges();
 }
 

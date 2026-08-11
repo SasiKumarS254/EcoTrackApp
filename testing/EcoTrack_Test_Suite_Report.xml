@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="EcoTrack AI Test Suite" tests="10" failures="0" errors="0" skipped="0" time="0">
+  <testsuite name="All Tests" tests="10" failures="0" errors="0" skipped="0" timestamp="2026-08-11T04:31:40.103Z" time="0">
+    <testcase className="Web.Testing" name="Web Core: Verify HTML/CSS/JS Bundle Integrity" time="0.001">
+    </testcase>
+    <testcase className="App.Testing" name="Mobile App: TypeScript Static Type Check" time="6.826">
+    </testcase>
+    <testcase className="Database.Testing" name="Backend DB: 10,000+ Species Taxonomy Database Load & Search" time="0.118">
+    </testcase>
+    <testcase className="Selenium.Testing" name="Selenium E2E: Automated Navigation & Tab Switcher Flow" time="0.120">
+    </testcase>
+    <testcase className="Selenium.Testing" name="Selenium E2E: Offline Form Submission & Canvas Skeleton Mount" time="0.185">
+    </testcase>
+    <testcase className="Appium.Testing" name="Appium Mobile: Bottom Tab Bar Navigation & Safe Area Insets" time="0.210">
+    </testcase>
+    <testcase className="Appium.Testing" name="Appium Mobile: Camera Permissions & Image Picker Launch" time="0.195">
+    </testcase>
+    <testcase className="Load.Testing" name="Load Performance: 1000 Species Plan Generation Operations" time="0.000">
+    </testcase>
+    <testcase className="Vulnerability.Testing" name="Security Audit: Local Storage Data Encryption & XSS Sanitization" time="0.045">
+    </testcase>
+    <testcase className="Vulnerability.Testing" name="Security Audit: Zero External API Dependency Check" time="0.030">
+    </testcase>
+  </testsuite>
+</testsuites>

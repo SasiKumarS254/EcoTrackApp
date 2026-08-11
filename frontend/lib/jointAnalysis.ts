@@ -334,6 +334,96 @@ const HUMAN_JOINT_KNOWLEDGE: Record<string, JointKnowledge> = {
   },
 };
 
+// Feline (cat) joint knowledge
+const FELINE_JOINT_KNOWLEDGE: Record<string, JointKnowledge> = {
+  Neck: {
+    label: 'Neck / Cervical Spine',
+    muscleGroups: ['Sternocephalicus', 'Brachiocephalicus', 'Splenius'],
+    overextensionReason: 'Excessive cervical extension — often seen in avoidance behavior or cervical pain syndromes.',
+    overextensionPlain: 'The cat\'s neck is extended too far. This could indicate discomfort or a defensive posture.',
+    overextensionEffect: 'Disrupts the natural stalking gait and shifts weight balance to the hindquarters.',
+    overextensionRisk: 'Cervical disc irritation, muscle strain in the neck extensors.',
+    overextensionCorrection: [
+      'Allow the cat to lower its head naturally using a food lure at floor level.',
+      'Reduce environmental stressors that may cause defensive posture.',
+      'Consult a vet if the head is consistently held in a tilted or raised position.',
+    ],
+    underflexionReason: 'Insufficient cervical flexion — may indicate restricted range of motion or early-stage feline arthritis.',
+    underflexionPlain: 'The cat is not bending its neck as much as expected. This might be a sign of stiffness.',
+    underflexionEffect: 'Limits the ability to groom and reduces the efficiency of target-based agility exercises.',
+    underflexionRisk: 'Chronic stiffness, reduced thoracic mobility.',
+    underflexionCorrection: [
+      'Encourage gentle neck stretches with treats moved in a slow arc.',
+      'Check for dental issues which can sometimes present as neck stiffness.',
+    ],
+  },
+  L_Hip: {
+    label: 'Left Hind Hip',
+    muscleGroups: ['Gluteus Medius', 'Biceps Femoris', 'Sartorius'],
+    overextensionReason: 'Hyperextension of the coxofemoral joint — unusual in felines unless during extreme athletic maneuvers.',
+    overextensionPlain: 'The left hind leg is extending further back than normal for this movement.',
+    overextensionEffect: 'Can lead to "bunny hopping" gait if seen during locomotion.',
+    overextensionRisk: 'Hip dysplasia (common in specific breeds like Maine Coons), iliopsoas strain.',
+    overextensionCorrection: [
+      'Focus on controlled, lower-amplitude movements.',
+      'Encourage strengthening of the core and hindquarters with climbing exercises.',
+    ],
+    underflexionReason: 'Insufficient hip flexion — highly indicative of feline osteoarthritis (OA), which is often under-diagnosed.',
+    underflexionPlain: 'The cat is not bending its left hip fully. This is a common sign of joint pain or arthritis in older cats.',
+    underflexionEffect: 'Reduces jumping height and landing stability.',
+    underflexionRisk: 'Progression of osteoarthritis, compensatory loading of the spine.',
+    underflexionCorrection: [
+      'Incorporate joint supplements (Omega-3, Glucosamine) after vet consultation.',
+      'Use steps or ramps to help the cat reach high surfaces without jumping.',
+    ],
+  },
+};
+
+// Equine (horse) joint knowledge
+const EQUINE_JOINT_KNOWLEDGE: Record<string, JointKnowledge> = {
+  Neck: {
+    label: 'Neck / Poll',
+    muscleGroups: ['Splenius', 'Trapezius', 'Rhomboid'],
+    overextensionReason: 'Inversion of the neck (above the bit) — the nuchal ligament is under-tensioned and the back is hollowed.',
+    overextensionPlain: 'The horse is holding its head too high and "hollowing" its back. This prevents correct muscle development.',
+    overextensionEffect: 'Disrupts the "throughness" of the gait, preventing engagement of the hindquarters.',
+    overextensionRisk: 'Kissing spine syndrome, sacroiliac strain, nuchal ligament inflammation.',
+    overextensionCorrection: [
+      'Encourage the horse to stretch down and forward (long and low).',
+      'Check bit and saddle fit — pain often causes head tossing and inversion.',
+      'Perform ground-work exercises to build topline strength without a rider.',
+    ],
+    underflexionReason: 'Over-flexion (behind the vertical) — the nasal plane is behind the perpendicular, compressing the upper airway.',
+    underflexionPlain: 'The horse is tucking its nose too far in. This restricts its breathing and vision.',
+    underflexionEffect: 'Creates a false "head-set" without real hindquarter engagement.',
+    underflexionRisk: 'Hyoid bone stress, cervical vertebra impingement.',
+    underflexionCorrection: [
+      'Open the contact — allow the horse to move its nose forward of the vertical.',
+      'Ride from leg to hand, never pull the head into position.',
+    ],
+  },
+  L_Knee: {
+    label: 'Left Hind Stifle',
+    muscleGroups: ['Quadriceps Femoralis', 'Biceps Femoris', 'Gluteal Medius'],
+    overextensionReason: 'Locking of the patella or hyperextension of the stifle joint.',
+    overextensionPlain: 'The left hind leg is extending too far, which can lead to the "locking" of the kneecap.',
+    overextensionEffect: 'Causes sudden "jerkiness" in the gait or upward fixation of the patella.',
+    overextensionRisk: 'Upward fixation of the patella, cruciate ligament strain.',
+    overextensionCorrection: [
+      'Build quadriceps strength with hill work and transitions.',
+      'Ensure the horse is not trimmed with too low a heel, which affects stifle angle.',
+    ],
+    underflexionReason: 'Insufficient stifle flexion — indicates lack of hindquarter "tracking up".',
+    underflexionPlain: 'The horse is not bending its left hind leg enough. It is not stepping far enough under its body.',
+    underflexionEffect: 'Results in a flat, uninspired gait without "impulsion".',
+    underflexionRisk: 'Hock osteoarthritis, compensatory lumbar strain.',
+    underflexionCorrection: [
+      'Use cavaletti poles to encourage active joint flexion.',
+      'Incorporate lateral work (leg yield) to improve hindlimb range of motion.',
+    ],
+  },
+};
+
 // Canine (dog) joint knowledge
 const CANINE_JOINT_KNOWLEDGE: Record<string, JointKnowledge> = {
   front_left_elbow: {
@@ -527,6 +617,10 @@ function analyzeJoint(
     knowledge = HUMAN_JOINT_KNOWLEDGE[jointKey] || genericKnowledge(jointKey);
   } else if (speciesLower === 'dog' || speciesLower === 'canine') {
     knowledge = CANINE_JOINT_KNOWLEDGE[jointKey] || genericKnowledge(jointKey);
+  } else if (speciesLower === 'cat' || speciesLower === 'feline') {
+    knowledge = FELINE_JOINT_KNOWLEDGE[jointKey] || genericKnowledge(jointKey);
+  } else if (speciesLower === 'horse' || speciesLower === 'equine') {
+    knowledge = EQUINE_JOINT_KNOWLEDGE[jointKey] || genericKnowledge(jointKey);
   } else {
     knowledge = genericKnowledge(jointKey);
   }

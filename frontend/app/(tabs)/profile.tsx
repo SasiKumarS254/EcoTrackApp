@@ -11,9 +11,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
 import { Radius, Shadow, FontSize, Spacing } from "@/constants/theme";
 import { router, useFocusEffect } from "expo-router";
+import { fetchMySocialProfile, updateSocialProfile } from "../../services/api";
 
 const { width } = Dimensions.get("window");
-const SOCIAL_BASE = "http://localhost:5000/api/social";
 
 type UserProfile = {
   id: string;
@@ -61,15 +61,8 @@ export default function ProfileRedesignScreen() {
 
   const fetchProfile = async () => {
     try {
-      const raw = await AsyncStorage.getItem("@ecotrack_user_session");
-      if (!raw) { router.replace("/auth/login"); return; }
-      const session = JSON.parse(raw);
-
-      const res = await fetch(`${SOCIAL_BASE}/me`, {
-        headers: { 'Authorization': `Bearer ${session.token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await fetchMySocialProfile();
+      if (data) {
         setProfile(data.profile);
         setPets(data.pets || []);
 
@@ -81,6 +74,10 @@ export default function ProfileRedesignScreen() {
           city: data.profile.city || "",
           country: data.profile.country || ""
         });
+      } else {
+        // If fetch fails, check if we're actually logged out
+        const raw = await AsyncStorage.getItem("@ecotrack_user_session");
+        if (!raw) router.replace("/auth/login");
       }
     } catch (e) {
       console.warn("Profile fetch error", e);
@@ -92,20 +89,9 @@ export default function ProfileRedesignScreen() {
   const saveProfile = async () => {
     try {
       setIsSaving(true);
-      const raw = await AsyncStorage.getItem("@ecotrack_user_session");
-      const session = JSON.parse(raw || "{}");
+      const data = await updateSocialProfile(editForm);
 
-      const res = await fetch(`${SOCIAL_BASE}/profile`, {
-        method: "PUT",
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.token}`
-        },
-        body: JSON.stringify(editForm)
-      });
-
-      if (res.ok) {
-        const data = await res.json();
+      if (data) {
         setProfile(data.profile);
         setEditModal(false);
         Alert.alert("Success", "Welfare profile updated.");
@@ -150,8 +136,8 @@ export default function ProfileRedesignScreen() {
               <Image source={{ uri: profile?.avatar_url || "https://ui-avatars.com/api/?name=Eco&background=10b981&color=fff" }} style={styles.avatar} />
             </View>
             <View style={styles.identityText}>
-              <Text style={styles.nameText}>{profile?.display_name || profile?.name}</Text>
-              <Text style={styles.roleText}>{profile?.profession || "Eco Practitioner"}</Text>
+              <Text style={styles.nameText} numberOfLines={1}>{profile?.display_name || profile?.name}</Text>
+              <Text style={styles.roleText} numberOfLines={1}>{profile?.profession || "Eco Practitioner"}</Text>
               <View style={styles.statsRow}>
                 <View style={styles.miniStat}>
                   <Text style={styles.statValue}>{profile?.followers_count || 0}</Text>

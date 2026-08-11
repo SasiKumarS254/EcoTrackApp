@@ -11,7 +11,17 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 // Increase limit for base64 image payloads (images up to ~10MB encoded)
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// ── SERVER TIMEOUT OPTIMIZATION for Large AI Video Processing ──
+// Set timeout to 10 minutes to support 500MB uploads and heavy inference
+const server = app.listen(PORT, () => {
+  console.log(`🌍 EcoTrack Backend active on port ${PORT}`);
+});
+server.timeout = 600000;
+server.keepAliveTimeout = 61000;
+server.headersTimeout = 62000;
 
 // ── STATIC FILE SERVING — Encyclopedia & Species Images ──
 // Serves images from backend/public/encyclopedia and backend/public/species_images
@@ -176,41 +186,62 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   // ── SECURE EMAIL DELIVERY ──
   const emailUser = process.env.EMAIL_USER;
   const emailPass = process.env.EMAIL_PASS;
+  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const smtpPort = process.env.SMTP_PORT || 465;
 
   if (emailUser && emailPass) {
     try {
       const transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort == 465,
         auth: { user: emailUser, pass: emailPass }
       });
       await transporter.sendMail({
-        from: '"EcoTrack Security" <noreply@ecotrack.app>',
+        from: `"EcoTrack Security" <${emailUser}>`,
         to: email.trim(),
         subject: "Your EcoTrack Account Security Code",
         html: `
-          <div style="font-family:sans-serif; padding:20px; border:1px solid #e2e8f0; border-radius:10px;">
-            <h2 style="color:#10b981;">EcoTrack OTP</h2>
-            <p>You requested a password reset. Use the code below to proceed:</p>
-            <div style="font-size:32px; font-weight:900; letter-spacing:5px; color:#0f172a; padding:10px 0;">${otp}</div>
-            <p style="color:#64748b; font-size:12px;">This code expires in 5 minutes.</p>
+          <div style="font-family:sans-serif; padding:40px; border:1px solid #e2e8f0; border-radius:16px; max-width:500px; margin:auto; background:#f8fafc;">
+            <div style="text-align:center; margin-bottom:24px;">
+              <div style="font-size:40px;">🌿</div>
+              <h1 style="color:#064e3b; margin:10px 0 0; font-size:24px;">EcoTrack Verification</h1>
+            </div>
+            <p style="color:#334155; font-size:16px; line-height:1.6;">You requested to reset your password. Use the following 6-digit security code to verify your identity. This code is valid for <strong>5 minutes</strong>.</p>
+            <div style="background:#fff; border:2px dashed #10b981; font-size:36px; font-weight:900; letter-spacing:8px; color:#0f172a; padding:20px; text-align:center; margin:24px 0; border-radius:12px;">
+              ${otp}
+            </div>
+            <p style="color:#64748b; font-size:13px; text-align:center; margin-top:30px;">If you did not request this code, please ignore this email or contact support if you suspect unauthorized access.</p>
+            <div style="border-top:1px solid #e2e8f0; margin-top:30px; padding-top:20px; text-align:center; color:#94a3b8; font-size:12px;">
+              &copy; 2026 EcoTrack Universal Welfare Ecosystem
+            </div>
           </div>`
       });
-      console.log(`📧 REAL EMAIL SENT to ${email}`);
+      console.log(`📧 REAL EMAIL SENT to ${email} via ${smtpHost}`);
     } catch (err) {
-      console.error("Email send error:", err.message);
+      console.error("❌ Email Delivery Failed:", err.message);
+      return res.status(500).json({ error: "Email delivery failed. Please contact support or try again later.", details: err.message });
     }
   } else {
+    // Write OTP to file for verification tests
+    const fs = require('fs');
+    try {
+      fs.writeFileSync(require('path').join(__dirname, '..', 'website', 'last_otp.txt'), otp);
+      console.log(`✍️ Written OTP ${otp} to website/last_otp.txt for verification`);
+    } catch (err) {
+      console.error("❌ Failed to write last_otp.txt", err);
+    }
+
     // Professional Mock Output for Developer Terminal
-    console.log("\n" + "=".repeat(50));
-    console.log("🛠️  ECOTRACK MOCK EMAIL SERVICE");
-    console.log("-".repeat(50));
+    console.log("\n" + "=".repeat(60));
+    console.log("🛠️  ECOTRACK MOCK EMAIL SERVICE (No credentials found in .env)");
+    console.log("-".repeat(60));
     console.log(`TO:      ${email}`);
-    console.log(`FROM:    noreply@ecotrack.app`);
-    console.log(`SUBJECT: Your EcoTrack Account Security Code`);
-    console.log(`BODY:    Your OTP is: ${otp}`);
-    console.log("-".repeat(50));
-    console.log("💡 Note: Set EMAIL_USER and EMAIL_PASS in .env for real delivery.");
-    console.log("=".repeat(50) + "\n");
+    console.log(`CODE:    ${otp}`);
+    console.log(`EXPIRES: 5 Minutes`);
+    console.log("-".repeat(60));
+    console.log("💡 To enable real delivery, set EMAIL_USER and EMAIL_PASS in .env");
+    console.log("=".repeat(60) + "\n");
   }
 
   res.json({
@@ -848,6 +879,10 @@ app.get('/api/community', (req, res) => {
         category: p.post_type === 'veterinary' ? 'Health & Care' : (p.post_type === 'training' ? 'Training Tips' : (p.post_type === 'sightings' ? 'Sightings' : 'General')),
         liked: !!p.liked_by_me,
         liked_by_me: !!p.liked_by_me,
+        scanner_report: p.scanner_report,
+        training_achievement: p.training_achievement,
+        location_tag: p.location_tag,
+        animal_tag: p.animal_tag,
         comments: commentsMapped
       };
     });
@@ -861,7 +896,7 @@ app.get('/api/community', (req, res) => {
 app.post('/api/community', (req, res) => {
   try {
     const user_id = req.user.id;
-    const { content, caption, media, media_urls, category, post_type } = req.body;
+    const { content, caption, media, media_urls, category, post_type, scanner_report, training_achievement, encyclopedia_discovery, event_participation, location_tag, animal_tag, hashtags } = req.body;
 
     const finalContent = content || caption || '';
     const finalMedia = media ? [media] : (media_urls || []);
@@ -876,7 +911,12 @@ app.post('/api/community', (req, res) => {
       user_id,
       content: finalContent,
       media_urls: finalMedia,
-      post_type: finalPostType
+      post_type: finalPostType,
+      scanner_report: scanner_report ? (typeof scanner_report === 'object' ? JSON.stringify(scanner_report) : scanner_report) : null,
+      training_achievement: training_achievement ? (typeof training_achievement === 'object' ? JSON.stringify(training_achievement) : training_achievement) : null,
+      encyclopedia_discovery: encyclopedia_discovery ? (typeof encyclopedia_discovery === 'object' ? JSON.stringify(encyclopedia_discovery) : encyclopedia_discovery) : null,
+      event_participation: event_participation ? (typeof event_participation === 'object' ? JSON.stringify(event_participation) : event_participation) : null,
+      location_tag, animal_tag, hashtags
     });
 
     res.json({ message: "Post published", post });
@@ -963,6 +1003,20 @@ app.get('/api/events/registrations/:userId', (req, res) => {
 // ══════════════════════════════════════════════
 // AI INFERENCE ENDPOINTS
 // ══════════════════════════════════════════════
+
+/**
+ * GET /api/ai/model-status
+ * Check if the AI inference microservice is online and models are loaded.
+ */
+app.get('/api/ai/model-status', async (req, res) => {
+  try {
+    const resp = await fetch('http://localhost:5001/model-status');
+    const data = await resp.json();
+    res.json(data);
+  } catch (err) {
+    res.status(503).json({ error: 'AI Service Offline', details: err.message });
+  }
+});
 
 /**
  * POST /api/ai/detect
@@ -1266,8 +1320,24 @@ app.post('/api/ai/analytics-sync', (req, res) => {
  * Get complete scan history for a user.
  */
 app.get('/api/ai/scan-history', (req, res) => {
-  const userId = req.user.id; // SECURITY: Strict user isolation
-  const history = db.getFullScanHistory(userId);
+  const targetUserId = req.query.user_id || req.user.id;
+
+  // SECURITY: Only allow users to see their own full scan history.
+  // If targetUserId is different, verify profile privacy.
+  if (targetUserId !== req.user.id) {
+    const sdb = getSocialDB();
+    const profile = sdb.prepare(`SELECT privacy_setting FROM Profiles WHERE user_id = ?`).get(targetUserId);
+
+    // If private or not found, return empty history (no leakage)
+    if (!profile || profile.privacy_setting === 'Private') {
+      return res.json([]);
+    }
+
+    // If public, we could return public scans. For now, let's allow it
+    // but the db query will filter by targetUserId correctly.
+  }
+
+  const history = db.getFullScanHistory(targetUserId);
   res.json(history);
 });
 /**
@@ -1314,7 +1384,7 @@ app.post('/api/services', (req, res) => {
   if (!name || !phone) {
     return res.status(400).json({ error: 'Name and Phone number are required' });
   }
-  const newService = db.addService(req.body);
+  const newService = db.addService({ ...req.body, user_id: req.user.id });
   res.json({ message: 'Service provider registered successfully', data: newService });
 });
 
@@ -1381,6 +1451,9 @@ app.get('/api/social/posts', (req, res) => {
     const search = req.query.search || '';
     const hashtag = req.query.hashtag || '';
     const targetUserId = req.query.user_id || '';
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
     let query = `
       SELECT p.*,
@@ -1397,6 +1470,22 @@ app.get('/api/social/posts', (req, res) => {
       WHERE 1=1
     `;
     const params = [currentUserId, currentUserId];
+
+    // Privacy security logic: Only return posts that are public, owned by current user, or where follower status is approved
+    query += `
+      AND (
+        p.user_id = ?
+        OR (
+          COALESCE(pr.privacy_setting, 'Public') = 'Public'
+          AND COALESCE(p.privacy_visibility, 'Public') = 'Public'
+        )
+        OR (
+          COALESCE(p.privacy_visibility, 'Public') = 'Followers Only'
+          AND EXISTS(SELECT 1 FROM Followers f WHERE f.follower_id = ? AND f.following_id = p.user_id AND f.status = 'Approved')
+        )
+      )
+    `;
+    params.push(currentUserId, currentUserId);
 
     if (req.query.saved_only === 'true') {
       query += ` AND EXISTS(SELECT 1 FROM SavedPosts sp WHERE sp.post_id = p.id AND sp.user_id = ?)`;
@@ -1431,34 +1520,18 @@ app.get('/api/social/posts', (req, res) => {
       params.push(currentUserId);
     }
 
-    query += ` ORDER BY p.is_pinned DESC, p.created_at DESC LIMIT 50`;
+    if (filter === 'Trending') {
+      query += ` ORDER BY p.is_pinned DESC, (likes_count * 2 + comments_count * 5 + saves_count * 3) DESC, p.created_at DESC`;
+    } else {
+      query += ` ORDER BY p.is_pinned DESC, p.created_at DESC`;
+    }
+
+    query += ` LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
 
     const posts = socialDb.prepare(query).all(...params);
 
-    // Attach comments & replies to each post
-    const commentStmt = socialDb.prepare(`
-      SELECT c.*, u.name as author_name, pr.avatar_url as author_avatar
-      FROM Comments c
-      JOIN Users u ON c.user_id = u.id
-      LEFT JOIN Profiles pr ON c.user_id = pr.user_id
-      WHERE c.post_id = ?
-      ORDER BY c.created_at ASC
-    `);
-
-    const replyStmt = socialDb.prepare(`
-      SELECT r.*, u.name as author_name, pr.avatar_url as author_avatar
-      FROM Replies r
-      JOIN Users u ON r.user_id = u.id
-      LEFT JOIN Profiles pr ON r.user_id = pr.user_id
-      WHERE r.comment_id = ?
-      ORDER BY r.created_at ASC
-    `);
-
     const formattedPosts = posts.map(p => {
-      const comments = commentStmt.all(p.id).map(c => {
-        const replies = replyStmt.all(c.id);
-        return { ...c, replies };
-      });
       return {
         ...p,
         media_urls: p.media_urls ? JSON.parse(p.media_urls) : [],
@@ -1472,14 +1545,49 @@ app.get('/api/social/posts', (req, res) => {
         certificate: p.certificate ? JSON.parse(p.certificate) : null,
         environmental_milestones: p.environmental_milestones ? JSON.parse(p.environmental_milestones) : null,
         liked_by_me: !!p.liked_by_me,
-        saved_by_me: !!p.saved_by_me,
-        comments
+        saved_by_me: !!p.saved_by_me
       };
     });
 
     res.json({ posts: formattedPosts });
   } catch (err) {
     console.error('Error fetching social posts:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/social/posts/:id/comments
+app.get('/api/social/posts/:id/comments', (req, res) => {
+  try {
+    const socialDb = getSocialDB();
+    const postId = req.params.id;
+
+    const comments = socialDb.prepare(`
+      SELECT c.*, u.name as author_name, pr.avatar_url as author_avatar
+      FROM Comments c
+      JOIN Users u ON c.user_id = u.id
+      LEFT JOIN Profiles pr ON c.user_id = pr.user_id
+      WHERE c.post_id = ?
+      ORDER BY c.created_at DESC
+    `).all(postId);
+
+    const replyStmt = socialDb.prepare(`
+      SELECT r.*, u.name as author_name, pr.avatar_url as author_avatar
+      FROM Replies r
+      JOIN Users u ON r.user_id = u.id
+      LEFT JOIN Profiles pr ON r.user_id = pr.user_id
+      WHERE r.comment_id = ?
+      ORDER BY r.created_at ASC
+    `);
+
+    const formattedComments = comments.map(c => {
+      const replies = replyStmt.all(c.id);
+      return { ...c, replies };
+    });
+
+    res.json({ comments: formattedComments });
+  } catch (err) {
+    console.error('Error fetching comments:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2098,16 +2206,29 @@ app.post('/api/social/portfolio', (req, res) => {
   }
 });
 
+// DELETE /api/social/posts/:id
+app.delete('/api/social/posts/:id', (req, res) => {
+  try {
+    const socialDb = getSocialDB();
+    const currentUserId = req.user.id;
+    const postId = req.params.id;
+
+    // Ownership check: only the post's author can delete it
+    const post = socialDb.prepare(`SELECT user_id FROM Posts WHERE id = ?`).get(postId);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    if (post.user_id !== currentUserId) {
+      return res.status(403).json({ error: 'Forbidden: You can only delete your own posts' });
+    }
+
+    socialDb.prepare(`DELETE FROM Posts WHERE id = ?`).run(postId);
+    res.json({ success: true, message: 'Post deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ══════════════════════════════════════════════
 // START SERVER
 // ══════════════════════════════════════════════
-app.listen(PORT, () => {
-  const d = db.getDB();
-  console.log(`🚀 EcoTrack Backend API v5.0 running on http://localhost:${PORT}`);
-  console.log(`📚 ${d.encyclopedia ? d.encyclopedia.length : 0} encyclopedia entries | 👥 ${d.users.length} users`);
-  console.log(`🔬 AI Endpoints: /api/ai/detect, /api/ai/pose, /api/ai/scan-save, /api/ai/analytics-sync`);
-  console.log(`🆕 New Endpoints: /api/ai/full-report, /api/ai/training-status, /api/ai/training-pipeline`);
-  console.log(`🔬 Services Endpoint: GET /api/services, POST /api/services`);
-  console.log(`📍 Port standardized to ${PORT} across all frontend clients`);
-});
+// Handled at top for timeout optimization
 

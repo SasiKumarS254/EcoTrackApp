@@ -46,7 +46,31 @@ jobs:
           cd testing
           node run_all_tests.js
 
-      - name: 📊 Upload QA Test Reports (Excel, HTML, PDF)
+      - name: 📊 GitHub Actions Job Summary
+        if: always()
+        run: |
+          echo "## 🔬 EcoTrack QA Automation Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -f testing/EcoTrack_Test_Suite_Report.csv ]; then
+            # Simple way to get counts since we know the structure
+            TOTAL=$(tail -n +2 testing/EcoTrack_Test_Suite_Report.csv | wc -l)
+            PASSED=$(grep -c "\"PASS\"" testing/EcoTrack_Test_Suite_Report.csv || echo "0")
+            FAILED=$(grep -c "\"FAIL\"" testing/EcoTrack_Test_Suite_Report.csv || echo "0")
+            
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+            echo "| Total Tests | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | ✅ $PASSED |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | ❌ $FAILED |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📈 Publish Test Report
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: 'testing/EcoTrack_Test_Suite_Report.xml'
+          check_name: 'QA Test Results'
+
+      - name: 📊 Upload QA Test Reports (Excel, HTML, PDF, XML)
         uses: actions/upload-artifact@v4.3.4
         with:
           name: EcoTrack-Test-Reports
@@ -54,3 +78,4 @@ jobs:
             testing/EcoTrack_Test_Suite_Report.csv
             testing/EcoTrack_Test_Suite_Report.html
             testing/EcoTrack_Test_Suite_Report.pdf
+            testing/EcoTrack_Test_Suite_Report.xml

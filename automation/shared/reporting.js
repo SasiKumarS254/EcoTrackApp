@@ -55,7 +55,44 @@ class Reporter {
         const htmlContent = this.generateHtml(passedResults, allResults.length);
         fs.writeFileSync(htmlPath, htmlContent);
 
+        // 5. JUNIT XML - For GitHub Actions native reporting
+        const junitPath = path.join(this.reportsDir, 'junit_results.xml');
+        const junitContent = this.generateJunit(allResults);
+        fs.writeFileSync(junitPath, junitContent);
+
         console.log(`\nReports generated in ${this.reportsDir}`);
+    }
+
+    generateJunit(results) {
+        const timestamp = new Date().toISOString();
+        const total = results.length;
+        const failures = results.filter(r => r.status === 'FAIL').length;
+        const errors = results.filter(r => r.status === 'ERROR').length;
+        const skipped = results.filter(r => r.status === 'SKIP' || r.status === 'BLOCKED').length;
+
+        let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="EcoTrack Automation" tests="${total}" failures="${failures}" errors="${errors}" skipped="${skipped}" time="0">
+  <testsuite name="All Tests" tests="${total}" failures="${failures}" errors="${errors}" skipped="${skipped}" timestamp="${timestamp}" time="0">`;
+
+        results.forEach(r => {
+            const time = (r.duration / 1000).toFixed(3);
+            xml += `
+    <testcase className="${r.category.replace(/ /g, '.')}" name="${r.testCase}" time="${time}">`;
+            if (r.status === 'FAIL') {
+                xml += `
+      <failure message="${r.error || 'Test Failed'}">${r.stack || ''}</failure>`;
+            } else if (r.status === 'SKIP' || r.status === 'BLOCKED') {
+                xml += `
+      <skipped message="${r.details.reason || 'Blocked'}"/>`;
+            }
+            xml += `
+    </testcase>`;
+        });
+
+        xml += `
+  </testsuite>
+</testsuites>`;
+        return xml;
     }
 
     generateHtml(passed, totalCount) {

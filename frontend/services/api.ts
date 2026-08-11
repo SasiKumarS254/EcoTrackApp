@@ -4,7 +4,10 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_BASE_URL = "http://localhost:5000/api";
+import { Platform } from "react-native";
+
+// Use 10.0.2.2 for Android emulators to reach the host machine's localhost
+const API_BASE_URL = Platform.OS === 'android' ? "http://10.0.2.2:5000/api" : "http://localhost:5000/api";
 const STORAGE_KEYS = {
   ANALYTICS: "@ecotrack_training_analytics",
   SCANS: "@ecotrack_scans_history",
@@ -12,6 +15,8 @@ const STORAGE_KEYS = {
   EVENTS: "@ecotrack_events_list",
   COMMUNITY: "@ecotrack_community_posts",
   AUTH: "@ecotrack_auth_token",
+  USER_ID: "@ecotrack_user_id",
+  SESSION: "@ecotrack_user_session"
 };
 
 // Authenticated fetch wrapper to automatically inject Authorization token
@@ -49,7 +54,7 @@ export async function fetchTaxonomySpecies(query: string = "", className: string
 }
 const getUserKey = async (baseKey: string) => {
   try {
-    const raw = await AsyncStorage.getItem("@ecotrack_user_id");
+    const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
     return raw ? `${baseKey}_${raw}` : baseKey;
   } catch {
     return baseKey;
@@ -265,6 +270,44 @@ export async function fetchSocialProfile(userId: string) {
     if (res.ok) return await res.json();
   } catch (e) {
     console.warn("Fetch social profile offline", e);
+  }
+  return null;
+}
+
+export async function fetchMySocialProfile() {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/me`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Fetch my social profile offline", e);
+  }
+  return null;
+}
+
+export async function updateSocialProfile(profileData: any) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(profileData),
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Update social profile offline");
+  }
+  return null;
+}
+
+export async function toggleFollow(followingId: string) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/follow/toggle`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ following_id: followingId }),
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Toggle follow offline");
   }
   return null;
 }

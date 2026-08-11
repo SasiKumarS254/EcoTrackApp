@@ -40,15 +40,6 @@ function getSocialDB() {
   seedInitialData(db);
   ensureUsersInSQLite(db);
 
-  // Enforce role constraints and fix passwords for demo accounts
-  try {
-    db.prepare(`UPDATE Users SET role = 'admin', password_hash = 'demo' WHERE email = 'user@ecotrack.org'`).run();
-    db.prepare(`UPDATE Users SET role = 'user', password_hash = 'password123' WHERE email != 'user@ecotrack.org'`).run();
-    console.log("🔒 SQLite User roles and passwords sanitized successfully.");
-  } catch (err) {
-    console.error("⚠️ Failed to sanitize users in SQLite:", err.message);
-  }
-
   return db;
 }
 

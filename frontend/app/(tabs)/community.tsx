@@ -28,6 +28,15 @@ type Post = {
   category: string;
   liked?: boolean;
   comments: CommentItem[];
+  scannerReport?: {
+    scanId: string;
+    score: number;
+    grade: string;
+    species: string;
+    exercise: string;
+    repCount: number;
+    duration: number;
+  };
 };
 const CATEGORIES = ["All", "Health & Care", "Training Tips", "Sightings", "General"];
 
@@ -80,6 +89,7 @@ export default function CommunityScreen() {
                 time: p.timestamp ? new Date(p.timestamp).toLocaleDateString() : "Just now",
                 category: p.category || "General",
                 liked: p.liked || false,
+                scannerReport: p.scanner_report ? (typeof p.scanner_report === 'string' ? JSON.parse(p.scanner_report) : p.scanner_report) : undefined,
                 comments: (p.comments || []).map((c: any) => ({
                   id: c.id,
                   userId: c.user_id || c.userId, // Save comment author user_id
@@ -335,7 +345,41 @@ export default function CommunityScreen() {
             </TouchableOpacity>
 
             {/* Image */}
-            <Image source={{ uri: post.image }} style={styles.postImg} />
+            {post.image ? (
+              <Image source={{ uri: post.image }} style={styles.postImg} />
+            ) : post.scannerReport ? (
+              <View style={styles.reportBox}>
+                <View style={styles.reportHeader}>
+                  <View style={styles.scoreCircle}>
+                    <Text style={styles.scoreNum}>{post.scannerReport.score}</Text>
+                    <Text style={styles.scoreLabel}>/100</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.reportTitle}>AI Analysis: {post.scannerReport.exercise}</Text>
+                    <Text style={styles.reportSubtitle}>{post.scannerReport.species.toUpperCase()} · Grade {post.scannerReport.grade}</Text>
+                  </View>
+                  <Ionicons name="ribbon" size={32} color="#f59e0b" />
+                </View>
+                <View style={styles.reportStats}>
+                  <View style={styles.reportStat}>
+                    <Text style={styles.statVal}>{post.scannerReport.repCount}</Text>
+                    <Text style={styles.statLabel}>Reps</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.reportStat}>
+                    <Text style={styles.statVal}>{post.scannerReport.duration}s</Text>
+                    <Text style={styles.statLabel}>Time</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <TouchableOpacity
+                    style={styles.viewFullBtn}
+                    onPress={() => Alert.alert("Scan Details", `Scan ID: ${post.scannerReport?.scanId}\nThis is a verified AI scan from the EcoTrack CV Engine.`)}
+                  >
+                    <Text style={styles.viewFullText}>Verified</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
 
             {/* Caption */}
             <View style={styles.postContent}>
@@ -503,6 +547,20 @@ function getStyles(colors: any, isDark: boolean) {
     catBadgeText: { color: colors.primary, fontSize: 10, fontWeight: "700" },
 
     postImg: { width: "100%", height: 220 },
+    reportBox: { backgroundColor: isDark ? "#1e293b" : "#f8fafc", margin: 12, borderRadius: Radius.lg, padding: 16, borderWidth: 1, borderColor: colors.border },
+    reportHeader: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 16 },
+    scoreCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+    scoreNum: { color: "#fff", fontSize: 16, fontWeight: "900" },
+    scoreLabel: { color: "rgba(255,255,255,0.7)", fontSize: 8, fontWeight: "700" },
+    reportTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: "800" },
+    reportSubtitle: { color: colors.textMuted, fontSize: 11, fontWeight: "700", marginTop: 2 },
+    reportStats: { flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
+    reportStat: { alignItems: "center" },
+    statVal: { color: colors.textPrimary, fontSize: 13, fontWeight: "800" },
+    statLabel: { color: colors.textMuted, fontSize: 9, fontWeight: "600" },
+    statDivider: { width: 1, height: 20, backgroundColor: colors.border },
+    viewFullBtn: { marginLeft: "auto", backgroundColor: "rgba(16,185,129,0.1)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+    viewFullText: { color: colors.primary, fontSize: 10, fontWeight: "800" },
     postContent: { padding: 14 },
     captionText: { fontSize: FontSize.sm, color: colors.textPrimary, lineHeight: 20 },
 

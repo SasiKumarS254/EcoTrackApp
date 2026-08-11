@@ -667,7 +667,9 @@ def process_video():
     if request.content_type and 'multipart/form-data' in request.content_type:
         species = request.form.get('species', 'human').lower().strip()
         exercise_id = request.form.get('exercise_id', '').strip()
-        user_id = request.form.get('user_id', 'anonymous').strip()
+        user_id = request.form.get('user_id', '').strip()
+        if not user_id:
+            return jsonify({'error': 'user_id required'}), 400
         file = request.files.get('video')
         if not file:
             return jsonify({'error': 'No video file provided'}), 400
@@ -688,7 +690,9 @@ def process_video():
             return jsonify({'error': 'video_base64 or multipart file required'}), 400
         species = data.get('species', 'human').lower().strip()
         exercise_id = data.get('exercise_id', '').strip()
-        user_id = data.get('user_id', 'anonymous').strip()
+        user_id = data.get('user_id', '').strip()
+        if not user_id:
+            return jsonify({'error': 'user_id required'}), 400
         video_base64 = data['video_base64']
         if ',' in video_base64:
             video_base64 = video_base64.split(',')[1]
@@ -1060,179 +1064,6 @@ def calculate_angle(p1, p2, p3):
     cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc) + 1e-6)
     angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
     return float(np.degrees(angle))
-                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_img)
-                    results  = pose_estimator.detect(mp_image)
-
-                    if results.pose_landmarks and len(results.pose_landmarks) > 0:
-                        landmarks = results.pose_landmarks[0]
-                        MEDIAPIPE_TO_COCO = {
-                            'nose':           0,  'left_eye':      2,  'right_eye':     5,
-                            'left_ear':       7,  'right_ear':     8,
-                            'left_shoulder': 11,  'right_shoulder':12,
-                            'left_elbow':    13,  'right_elbow':   14,
-                            'left_wrist':    15,  'right_wrist':   16,
-                            'left_hip':      23,  'right_hip':     24,
-                            'left_knee':     25,  'right_knee':    26,
-                            'left_ankle':    27,  'right_ankle':   28,
-                        }
-                        for name, idx in MEDIAPIPE_TO_COCO.items():
-                            lm = landmarks[idx]
-                            keypoints.append({
-                                'name':       name,
-                                'x':          float(lm.x),
-                                'y':          float(lm.y),
-                                'visibility': float(lm.visibility),
-                            })
-                        pose_source = 'mediapipe_blazepose'
-                        pose_conf   = float(np.mean([lm.visibility for lm in landmarks]))
-                except Exception as e:
-                    print(f"[WARN] MediaPipe pose failed: {e}")
-
-            # Fallback: YOLOv8 pose for humans
-            if not keypoints and yolo_pose:
-                try:
-                    results = yolo_pose(crop_img, verbose=False)[0]
-                    if len(results.keypoints) > 0:
-                        kps = results.keypoints[0].data[0].tolist()
-                        COCO_NAMES = [
-                            'nose','left_eye','right_eye','left_ear','right_ear',
-                            'left_shoulder','right_shoulder','left_elbow','right_elbow',
-                            'left_wrist','right_wrist','left_hip','right_hip',
-                            'left_knee','right_knee','left_ankle','right_ankle'
-                        ]
-                        for idx, kp in enumerate(kps[:17]):
-                            kx, ky, conf = kp
-                            keypoints.append({
-                                'name':       COCO_NAMES[idx],
-                                'x':          float(kx / bw) if bw > 0 else 0.0,
-                                'y':          float(ky / bh) if bh > 0 else 0.0,
-                                'visibility': float(conf),
-                            })
-                        pose_source = 'yolov8_pose_fallback'
-                        pose_conf   = float(np.mean([kp[2] for kp in kps[:17]]))
-                except Exception as e:
-                    print(f"[WARN] YOLOv8 human pose failed: {e}")
-
-        # ── ANIMAL: Fine-tuned → RTMPose → YOLOv8 fallback ──────────────────────
-        else:
-            # Priority 1: Fine-tuned animal pose model
-            if animal_pose_model:
-                try:
-                    results = animal_pose_model(crop_img, verbose=False)[0]
-                    if len(results.keypoints) > 0:
-                        kps = results.keypoints[0].data[0].tolist()
-                        species_labels = SPECIES_JOINT_LABELS.get(species, {})
-                        for idx, kp in enumerate(kps[:17]):
-                            kx, ky, conf = kp
-                            raw_name   = AP10K_KEYPOINT_NAMES[idx] if idx < len(AP10K_KEYPOINT_NAMES) else f"kp_{idx}"
-                            label_name = species_labels.get(raw_name, raw_name)
-                            keypoints.append({
-                                'name':       label_name,
-                                'x':          float(kx / bw) if bw > 0 else 0.0,
-                                'y':          float(ky / bh) if bh > 0 else 0.0,
-                                'visibility': float(conf),
-                                'ap10k_idx':  idx,
-                            })
-                        pose_source = 'animal_pose_finetuned'
-                        pose_conf   = float(np.mean([kp[2] for kp in kps[:17]]))
-                except Exception as e:
-                    print(f"[WARN] Fine-tuned animal pose failed: {e}")
-
-            # Priority 2: RTMPose
-            if rtmpose_inferencer and not keypoints:
-                try:
-                    result_gen   = rtmpose_inferencer(crop_img)
-                    result       = next(result_gen)
-                    predictions  = result['predictions'][0][0]
-                    kpts         = predictions['keypoints']
-                    scores       = predictions['keypoint_scores']
-                    species_labels = SPECIES_JOINT_LABELS.get(species, {})
-                    for idx, (kpt, score) in enumerate(zip(kpts[:17], scores[:17])):
-                        raw_name   = AP10K_KEYPOINT_NAMES[idx] if idx < len(AP10K_KEYPOINT_NAMES) else f"kp_{idx}"
-                        label_name = species_labels.get(raw_name, raw_name)
-                        keypoints.append({
-                            'name':       label_name,
-                            'x':          float(kpt[0] / bw) if bw > 0 else 0.0,
-                            'y':          float(kpt[1] / bh) if bh > 0 else 0.0,
-                            'visibility': float(score),
-                            'ap10k_idx':  idx,
-                        })
-                    pose_source = 'rtmpose_ap10k'
-                    pose_conf   = float(np.mean(scores[:17]))
-                except Exception as e:
-                    print(f"[WARN] RTMPose inference failed: {e}")
-
-            # Priority 3: YOLOv8 pose fallback
-            if yolo_pose and not keypoints:
-                try:
-                    results = yolo_pose(crop_img, verbose=False)[0]
-                    if len(results.keypoints) > 0:
-                        kps = results.keypoints[0].data[0].tolist()
-                        YOLO_TO_AP10K = {
-                            0:  (2,  "Nose"),
-                            1:  (0,  "L_Eye"),
-                            2:  (1,  "R_Eye"),
-                            5:  (5,  "L_Shoulder"),
-                            6:  (8,  "R_Shoulder"),
-                            7:  (6,  "L_Elbow"),
-                            8:  (9,  "R_Elbow"),
-                            9:  (7,  "L_F_Paw"),
-                            10: (10, "R_F_Paw"),
-                            11: (11, "L_Hip"),
-                            12: (14, "R_Hip"),
-                            13: (12, "L_Knee"),
-                            14: (15, "R_Knee"),
-                            15: (13, "L_B_Paw"),
-                            16: (16, "R_B_Paw"),
-                        }
-                        species_labels = SPECIES_JOINT_LABELS.get(species, {})
-                        produced_ap10k = set()
-                        for yolo_idx, (ap10k_idx, ap10k_name) in YOLO_TO_AP10K.items():
-                            if yolo_idx >= len(kps):
-                                continue
-                            if ap10k_idx in produced_ap10k:
-                                continue
-                            kx, ky, conf = kps[yolo_idx]
-                            raw_name   = ap10k_name
-                            label_name = species_labels.get(raw_name, raw_name)
-                            keypoints.append({
-                                'name':       label_name,
-                                'x':          float(kx / bw) if bw > 0 else 0.0,
-                                'y':          float(ky / bh) if bh > 0 else 0.0,
-                                'visibility': float(conf),
-                                'ap10k_idx':  ap10k_idx,
-                            })
-                            produced_ap10k.add(ap10k_idx)
-
-                        pose_source = 'yolov8_ap10k_remap'
-                        pose_conf   = float(np.mean([kp[2] for kp in kps[:17]]))
-                except Exception as e:
-                    print(f"[WARN] YOLOv8 animal fallback pose failed: {e}")
-
-    # Normalize body box to 0-1 relative coords
-    body_box = {
-        'x':      bbox['x'] / img_w,
-        'y':      bbox['y'] / img_h,
-        'width':  bbox['width'] / img_w,
-        'height': bbox['height'] / img_h,
-    }
-
-    return jsonify({
-        'success':      len(keypoints) > 0,
-        'detected':     True,
-        'className':    best_target['className'],
-        'confidence':   best_target['confidence'],
-        'boundingBox':  bbox,
-        'keypoints':    keypoints,
-        'bodyBox':      body_box,
-        'poseSource':   pose_source,
-        'poseConf':     round(pose_conf, 3),
-        'keypoint_schema': 'coco_17' if is_human else 'ap10k_17',
-        'is_human':     is_human,
-        'species':      species,
-        'model_used':   pose_source,
-        'modelAvailable': True
-    })
 
 
 @app.route('/scan-save', methods=['POST'])
@@ -1242,7 +1073,9 @@ def scan_save():
     if not data:
         return jsonify({'error': 'Request body required'}), 400
 
-    user_id = data.get('user_id', 'anonymous')
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 400
     scan_id = data.get('scanId') or str(uuid.uuid4())
 
     try:
@@ -1289,7 +1122,9 @@ def scan_save():
 @app.route('/scan-history', methods=['GET'])
 def scan_history():
     """Retrieve scan history for a user."""
-    user_id = request.args.get('user_id', 'anonymous')
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 400
     limit   = min(int(request.args.get('limit', 50)), 100)
 
     try:

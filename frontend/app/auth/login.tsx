@@ -10,7 +10,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Radius, Shadow, FontSize } from "@/constants/theme";
 import { router } from "expo-router";
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = Platform.OS === 'android' ? "http://10.0.2.2:5000/api" : "http://localhost:5000/api";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
