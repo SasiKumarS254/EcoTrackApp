@@ -21,20 +21,18 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          # No caching for website as it has no package.json
-
       - name: Build Web Application
-        working-directory: website
         run: |
-          echo "Building EcoTrack Web Assets..."
+          echo "Preparing EcoTrack Web Assets..."
+          # Ensuring directories exist for deployment
+          mkdir -p website/assets
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -53,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for Deployment Propagation
-        run: sleep 30
+        run: sleep 45
 
       - name: HTTP Readiness Check
         run: |
@@ -77,8 +75,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: automation/package.json
 
       - name: Install Selenium Dependencies
         working-directory: automation
@@ -155,6 +151,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Run DAST Security Probes
         working-directory: automated_test/security
         run: |
@@ -187,8 +188,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: package.json
 
       - name: Download All Results
         uses: actions/download-artifact@v4
@@ -199,7 +198,8 @@ jobs:
       - name: Generate Global Summary Report
         run: |
           npm install
-          npm run report:summary
+          node scripts/generate_summary.js
+          node scripts/historical_metrics.js
 
       - name: Upload Final Summary
         uses: actions/upload-artifact@v4
