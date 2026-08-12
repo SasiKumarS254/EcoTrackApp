@@ -158,7 +158,6 @@ jobs:
         env:
           GITHUB_ACTIONS: true
           FORCE_MOCK: true
-        env:
           APP_PATH: ${{ github.workspace }}/frontend/build/app-release.apk
 
       - name: Archive Mobile Logs on Failure
@@ -199,7 +198,7 @@ jobs:
           node scanner.js
           node credential_scan.js
         env:
-          API_BASE_URL: http://localhost:5000/api
+          API_BASE_URL: http://127.0.0.1:5000/api
 
       - name: Run Performance Load Test
         working-directory: automated_test/performance
@@ -207,7 +206,7 @@ jobs:
           mkdir -p reports
           node loadTest.js
         env:
-          API_BASE_URL: http://localhost:5000/api
+          API_BASE_URL: http://127.0.0.1:5000/api
 
       - name: Upload Security & Performance Results
         uses: actions/upload-artifact@v4
