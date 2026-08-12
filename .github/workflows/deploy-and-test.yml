@@ -1,4 +1,5 @@
 name: EcoTrack CI/CD & Automated Quality Assurance
+run-name: EcoTrack Quality Gate - Build #${{ github.run_number }} on ${{ github.ref_name }}
 
 on:
   push:
