@@ -146,7 +146,7 @@ jobs:
         working-directory: mobile_automation
         run: |
           echo "Appium tests executing..."
-          # npm test 
+          npm test
         continue-on-error: true
 
       - name: Upload Appium Artifacts

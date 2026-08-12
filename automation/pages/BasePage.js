@@ -21,10 +21,12 @@ class BasePage {
   }
 
   async waitForElement(locator) {
+    console.log(`Waiting for element: ${locator}`);
     return await this.driver.wait(until.elementLocated(locator), this.timeout);
   }
 
   async waitForClickable(locator) {
+    console.log(`Waiting for clickable: ${locator}`);
     const element = await this.waitForElement(locator);
     return await this.driver.wait(until.elementIsEnabled(element), this.timeout);
   }
@@ -34,6 +36,8 @@ class BasePage {
     while (retries > 0) {
       try {
         const element = await this.waitForClickable(locator);
+        await this.driver.executeScript("arguments[0].scrollIntoView({block: 'center'});", element);
+        await this.driver.sleep(500); // Wait for scroll/animation
         await this.driver.wait(until.elementIsVisible(element), this.timeout);
         await element.click();
         return;
