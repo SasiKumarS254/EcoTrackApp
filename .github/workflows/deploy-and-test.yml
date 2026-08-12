@@ -135,7 +135,7 @@ jobs:
 
   appium-mobile-tests:
     needs: verify-deployment
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -145,29 +145,31 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Appium & Dependencies
-        working-directory: mobile_automation
+      - name: Install Appium & Wait-On
         run: |
-          npm install
-          npm install -g appium
+          npm install -g appium wait-on
           appium driver install uiautomator2
+
+      - name: Install Mobile Dependencies
+        working-directory: mobile_automation
+        run: npm install
 
       - name: Run Appium Tests on Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
-          target: google_apis
+          api-level: 28
+          target: default
           arch: x86_64
-          profile: Nexus 6
+          profile: Nexus 4
           disable-animations: true
           force-avd-creation: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            # Start Appium server in background
+            # Start Appium server
             appium --log appium.log &
-            # Wait for Appium port 4723 to be ready
-            npx wait-on tcp:4723 --timeout 60000
-            # Execute the full suite
+            # Wait for Appium port 4723
+            wait-on tcp:4723 --timeout 60000
+            # Run tests
             cd mobile_automation && npm test
         env:
           APP_PATH: ${{ github.workspace }}/frontend/build/app-release.apk
