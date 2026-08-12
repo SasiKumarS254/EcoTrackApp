@@ -145,7 +145,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Appium & Wdio
+      - name: Install Appium & Dependencies
         working-directory: mobile_automation
         run: |
           npm install
@@ -155,19 +155,19 @@ jobs:
       - name: Run Appium Tests on Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 28
-          target: default
+          api-level: 30
+          target: google_apis
           arch: x86_64
-          profile: pixel_5
+          profile: Nexus 6
           disable-animations: true
+          force-avd-creation: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            appium driver install uiautomator2 || true
-            # Start Appium server
+            # Start Appium server in background
             appium --log appium.log &
-            # Wait for Appium readiness
-            npx wait-on tcp:4723 --timeout 30000
-            # Run tests
+            # Wait for Appium port 4723 to be ready
+            npx wait-on tcp:4723 --timeout 60000
+            # Execute the full suite
             cd mobile_automation && npm test
         env:
           APP_PATH: ${{ github.workspace }}/frontend/build/app-release.apk
