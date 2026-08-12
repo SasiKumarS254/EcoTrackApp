@@ -6,8 +6,14 @@ const port = 8080;
 const websiteDir = path.join(__dirname, '../website');
 
 const server = http.createServer((req, res) => {
-    // Strip query strings
-    const urlPath = req.url.split('?')[0];
+    console.log(`[Serve] Request: ${req.url}`);
+
+    // Strip query strings and handle GitHub Pages repo prefix
+    let urlPath = req.url.split('?')[0];
+    if (urlPath.startsWith('/EcoTrackApp/')) {
+        urlPath = urlPath.replace('/EcoTrackApp/', '/');
+    }
+
     let filePath = path.join(websiteDir, urlPath === '/' ? 'index.html' : urlPath);
     const extname = String(path.extname(filePath)).toLowerCase();
     const mimeTypes = {

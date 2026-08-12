@@ -92,7 +92,7 @@ jobs:
         run: |
           node backend/index.js &
           node scratch/serve.js &
-          sleep 15 # Give services time to boot
+          sleep 20 # Increased boot time
 
       - name: Run Selenium Test Suite
         working-directory: automation
