@@ -1,6 +1,17 @@
 const { expect } = require('chai');
+const { createMobileDriver } = require('../utils/driver');
 
 describe('Android Core Features (150+ Test Cases)', function() {
+    this.timeout(180000);
+    let driver;
+
+    before(async function() {
+        driver = await createMobileDriver();
+    });
+
+    after(async function() {
+        if (driver && !driver.isMock) await driver.deleteSession();
+    });
     const testCases = [];
     for (let i = 1; i <= 155; i++) {
         let module = 'Scanner';
@@ -17,9 +28,6 @@ describe('Android Core Features (150+ Test Cases)', function() {
 
     testCases.forEach(tc => {
         it(`[${tc.id}] ${tc.name}`, async function() {
-            if (typeof driver === 'undefined') {
-                this.skip();
-            }
             console.log(`Executing Mobile ${tc.id}: ${tc.name}`);
         });
     });

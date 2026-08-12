@@ -145,31 +145,38 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Appium Dependencies
-        working-directory: mobile_automation
-        run: npm install
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Run Appium Test Suite
+      - name: Install Appium & Wdio
         working-directory: mobile_automation
         run: |
-          echo "Appium tests executing..."
-          npm test
-        continue-on-error: true
+          npm install
+          npm install -g appium
+          appium driver install uiautomator2
 
-      - name: Upload Appium Artifacts
+      - name: Run Appium Tests on Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            # Start Appium server in background
+            appium --log appium.log &
+            # Wait for Appium
+            sleep 10
+            # Run tests
+            cd mobile_automation && npm test
+        env:
+          APP_PATH: ${{ github.workspace }}/frontend/build/app-release.apk
+
+      - name: Archive Mobile Logs on Failure
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: appium-test-results
+          name: mobile-service-logs
           path: |
-            mobile_automation/reports/Excel/
-            mobile_automation/reports/HTML/
-            mobile_automation/reports/JSON/
-            mobile_automation/screenshots/
-            mobile_automation/logs/
-          retention-days: 30
+            appium.log
+            mobile_automation/reports/
 
   security-and-performance:
     needs: build-and-deploy
