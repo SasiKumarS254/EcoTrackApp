@@ -93,14 +93,15 @@ jobs:
         run: |
           node backend/index.js > backend.log 2>&1 &
           node scratch/serve.js > website.log 2>&1 &
-          npx wait-on http-get://localhost:5000/ http-get://localhost:8080/ --timeout 90000
+          # Use 127.0.0.1 for stability
+          npx wait-on http-get://127.0.0.1:5000/ http-get://127.0.0.1:8080/ --timeout 90000
 
       - name: Run Selenium Test Suite
         working-directory: automation
         run: npm test
         env:
-          BASE_URL: http://localhost:8080/
-          API_BASE_URL: http://localhost:5000/api
+          BASE_URL: http://127.0.0.1:8080/
+          API_BASE_URL: http://127.0.0.1:5000/api
           CHROME_BIN: /usr/bin/google-chrome
           HEADLESS: true
 
@@ -135,7 +136,7 @@ jobs:
 
   appium-mobile-tests:
     needs: verify-deployment
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -148,7 +149,7 @@ jobs:
       - name: Install Appium & Wait-On
         run: |
           npm install -g appium wait-on
-          appium driver install uiautomator2
+          appium driver install uiautomator2 || true
 
       - name: Install Mobile Dependencies
         working-directory: mobile_automation
@@ -157,10 +158,10 @@ jobs:
       - name: Run Appium Tests on Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 28
-          target: default
-          arch: x86_64
-          profile: Nexus 4
+          api-level: 31
+          target: google_apis
+          arch: arm64-v8a
+          profile: pixel_5
           disable-animations: true
           force-avd-creation: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
@@ -203,7 +204,7 @@ jobs:
       - name: Start EcoTrack Backend
         run: |
           node backend/index.js > backend.log 2>&1 &
-          npx wait-on http-get://localhost:5000/ --timeout 90000
+          npx wait-on http-get://127.0.0.1:5000/ --timeout 90000
 
       - name: Run DAST Security Probes
         working-directory: automated_test/security
