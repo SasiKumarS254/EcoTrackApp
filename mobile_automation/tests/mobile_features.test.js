@@ -17,6 +17,9 @@ describe('Android Core Features (150+ Test Cases)', function() {
 
     testCases.forEach(tc => {
         it(`[${tc.id}] ${tc.name}`, async function() {
+            if (typeof driver === 'undefined') {
+                this.skip();
+            }
             console.log(`Executing Mobile ${tc.id}: ${tc.name}`);
         });
     });

@@ -101,9 +101,13 @@ function startAIService() {
   });
   
   aiServiceProcess.on('close', (code) => {
-    console.warn(`[Python AI Service] Exited with code ${code}. Restarting in 3 seconds...`);
+    console.warn(`[Python AI Service] Exited with code ${code}.`);
     tfLoaded = false;
-    setTimeout(startAIService, 3000);
+    // Don't restart in CI if it fails to avoid clogging logs
+    if (!process.env.GITHUB_ACTIONS) {
+      console.log('Restarting in 3 seconds...');
+      setTimeout(startAIService, 3000);
+    }
   });
 }
 

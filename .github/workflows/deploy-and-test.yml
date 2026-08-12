@@ -86,13 +86,14 @@ jobs:
       - name: Install Dependencies
         run: |
           npm install
-          cd automation && npm install
+          cd backend && npm install
+          cd ../automation && npm install
 
       - name: Start EcoTrack Services
         run: |
-          node backend/index.js &
-          node scratch/serve.js &
-          sleep 20 # Increased boot time
+          node backend/index.js > backend.log 2>&1 &
+          node scratch/serve.js > website.log 2>&1 &
+          npx wait-on http://localhost:5000/api http://localhost:8080/ --timeout 60000
 
       - name: Run Selenium Test Suite
         working-directory: automation
@@ -102,6 +103,15 @@ jobs:
           API_BASE_URL: http://localhost:5000/api
           CHROME_BIN: /usr/bin/google-chrome
           HEADLESS: true
+
+      - name: Archive Service Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: service-logs
+          path: |
+            backend.log
+            website.log
 
       - name: Generate Reports
         working-directory: automation
@@ -174,12 +184,14 @@ jobs:
           node-version: '22'
 
       - name: Install Dependencies
-        run: npm install
+        run: |
+          npm install
+          cd backend && npm install
 
       - name: Start EcoTrack Backend
         run: |
-          node backend/index.js &
-          sleep 10
+          node backend/index.js > backend.log 2>&1 &
+          npx wait-on http://localhost:5000/api --timeout 60000
 
       - name: Run DAST Security Probes
         working-directory: automated_test/security

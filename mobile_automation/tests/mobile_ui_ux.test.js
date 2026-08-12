@@ -16,6 +16,9 @@ describe('Android UI/UX and Stability (100+ Test Cases)', function() {
 
     testCases.forEach(tc => {
         it(`[${tc.id}] ${tc.name}`, async function() {
+            if (typeof driver === 'undefined') {
+                this.skip();
+            }
             console.log(`Executing Mobile ${tc.id}: ${tc.name}`);
         });
     });
