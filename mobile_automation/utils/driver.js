@@ -48,7 +48,16 @@ async function createMobileDriver() {
                 isDisplayed: async () => true
             }),
             getWindowSize: async () => ({ width: 1080, height: 1920 }),
-            action: () => ({ move: () => ({ down: () => ({ pause: () => ({ up: () => ({ perform: () => ({}) }) }) }) }) }),
+            action: function() {
+                const chain = {
+                    move: () => chain,
+                    down: () => chain,
+                    pause: () => chain,
+                    up: () => chain,
+                    perform: async () => console.log('Mock Gesture Performed')
+                };
+                return chain;
+            },
             back: async () => console.log('Mock Android Back')
         };
     }
