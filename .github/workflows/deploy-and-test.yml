@@ -93,7 +93,7 @@ jobs:
         run: |
           node backend/index.js > backend.log 2>&1 &
           node scratch/serve.js > website.log 2>&1 &
-          npx wait-on http://localhost:5000/api http://localhost:8080/ --timeout 60000
+          npx wait-on http-get://localhost:5000/ http-get://localhost:8080/ --timeout 90000
 
       - name: Run Selenium Test Suite
         working-directory: automation
@@ -155,15 +155,18 @@ jobs:
       - name: Run Appium Tests on Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 29
+          api-level: 28
           target: default
           arch: x86_64
-          profile: pixel_6
+          profile: pixel_5
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            # Start Appium server in background
+            appium driver install uiautomator2 || true
+            # Start Appium server
             appium --log appium.log &
-            # Wait for Appium
-            sleep 10
+            # Wait for Appium readiness
+            npx wait-on tcp:4723 --timeout 30000
             # Run tests
             cd mobile_automation && npm test
         env:
@@ -198,7 +201,7 @@ jobs:
       - name: Start EcoTrack Backend
         run: |
           node backend/index.js > backend.log 2>&1 &
-          npx wait-on http://localhost:5000/api --timeout 60000
+          npx wait-on http-get://localhost:5000/ --timeout 90000
 
       - name: Run DAST Security Probes
         working-directory: automated_test/security
