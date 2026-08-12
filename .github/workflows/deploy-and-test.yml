@@ -74,7 +74,7 @@ jobs:
           echo "Deployment verified successfully!"
 
   selenium-web-tests:
-    needs: verify-deployment
+    needs: build-and-deploy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -85,19 +85,29 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Selenium Dependencies
-        working-directory: automation
-        run: npm install
+      - name: Install Dependencies
+        run: |
+          npm install
+          cd automation && npm install
+
+      - name: Start EcoTrack Services
+        run: |
+          node backend/index.js &
+          node scratch/serve.js &
+          sleep 15 # Give services time to boot
 
       - name: Run Selenium Test Suite
         working-directory: automation
         run: npm test
         env:
-          BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          BASE_URL: http://localhost:8080/
+          API_BASE_URL: http://localhost:5000/api
           CHROME_BIN: /usr/bin/google-chrome
+          HEADLESS: true
 
       - name: Generate Reports
         working-directory: automation
+        if: always()
         run: |
           mkdir -p reports/HTML reports/JSON
           npm run report:html || true
@@ -154,7 +164,7 @@ jobs:
           retention-days: 30
 
   security-and-performance:
-    needs: verify-deployment
+    needs: build-and-deploy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -165,18 +175,30 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Start EcoTrack Backend
+        run: |
+          node backend/index.js &
+          sleep 10
+
       - name: Run DAST Security Probes
         working-directory: automated_test/security
         run: |
           mkdir -p reports
           node scanner.js
           node credential_scan.js
+        env:
+          API_BASE_URL: http://localhost:5000/api
 
       - name: Run Performance Load Test
         working-directory: automated_test/performance
         run: |
           mkdir -p reports
           node loadTest.js
+        env:
+          API_BASE_URL: http://localhost:5000/api
 
       - name: Upload Security & Performance Results
         uses: actions/upload-artifact@v4

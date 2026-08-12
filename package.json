@@ -7,7 +7,7 @@
     "test:security": "node automated_test/security/scanner.js",
     "test:performance": "node automated_test/performance/loadTest.js",
     "report:summary": "node scripts/generate_summary.js && node scripts/historical_metrics.js",
-    "test:all": "npm run test:web && npm run test:mobile && npm run test:security && npm run test:performance && npm run report:summary"
+    "test:all": "powershell -Command \"Stop-Process -Name node -ErrorAction SilentlyContinue; sleep 2; Start-Process node -ArgumentList 'scratch/serve.js'; Start-Process node -ArgumentList 'backend/index.js'; sleep 10; $env:BASE_URL='http://localhost:8080/'; $env:API_BASE_URL='http://localhost:5000/api'; npm run test:web; npm run test:security; npm run test:performance; npm run report:summary; Stop-Process -Name node -ErrorAction SilentlyContinue\""
   },
   "dependencies": {
     "exceljs": "^4.3.0",

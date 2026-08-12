@@ -80,7 +80,7 @@ frontend/dist/
 website/dist/
 
 # Test Reports
-automation/
+# automation/
 testing/
 junit_results.xml
 *.log

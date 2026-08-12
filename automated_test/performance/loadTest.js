@@ -50,7 +50,7 @@ async function runLoadTest() {
         duration: `${DURATION_MS / 1000}s`,
         totalRequests,
         totalErrors,
-        errorRate: `${((totalErrors / totalRequests) * 100).toFixed(2)}%`,
+        errorRate: totalRequests > 0 ? `${((totalErrors / totalRequests) * 100).toFixed(2)}%` : '100%',
         avgLatency: `${avgLatency.toFixed(2)}ms`,
         throughput: `${(totalRequests / (DURATION_MS / 1000)).toFixed(2)} req/s`
     };
