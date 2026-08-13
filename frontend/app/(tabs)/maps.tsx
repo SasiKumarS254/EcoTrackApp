@@ -25,34 +25,15 @@ type ServiceType = {
   color: string;
 };
 
-const HOSPITALS: ServiceType[] = [
-  { id: 1, name: "Blue Cross of India (Animal Rescue & Hospital)", type: "24x7 Emergency & Trauma", location: "Velachery Road, Guindy, Chennai", distance: "1.2 km", rating: "4.9", reviews: 1240, phone: "+914422354959", emergency: true, open24h: true, specialties: ["24x7 Ambulance", "Emergency Trauma", "Stray Rescue", "Surgeries"], icon: "medkit", color: "#ef4444" },
-  { id: 2, name: "Madras Veterinary College Hospital (Government)", type: "Multi-Specialty Teaching Hospital", location: "Vepery, Chennai", distance: "2.5 km", rating: "4.8", reviews: 890, phone: "+914425304000", emergency: true, open24h: true, specialties: ["Advanced Radiology", "ICU Unit", "Orthopedics", "Exotic Care"], icon: "shield", color: "#10b981" },
-  { id: 3, name: "SPCA Animal Hospital & Shelter", type: "Shelter & Clinical Inpatient", location: "Vepery High Road, Chennai", distance: "3.1 km", rating: "4.7", reviews: 430, phone: "+914425612894", emergency: false, open24h: false, specialties: ["Inpatient Care", "Spay/Neuter (ABC)", "Vaccination"], icon: "pulse", color: "#0ea5e9" },
-  { id: 4, name: "CUPA Wildlife & Pet Trauma Center", type: "Wildlife Rescue & Emergency", location: "Kengeri, Bengaluru", distance: "4.8 km", rating: "4.8", reviews: 670, phone: "+918022947352", emergency: true, open24h: true, specialties: ["Avian & Reptile Rehab", "Monkey Rescue", "Trauma ICU"], icon: "shield", color: "#f59e0b" },
-];
-
-const PETSHOPS: ServiceType[] = [
-  { id: 5, name: "Happy Pets World & Supplies", type: "Pet Food & Accessories", location: "OMR Road, Chennai", distance: "1.8 km", rating: "4.8", reviews: 267, phone: "+919840122334", emergency: false, open24h: false, specialties: ["Prescription Food", "Grooming Supplies", "Bedding & Toys"], icon: "bag", color: "#16a34a" },
-  { id: 6, name: "Animal Kingdom Store", type: "Full-Service Pet Supplies", location: "Velachery, Chennai", distance: "3.2 km", rating: "4.6", reviews: 143, phone: "+919840277889", emergency: false, open24h: false, specialties: ["Aquarium Supplies", "Bird Cages", "Medicines"], icon: "storefront", color: "#8b5cf6" },
-];
-
-const GROOMING: ServiceType[] = [
-  { id: 7, name: "Pawsome Grooming & Hygiene Spa", type: "Premium Grooming & Spa", location: "Nungambakkam, Chennai", distance: "2.4 km", rating: "4.9", reviews: 312, phone: "+919840122334", emergency: false, open24h: false, specialties: ["Medicated Bath", "Breed Haircut", "Nail Trimming", "Ear Hygiene"], icon: "cut", color: "#f59e0b" },
-  { id: 8, name: "AquaVet Marine & Exotic Pet Care", type: "Exotic & Aquatic Pet Care", location: "ECR, Thiruvanmiyur, Chennai", distance: "5.2 km", rating: "4.7", reviews: 195, phone: "+914424418899", emergency: false, open24h: false, specialties: ["Aquarium Care", "Turtle Shell Repair", "Exotic Birds"], icon: "water", color: "#06b6d4" },
-];
-
-const DOCTORS = [
-  { id: 1, name: "Dr. Ananya Krishnan", specialization: "Small Animal Surgery", hospital: "Pet Care Veterinary", experience: "12 years", rating: "4.9", available: true, fee: "₹800", image: "https://randomuser.me/api/portraits/women/45.jpg", userId: "usr_user1" },
-  { id: 2, name: "Dr. Rajesh Kumar", specialization: "Wildlife Medicine", hospital: "Animal Rescue Center", experience: "8 years", rating: "4.8", available: false, fee: "₹650", image: "https://randomuser.me/api/portraits/men/32.jpg", userId: "usr_user2" },
-  { id: 3, name: "Dr. Priya Sharma", specialization: "Veterinary Dermatology", hospital: "VetPro Clinic", experience: "6 years", rating: "4.7", available: true, fee: "₹700", image: "https://randomuser.me/api/portraits/women/68.jpg", userId: "usr1" },
-  { id: 4, name: "Dr. Mohammed Ali", specialization: "Avian & Exotic Animals", hospital: "Pet Care Veterinary", experience: "10 years", rating: "4.9", available: true, fee: "₹900", image: "https://randomuser.me/api/portraits/men/55.jpg", userId: "usr_user3" },
-];
+const HOSPITALS: ServiceType[] = [];
+const PETSHOPS: ServiceType[] = [];
+const GROOMING: ServiceType[] = [];
+const DOCTORS: any[] = [];
 
 const TABS = [
-  { key: "hospitals", label: "🏥 Hospitals", data: HOSPITALS },
-  { key: "petshops", label: "🐾 Pet Shops", data: PETSHOPS },
-  { key: "grooming", label: "✂️ Grooming", data: GROOMING },
+  { key: "hospitals", label: "🏥 Hospitals", data: [] },
+  { key: "petshops", label: "🐾 Pet Shops", data: [] },
+  { key: "grooming", label: "✂️ Grooming", data: [] },
   { key: "doctors", label: "👨‍⚕️ Doctors", data: [] },
 ];
 

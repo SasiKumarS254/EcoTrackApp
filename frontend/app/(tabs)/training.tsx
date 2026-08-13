@@ -421,7 +421,7 @@ export default function TrainingScreen() {
                   return (
                     <View style={{ backgroundColor: isDark ? "#1e293b" : "#f0f9ff", padding: 14, borderRadius: 16, borderLeftWidth: 4, borderLeftColor: "#0284c7", marginBottom: 16 }}>
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <Text style={{ fontSize: 14, fontWeight: "900", color: colors.textPrimary }}>🥗 Day {currentDay.dayNum} Recovery Diet Plan</Text>
+                        <Text style={{ fontSize: 14, fontWeight: "900", color: colors.textPrimary }}>🥗 Day {currentDay.dayNum} Recovery Diet Protocol</Text>
                         <View style={{ backgroundColor: "#0284c715", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
                           <Text style={{ fontSize: 10, fontWeight: "800", color: "#0284c7" }}>Macro & Hydration</Text>
                         </View>
@@ -429,11 +429,8 @@ export default function TrainingScreen() {
                       
                       <View style={{ gap: 6 }}>
                         <View style={{ backgroundColor: isDark ? "#0f172a" : "#fff", padding: 10, borderRadius: 10, borderWidth: 1, borderColor: isDark ? "#334155" : "#e2e8f0" }}>
-                          <Text style={{ fontSize: 10, fontWeight: "800", color: colors.primary, textTransform: "uppercase" }}>Meals Scheduled</Text>
-                          <Text style={{ fontSize: 12, color: colors.textPrimary, marginTop: 2 }}>• Breakfast: {currentDay.diet.breakfast}</Text>
-                          <Text style={{ fontSize: 12, color: colors.textPrimary, marginTop: 2 }}>• Lunch: {currentDay.diet.lunch}</Text>
-                          <Text style={{ fontSize: 12, color: colors.textPrimary, marginTop: 2 }}>• Dinner: {currentDay.diet.dinner}</Text>
-                          <Text style={{ fontSize: 12, color: colors.textPrimary, marginTop: 2 }}>• Snack: {currentDay.diet.snack}</Text>
+                          <Text style={{ fontSize: 10, fontWeight: "800", color: colors.primary, textTransform: "uppercase" }}>Recommended Nutrition</Text>
+                          <Text style={{ fontSize: 13, color: colors.textPrimary, fontWeight: "700", marginTop: 2 }}>{currentDay.diet.recommendation}</Text>
                         </View>
 
                         <View style={{ backgroundColor: isDark ? "#0f172a" : "#fff", padding: 10, borderRadius: 10, borderWidth: 1, borderColor: isDark ? "#334155" : "#e2e8f0" }}>
@@ -445,7 +442,7 @@ export default function TrainingScreen() {
                         <View style={{ backgroundColor: isDark ? "#0f172a" : "#fff", padding: 10, borderRadius: 10, borderWidth: 1, borderColor: isDark ? "#334155" : "#e2e8f0" }}>
                           <Text style={{ fontSize: 10, fontWeight: "800", color: colors.primary, textTransform: "uppercase" }}>Hydration & Supplements</Text>
                           <Text style={{ fontSize: 12, color: colors.textPrimary, marginTop: 2 }}>💧 {currentDay.diet.hydration}</Text>
-                          <Text style={{ fontSize: 12, color: colors.textPrimary, marginTop: 2 }}>💊 Supplements: {currentDay.diet.supplements}</Text>
+                          <Text style={{ fontSize: 12, color: colors.textPrimary, marginTop: 2 }}>💊 {currentDay.diet.supplements}</Text>
                         </View>
                       </View>
                     </View>

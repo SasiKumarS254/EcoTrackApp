@@ -157,28 +157,40 @@ export default function OtherProfileScreen() {
           </Text>
         ) : null}
 
-        <Text style={[styles.bioText, { color: colors.textSecondary }]}>{profile.bio || "EcoTrack Enthusiast"}</Text>
+        <Text style={[styles.bioText, { color: colors.textSecondary }]}>{profile.bio || "EcoTrack Member"}</Text>
 
-        {/* Follow/Connect Button */}
-        <TouchableOpacity
-          style={[
-            styles.followBtn,
-            {
-              backgroundColor: followStatus === "Approved" ? colors.border : colors.primary,
-              borderColor: followStatus === "Approved" ? colors.border : "transparent"
-            }
-          ]}
-          onPress={handleFollowToggle}
-        >
-          <Ionicons
-            name={followStatus === "Approved" ? "checkmark-circle" : followStatus === "Pending" ? "time" : "person-add"}
-            size={18}
-            color="#fff"
-          />
-          <Text style={styles.followBtnText}>
-            {followStatus === "Approved" ? "Following" : followStatus === "Pending" ? "Requested" : "Follow"}
-          </Text>
-        </TouchableOpacity>
+        {/* Actions Row */}
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+          <TouchableOpacity
+            style={[
+              styles.followBtn,
+              {
+                backgroundColor: followStatus === "Approved" ? colors.border : colors.primary,
+                borderColor: followStatus === "Approved" ? colors.border : "transparent",
+                marginTop: 0,
+                width: 130
+              }
+            ]}
+            onPress={handleFollowToggle}
+          >
+            <Ionicons
+              name={followStatus === "Approved" ? "checkmark-circle" : followStatus === "Pending" ? "time" : "person-add"}
+              size={18}
+              color="#fff"
+            />
+            <Text style={styles.followBtnText}>
+              {followStatus === "Approved" ? "Following" : followStatus === "Pending" ? "Requested" : "Follow"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.messageBtn, { borderColor: colors.primary }]}
+            onPress={() => router.push(`/chat/${id}`)}
+          >
+            <Ionicons name="mail-outline" size={18} color={colors.primary} />
+            <Text style={[styles.messageBtnText, { color: colors.primary }]}>Message</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Core Stats Grid (2x3 Layout) */}
         <View style={[styles.mainStatsRow, { backgroundColor: colors.bgCard, borderColor: colors.border, flexDirection: 'column', gap: 12, paddingVertical: 14, marginTop: 22 }]}>
@@ -316,6 +328,9 @@ const styles = StyleSheet.create({
 
   followBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, width: 160, height: 40, borderRadius: Radius.md, marginTop: 16, ...Shadow.sm },
   followBtnText: { color: "#fff", fontWeight: "700", fontSize: FontSize.sm },
+
+  messageBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, width: 130, height: 40, borderRadius: Radius.md, borderWidth: 1, ...Shadow.sm },
+  messageBtnText: { fontWeight: "700", fontSize: FontSize.sm },
 
   mainStatsRow: { flexDirection: "row", width: "100%", borderRadius: Radius.lg, paddingVertical: 14, borderWidth: 1, ...Shadow.sm },
   mainStat: { flex: 1, alignItems: "center" },

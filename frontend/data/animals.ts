@@ -294,201 +294,72 @@ export function generateSpeciesTrainingPlan(
   const isHuman = normSpecies.includes("human") || normSpecies.includes("person") || normSpecies.includes("user");
   const isDog = normSpecies.includes("dog") || normSpecies.includes("canine") || normSpecies.includes("shepherd");
   const isCat = normSpecies.includes("cat") || normSpecies.includes("feline");
-  const isHorse = normSpecies.includes("horse") || normSpecies.includes("equine");
 
-  // Get species-specific candidate exercises
-  const allExercises = getExercisesForSpecies(animalName);
-  
-  // Daily Periodization focuses
-  const periodizationFoci = [
-    { focus: "Mobility & Joint Flex", isRest: false, titleSuffix: "Joint Mobility Stride" },
-    { focus: "Strength & Stance Power", isRest: false, titleSuffix: "Core Strength Build" },
-    { focus: "Endurance & Heart Rate", isRest: false, titleSuffix: "Steady Pace Endurance" },
-    { focus: "Active Recovery & Senses", isRest: true, titleSuffix: "Active Recovery & Rest" },
-    { focus: "Agility & Coordination", isRest: false, titleSuffix: "Lateral Agility Drill" },
-    { focus: "Balance & Core Hold", isRest: false, titleSuffix: "Static Balance Stance" },
-    { focus: "Rehabilitation & Stretch", isRest: false, titleSuffix: "Suppleness Rehabilitation" },
+  const focusThemes = [
+    "Foundation & Biomechanical Form Setup",
+    "Hypertrophy, Core & Postural Stability",
+    "High-Drive Endurance & Cardiovascular Stamina",
+    "Active Recovery, Joint Mobility & Hydration",
+    "Explosive Agility & Kinetic Power",
+    "Cognitive Focus & Impulse Control",
+    "Milestone Performance Review & Peak Mastery"
   ];
 
-  // Unique Meal Templates per Species
-  const humanMeals = {
-    breakfasts: [
-      { recommendation: "Oatmeal with berries and chia seeds", portion: "350g", calories: 380, macros: "15g P, 60g C, 8g F", micro: "Iron, Vitamin B", prep: "Boil oats in water, stir in chia seeds, top with berries.", alt: "Gluten-free oats swap" },
-      { recommendation: "Scrambled egg whites with baby spinach and whole wheat toast", portion: "250g", calories: 310, macros: "24g P, 28g C, 10g F", micro: "Choline, Folate", prep: "Whisk egg whites, cook in non-stick pan with spinach. Toast bread.", alt: "Tofu scramble swap" },
-      { recommendation: "Greek yogurt parfait with honey and raw almond flakes", portion: "220g", calories: 290, macros: "18g P, 35g C, 7g F", micro: "Calcium, Riboflavin", prep: "Layer yogurt, drizzle honey, sprinkle sliced almonds.", alt: "Coconut milk yogurt swap" }
-    ],
-    lunches: [
-      { recommendation: "Grilled chicken breast with tri-color quinoa and steamed broccoli", portion: "400g", calories: 510, macros: "42g P, 45g C, 11g F", micro: "Zinc, Vitamin C", prep: "Grill chicken, boil quinoa, steam broccoli for 5 minutes.", alt: "Seared tempeh swap" },
-      { recommendation: "Lean sliced turkey breast wrap with avocado and mixed greens", portion: "300g", calories: 450, macros: "32g P, 30g C, 18g F", micro: "Vitamin B6, Potassium", prep: "Lay out whole wheat wrap, add turkey, mashed avocado, and greens. Roll up.", alt: "Hummus veggie wrap swap" },
-      { recommendation: "Brown rice bowl with pan-seared tofu and sautéed green beans", portion: "420g", calories: 480, macros: "22g P, 58g C, 14g F", micro: "Magnesium, Iron", prep: "Sear tofu cubes, steam rice, sauté green beans in olive oil.", alt: "Lentil dahl swap" }
-    ],
-    dinners: [
-      { recommendation: "Baked wild-caught salmon with sweet potato and asparagus", portion: "380g", calories: 560, macros: "38g P, 35g C, 16g F", micro: "Omega-3, Vitamin D", prep: "Bake salmon at 200°C for 15 mins. Roast sweet potatoes and asparagus.", alt: "Baked trout or chickpeas swap" },
-      { recommendation: "Lean beef stir-fry with bell peppers, onions, and jasmine rice", portion: "400g", calories: 590, macros: "40g P, 50g C, 14g F", micro: "Heme Iron, Vitamin B12", prep: "Thinly slice beef, flash fry with veggies. Serve over steamed rice.", alt: "Seitan stir-fry swap" },
-      { recommendation: "Baked sea bass fillet with quinoa and sautéed zucchini", portion: "350g", calories: 470, macros: "35g P, 40g C, 10g F", micro: "Selenium, Vitamin A", prep: "Bake fish, boil quinoa, sauté zucchini slices with garlic.", alt: "Lentil loaf swap" }
-    ],
-    snacks: [
-      { recommendation: "Raw walnuts and organic apple slices", portion: "120g", calories: 180, macros: "4g P, 22g C, 12g F", micro: "Vitamin E", prep: "Core and slice apple, serve with walnuts.", alt: "Sunflower seeds swap" },
-      { recommendation: "Carrot and cucumber sticks with roasted red pepper hummus", portion: "150g", calories: 140, macros: "5g P, 18g C, 5g F", micro: "Beta-Carotene", prep: "Slice vegetables, scoop hummus on side.", alt: "Guacamole swap" },
-      { recommendation: "Whey protein shake blended with unsweetened almond milk", portion: "300ml", calories: 210, macros: "25g P, 8g C, 3g F", micro: "Calcium", prep: "Blend 1 scoop protein powder with 300ml almond milk.", alt: "Pea protein swap" }
-    ],
-    supplements: ["Vitamin D3 (2000 IU)", "Omega-3 Fish Oil (1000mg)", "Multivitamin capsule"],
-    hydration: "3.2 Liters pure mineral water, consumed in 250ml portions hourly."
-  };
+  const nutritionHumanActive = [
+    "Pre-workout carbs (Oats/Banana) + Post-workout Protein (Chicken/Whey).",
+    "Sweet Potato + Lean Turkey/Chicken Breast (~500 kcal).",
+    "Quinoa bowl with mixed greens and grilled salmon.",
+    "Protein shake with banana and peanut butter before session."
+  ];
 
-  const dogMeals = {
-    breakfasts: [
-      { recommendation: "Raw ground beef mixed with warm marrow bone broth", portion: "250g", calories: 340, macros: "28g P, 2g C, 18g F", micro: "Calcium, Collagen", prep: "Mix ground beef with warm broth. Serve at room temperature.", alt: "Venison formula swap" },
-      { recommendation: "Dehydrated salmon kibble soaked in warm goat milk", portion: "200g", calories: 310, macros: "24g P, 15g C, 12g F", micro: "Omega-3, Probiotics", prep: "Pour warm goat milk over kibble, let sit for 5 mins to soften.", alt: "Hypoallergenic rabbit kibble" },
-      { recommendation: "Cooked lean turkey mince with pureed pumpkin", portion: "260g", calories: 290, macros: "26g P, 8g C, 10g F", micro: "Vitamin A, Potassium", prep: "Cook turkey mince, stir in organic pumpkin puree.", alt: "White fish mash swap" }
-    ],
-    lunches: [
-      { recommendation: "Shredded chicken breast with steamed sweet potato mash", portion: "180g", calories: 220, macros: "22g P, 12g C, 4g F", micro: "Vitamin B3, Beta-Carotene", prep: "Shred boiled chicken, mix with mashed steamed sweet potato.", alt: "Boiled cod swap" },
-      { recommendation: "Minced lamb shoulder with blended green beans", portion: "190g", calories: 260, macros: "20g P, 4g C, 16g F", micro: "Zinc, Iron", prep: "Lightly sear lamb mince, stir in steamed pureed green beans.", alt: "Lean pork mince swap" },
-      { recommendation: "Scrambled egg with cottage cheese and carrot puree", portion: "150g", calories: 200, macros: "16g P, 6g C, 10g F", micro: "Riboflavin", prep: "Scramble egg in water, mix in low-fat cottage cheese and carrot.", alt: "Duck liver bites swap" }
-    ],
-    dinners: [
-      { recommendation: "Baked mackerel fillet with brown rice and kelp powder", portion: "250g", calories: 350, macros: "30g P, 20g C, 14g F", micro: "Iodine, Vitamin D", prep: "Flake baked mackerel, mix with cooked brown rice and kelp.", alt: "Sardines in water swap" },
-      { recommendation: "Ground bison roll with steamed broccoli florets", portion: "260g", calories: 380, macros: "34g P, 5g C, 20g F", micro: "B Vitamins, Iron", prep: "Serve bison raw or lightly seared, topped with chopped broccoli.", alt: "Ground turkey swap" },
-      { recommendation: "Boiled cod chunks with butternut squash mash and salmon oil", portion: "250g", calories: 280, macros: "28g P, 10g C, 8g F", micro: "DHA, EPA", prep: "Boil cod, mash squash, drizzle with 1 tsp salmon oil.", alt: "Canned tuna in water swap" }
-    ],
-    snacks: [
-      { recommendation: "Dehydrated beef liver slices", portion: "30g", calories: 90, macros: "12g P, 1g C, 2g F", micro: "Vitamin B12", prep: "Feed as high-value training rewards.", alt: "Freeze-dried chicken breast" },
-      { recommendation: "Organic sweet potato dog chews", portion: "40g", calories: 70, macros: "1g P, 15g C, 0g F", micro: "Fiber", prep: "Slice and dehydrate sweet potato strips.", alt: "Apple slices swap" },
-      { recommendation: "Freeze-dried green-lipped mussel bites", portion: "20g", calories: 60, macros: "8g P, 2g C, 2g F", micro: "Glucosamine", prep: "Feed directly as joint conditioning snack.", alt: "Sardine treats swap" }
-    ],
-    supplements: ["Glucosamine-Chondroitin chewable (500mg)", "Probiotic powder scoop", "Wild Alaskan Salmon Oil (5ml)"],
-    hydration: "1.5 Liters clean filtered water, replenished in stainless steel bowl 3 times daily."
-  };
+  const nutritionHumanRest = [
+    "Focus on hydration, Omega-3s, and light proteins (e.g. Salmon, Avocado).",
+    "Vegetable stir-fry with tofu and bone broth.",
+    "Greek yogurt with berries and walnuts for joint health.",
+    "High hydration day: minimum 3L water with electrolytes."
+  ];
 
-  const catMeals = {
-    breakfasts: [
-      { recommendation: "Wet canned salmon and cod pate", portion: "85g", calories: 95, macros: "11g P, 0.5g C, 5g F", micro: "Taurine, Vitamin A", prep: "Serve wet pate directly from can at room temperature.", alt: "Chicken wet pate swap" },
-      { recommendation: "Minced turkey and chicken breast chunks in gravy", portion: "90g", calories: 85, macros: "10g P, 1g C, 4g F", micro: "Arginine", prep: "Mix canned chunks with a splash of warm water.", alt: "Rabbit formula swap" },
-      { recommendation: "Freeze-dried quail formula rehydrated with bone broth", portion: "50g", calories: 90, macros: "12g P, 0g C, 4g F", micro: "Niacin", prep: "Rehydrate freeze-dried nuggets in warm bone broth for 5 mins.", alt: "Duck formula swap" }
-    ],
-    lunches: [
-      { recommendation: "Pureed chicken breast with chicken broth", portion: "60g", calories: 55, macros: "8g P, 0g C, 2g F", micro: "B6, Zinc", prep: "Blend boiled chicken breast with broth into a smooth puree.", alt: "Tuna lickable treat" },
-      { recommendation: "Flaked white fish with a pinch of cat grass", portion: "70g", calories: 65, macros: "9g P, 0.5g C, 1.5g F", micro: "Selenium", prep: "Poach cod or tilapia, flake with fork, top with chopped grass.", alt: "Salmon flakes swap" },
-      { recommendation: "Wet canned beef and liver minced formula", portion: "80g", calories: 80, macros: "10g P, 0.5g C, 4.5g F", micro: "Heme Iron", prep: "Serve wet minced food directly.", alt: "Turkey pate swap" }
-    ],
-    dinners: [
-      { recommendation: "Minced duck and venison grain-free wet food", portion: "85g", calories: 105, macros: "12g P, 0.5g C, 6g F", micro: "Vitamin E, Taurine", prep: "Serve wet grain-free canned food.", alt: "Pork wet formula" },
-      { recommendation: "Shredded chicken and salmon in water", portion: "85g", calories: 90, macros: "11g P, 0g C, 4g F", micro: "Omega-3", prep: "Drain slightly, mash with fork.", alt: "Mackerel wet formula" },
-      { recommendation: "Wet rabbit pate formula", portion: "85g", calories: 100, macros: "12g P, 0.5g C, 5.5g F", micro: "Phosphorus", prep: "Serve directly.", alt: "Venison wet pate swap" }
-    ],
-    snacks: [
-      { recommendation: "Lickable tuna puree tube", portion: "14g", calories: 12, macros: "2g P, 0.5g C, 0.2g F", micro: "Moisture", prep: "Squeeze directly or onto a licking mat.", alt: "Chicken puree tube" },
-      { recommendation: "Freeze-dried beef liver bites", portion: "10g", calories: 35, macros: "5g P, 0.2g C, 1g F", micro: "Vitamin B12", prep: "Crush over meals or feed as agility reward.", alt: "Salmon bites swap" },
-      { recommendation: "Air-dried chicken heart slices", portion: "12g", calories: 40, macros: "6g P, 0g C, 2.5g F", micro: "Natural Taurine", prep: "Feed as treats.", alt: "Duck liver bits swap" }
-    ],
-    supplements: ["L-Lysine powder (250mg for respiratory health)", "Taurine drops", "Coconut oil (1/4 tsp for hairballs)"],
-    hydration: "350ml fresh circulating fountain water. Cats prefer running water to maintain renal health."
-  };
+  const nutritionDogActive = [
+    "High protein recovery meal after training session.",
+    "Add 1 raw egg and salmon oil to kibble for joint support.",
+    "Extra 20% portion of working-dog high-calorie kibble.",
+    "Boiled chicken breast mixed with standard feed."
+  ];
 
-  const equineMeals = {
-    breakfasts: [
-      { recommendation: "Meadow grass hay with organic alfalfa pellets", portion: "4.5kg", calories: 7200, macros: "350g P, 2000g C, 120g F", micro: "Calcium, Copper", prep: "Weigh hay, place in slow-feed hay net. Blend alfalfa pellets in bucket.", alt: "Timothy hay swap" },
-      { recommendation: "Timothy grass hay with rolled oats feed", portion: "4.5kg", calories: 7500, macros: "370g P, 2100g C, 140g F", micro: "Magnesium, Phosphorus", prep: "Soak oats in warm water for 10 mins before feeding.", alt: "Orchard grass swap" },
-      { recommendation: "Meadow grass hay with soaked beet pulp mash", portion: "5.0kg", calories: 7800, macros: "340g P, 2300g C, 110g F", micro: "Digestible Fiber", prep: "Soak beet pulp shred in double volume of water for 30 mins.", alt: "Alfalfa hay swap" }
-    ],
-    lunches: [
-      { recommendation: "Rolled barley flakes mixed with flaxseed meal", portion: "1.0kg", calories: 2500, macros: "110g P, 650g C, 60g F", micro: "Omega-3", prep: "Dampen barley flakes, stir in ground flaxseed.", alt: "Rice bran pellets swap" },
-      { recommendation: "Premium chaff mix with wheat bran mash", portion: "1.2kg", calories: 2800, macros: "130g P, 700g C, 50g F", micro: "Potassium", prep: "Mix chaff with wheat bran and warm water to form a crumbly mash.", alt: "Beet pulp mash swap" },
-      { recommendation: "Sweet feed grain blend with soybean meal", portion: "1.0kg", calories: 2900, macros: "150g P, 680g C, 70g F", micro: "Lysine", prep: "Mix in bucket, dampen slightly to control dust.", alt: "Oats blend swap" }
-    ],
-    dinners: [
-      { recommendation: "Meadow grass hay with a concentrated mineral-vitamin balancer scoop", portion: "5.0kg", calories: 7900, macros: "380g P, 2200g C, 130g F", micro: "Selenium, Zinc, Biotin", prep: "Weigh hay net. Add balancer scoop to bucket.", alt: "Bermuda grass hay swap" },
-      { recommendation: "Orchard grass hay with soybean hulls pellets", portion: "5.0kg", calories: 8100, macros: "410g P, 2150g C, 150g F", micro: "Iron, Cobalt", prep: "Serve hay, damp hulls pellets with water.", alt: "Timothy hay swap" },
-      { recommendation: "Bermuda grass hay with rice bran pellets and salt balancer", portion: "5.2kg", calories: 7700, macros: "330g P, 2250g C, 160g F", micro: "Sodium, Chloride", prep: "Mix salt balancer in rice bran pellets, serve with hay.", alt: "Meadow hay swap" }
-    ],
-    snacks: [
-      { recommendation: "Sliced organic apples and whole raw carrots", portion: "500g", calories: 240, macros: "5g P, 52g C, 1g F", micro: "Vitamin A, C", prep: "Wash and cut into safe bite-sized rounds.", alt: "Watermelon rinds swap" },
-      { recommendation: "Whole bananas (including peel)", portion: "400g", calories: 350, macros: "4g P, 80g C, 1g F", micro: "Potassium", prep: "Slice into 5cm pieces.", alt: "Carrot slices swap" },
-      { recommendation: "Sugar-free compressed herbal biscuits", portion: "150g", calories: 180, macros: "12g P, 30g C, 10g F", micro: "Fiber", prep: "Feed by hand as reward.", alt: "Peppermint treats swap" }
-    ],
-    supplements: ["Biotin hoof supplement (20mg)", "Joint chondroitin scoop (1500mg)", "Electrolyte paste (during summer)"],
-    hydration: "35 Liters clean, fresh, temperate water. Monitored through automatic drinker or dual 20L buckets."
-  };
+  const nutritionDogRest = [
+    "Hydration and joint supplements (Glucosamine/Chondroitin).",
+    "Standard maintenance portion to prevent weight gain.",
+    "Bone broth poured over standard feed for hydration.",
+    "Light meal: 80% of normal portion with added pumpkin."
+  ];
 
-  // Determine species-specific diet pool
-  const dietPool = isHuman ? humanMeals : isDog ? dogMeals : isCat ? catMeals : isHorse ? equineMeals : dogMeals;
+  const allExercises = getExercisesForSpecies(animalName);
+  const daysPlan: any[] = [];
 
-  const daysPlan: Array<{
-    dayNum: number;
-    title: string;
-    focus: string;
-    isRestDay: boolean;
-    targetCalories: number;
-    drills: any[];
-    diet: {
-      breakfast: string;
-      lunch: string;
-      dinner: string;
-      snack: string;
-      macros: string;
-      prepInstructions: string;
-      allergyAlternative: string;
-      hydration: string;
-      supplements: string;
-    };
-  }> = [];
-
-  // Generate periodized multi-day program
   for (let i = 1; i <= daysCount; i++) {
-    const focusObj = periodizationFoci[(i - 1) % periodizationFoci.length];
-    
-    // Pick unique exercises for this day to avoid consecutive duplication
-    // We shuffle or slice based on day number to vary drills
-    let dayExercises: ExerciseTemplate[] = [];
-    if (!focusObj.isRest) {
-      const startIdx = (i - 1) * 2 % allExercises.length;
-      dayExercises = [
-        allExercises[startIdx],
-        allExercises[(startIdx + 1) % allExercises.length]
-      ];
-    }
+    const isRest = (i % 4 === 0);
+    const themeIndex = (i - 1) % focusThemes.length;
+    const theme = focusThemes[themeIndex];
 
-    // Determine target calories dynamically
-    let targetCal = 0;
-    if (!focusObj.isRest) {
-      if (isHuman) targetCal = 350 + (i * 20) % 250;
-      else if (isDog) targetCal = 180 + (i * 10) % 100;
-      else if (isCat) targetCal = 60 + (i * 5) % 40;
-      else if (isHorse) targetCal = 3000 + (i * 200) % 1500;
-      else targetCal = 150;
+    let nutText = "";
+    if (isHuman) {
+      nutText = isRest ? nutritionHumanRest[i % nutritionHumanRest.length] : nutritionHumanActive[i % nutritionHumanActive.length];
     } else {
-      if (isHuman) targetCal = 100;
-      else if (isDog) targetCal = 50;
-      else if (isCat) targetCal = 20;
-      else if (isHorse) targetCal = 800;
-      else targetCal = 50;
+      nutText = isRest ? nutritionDogRest[i % nutritionDogRest.length] : nutritionDogActive[i % nutritionDogActive.length];
     }
 
-    // Pull unique meals for this day
-    const b = dietPool.breakfasts[(i - 1) % dietPool.breakfasts.length];
-    const l = dietPool.lunches[(i - 1) % dietPool.lunches.length];
-    const d = dietPool.dinners[(i - 1) % dietPool.dinners.length];
-    const s = dietPool.snacks[(i - 1) % dietPool.snacks.length];
-
-    const totalCal = b.calories + l.calories + d.calories + s.calories;
-    const macrosSummary = `B: ${b.macros} | L: ${l.macros} | D: ${d.macros}`;
-    
-    const prepInstructions = `Breakfast: ${b.prep} \nLunch: ${l.prep} \nDinner: ${d.prep}`;
-    const allergyAlternative = `Breakfast: ${b.alt} \nLunch: ${l.alt} \nDinner: ${d.alt}`;
-
-    // Map exercises to UI expectations
-    const drills = dayExercises.map(ex => {
-      const exProfile = getExerciseProfile(ex.id, animalName);
-      // Scale reps & difficulty based on level
+    const startIdx = (i - 1) * 2 % allExercises.length;
+    const dayDrills = isRest ? [] : [
+      allExercises[startIdx],
+      allExercises[(startIdx + 1) % allExercises.length]
+    ].filter(Boolean).map(ex => {
       const repsVal = isHuman ? (10 + level * 2) : (5 + level);
       const setsVal = 3 + Math.floor(level / 2);
       return {
         id: ex.id,
         name: ex.name,
         reps: `${setsVal} sets × ${repsVal} reps`,
-        intensity: exProfile.difficulty,
-        icon: isHuman ? "body" : isDog ? "paw" : isCat ? "logo-snapchat" : "cube",
+        intensity: level > 1 ? "High" : "Moderate",
         instructions: ex.coaching_tip,
         targetMuscles: ex.description.split("—")[0].trim()
       };
@@ -496,100 +367,58 @@ export function generateSpeciesTrainingPlan(
 
     daysPlan.push({
       dayNum: i,
-      title: `Day ${i} - ${focusObj.titleSuffix}`,
-      focus: focusObj.focus,
-      isRestDay: focusObj.isRest,
-      targetCalories: targetCal,
-      drills,
+      title: isRest ? `Day ${i}: Active Recovery 💤` : `Day ${i}: ${theme} 🔥`,
+      focus: isRest ? "Neurological recovery & joint decompression" : `Targeted ${goalInput || "welfare"} progression`,
+      isRestDay: isRest,
+      targetCalories: isHuman ? (isRest ? 1800 : 2500) : (isRest ? 400 : 600),
+      drills: dayDrills,
       diet: {
-        breakfast: `${b.recommendation} (${b.portion}) - ~${b.calories} kcal`,
-        lunch: `${l.recommendation} (${l.portion}) - ~${l.calories} kcal`,
-        dinner: `${d.recommendation} (${d.portion}) - ~${d.calories} kcal`,
-        snack: `${s.recommendation} (${s.portion}) - ~${s.calories} kcal`,
-        macros: `Day Total Cal: ~${totalCal} kcal | ` + macrosSummary,
-        prepInstructions,
-        allergyAlternative,
-        hydration: dietPool.hydration,
-        supplements: dietPool.supplements.join(", ")
+        recommendation: nutText,
+        breakfast: isRest ? "Light hydration & fiber" : "High protein start",
+        lunch: "Balanced macro portion",
+        dinner: "Recovery meal",
+        snack: "Training rewards",
+        hydration: isHuman ? "3L Water" : "1.5L Fresh Water",
+        supplements: "Joint support & Omegas",
+        prepInstructions: "Serve at room temperature.",
+        allergyAlternative: "Swap chicken for tofu/white fish.",
+        macros: isRest ? "Maintenance" : "Performance"
       }
     });
   }
 
-  // Populate overall exercises library card
-  const exercises = allExercises.map(ex => {
-    const exProfile = getExerciseProfile(ex.id, animalName);
-    const repsVal = isHuman ? (10 + level * 2) : (5 + level);
-    const setsVal = 3 + Math.floor(level / 2);
-    return {
-      id: ex.id,
-      name: ex.name,
-      targetReps: repsVal,
-      sets: setsVal,
-      restSeconds: 60,
-      instructions: ex.coaching_tip,
-      intensity: exProfile.difficulty,
-      icon: isHuman ? "body" : isDog ? "paw" : "cube",
-      reps: `${setsVal} × ${repsVal} reps`,
-      targetMuscles: ex.description.split("—")[0].trim()
-    };
-  });
-
-  // Daily timing schedules
-  const dailySchedule = [
-    { time: "07:30 AM", activity: "Hydration & Morning Feed", duration: "15 min", notes: "Check resting heart rate and posture symmetry before feeding." },
-    { time: "09:30 AM", activity: "AI-Guided Training Session", duration: "25 min", notes: "Activate AI posture scanner for real-time form checks." },
-    { time: "12:30 PM", activity: "Post-Workout Lunch & Recovery", duration: "30 min", notes: "Serve recovery nutrition ratio with joint health supplements." },
-    { time: "04:30 PM", activity: "Active Pacing / Walking Drill", duration: "20 min", notes: "Focus on flat-surface heel pacing and stride length balance." },
-    { time: "07:30 PM", activity: "Dinner & Hydration Restock", duration: "25 min", notes: "Serve evening dietary portion. Ensure calm environment for digestion." }
-  ];
-
-  // Dynamic dietaryPlan mapping
-  const dietaryPlan = daysPlan.map(dp => ({
-    meal: `Day ${dp.dayNum} Meal Plan`,
-    recommendation: `B: ${dp.diet.breakfast} \nL: ${dp.diet.lunch} \nD: ${dp.diet.dinner}`,
-    portion: `Macros: ${dp.diet.macros}`,
-    timing: `Hydration: ${dp.diet.hydration} \nSupplements: ${dp.diet.supplements}`,
-    macros: dp.diet.macros,
-    prepInstructions: dp.diet.prepInstructions,
-    allergyAlternative: dp.diet.allergyAlternative
-  }));
-
-  const milestones = [
-    "Complete Day 1 Baseline Posture Assessment Scan",
-    "Maintain consecutive 3-day training streak",
-    "Achieve Form Score >= 85% on primary drill",
-    "Track full compliance for daily macro/micro intake",
-    "Unlock Level Up milestone progress"
-  ];
-
-  const metrics = [
-    { label: "Postural Symmetry", value: 75 + (level * 3) % 25, description: "Bilateral alignment computed from scanner history." },
-    { label: "Movement Precision", value: 70 + (level * 4) % 30, description: "Range of motion accuracy compared to biomechanical template." },
-    { label: "Core Stability", value: 65 + (level * 5) % 35, description: "Postural center-of-mass balance retention score." },
-    { label: "Dietary Compliance", value: 80, description: "Macronutrient and hydration compliance tracking." }
-  ];
-
-  const safetyWarnings = [
-    "Ensure client performs on flat, dry, non-slip rubber mats or clean ground.",
-    "Monitor core temperature and breathing rate. Stop if heavy panting or acute fatigue occurs.",
-    "Check paw pads (for animals) or ankle stability (for humans) before starting high-intensity routines.",
-    "If distress, limping, or sharp joint pain is noticed, immediately halt all exercises."
-  ];
-
   return {
     speciesName: animalName,
-    breedName: breedName || "Standard Lineage",
+    breedName: breedName || "Standard",
     ageCategory: ageValue < 1 ? "Juvenile" : ageValue > 8 ? "Senior" : "Adult",
-    weightClass: weightValue < 5 ? "Lightweight" : weightValue > 50 ? "Heavyweight" : "Standard Class",
-    goal: goalInput || "General Biomechanical Conditioning",
+    weightClass: weightValue < 5 ? "Lightweight" : weightValue > 50 ? "Heavyweight" : "Standard",
+    goal: goalInput || "General Conditioning",
     planDurationDays: daysCount,
     daysPlan,
-    dailySchedule,
-    dietaryPlan,
-    exercises,
-    milestones,
-    metrics,
-    safetyWarnings
+    dailySchedule: [
+      { time: "08:00 AM", activity: "Morning Vitals & Feed", duration: "20m", notes: "Check posture" },
+      { time: "10:30 AM", activity: "AI Training Session", duration: "30m", notes: "Use scanner" },
+      { time: "01:00 PM", activity: "Nutritional Recovery", duration: "30m", notes: "Protein rich" }
+    ],
+    dietaryPlan: daysPlan.map(d => ({
+      meal: `Day ${d.dayNum} Protocol`,
+      recommendation: d.diet.recommendation,
+      portion: d.diet.macros,
+      timing: d.diet.hydration
+    })),
+    exercises: allExercises.map(ex => ({
+      id: ex.id,
+      name: ex.name,
+      reps: "3 x 12",
+      intensity: "Moderate",
+      instructions: ex.coaching_tip
+    })),
+    milestones: ["Baseline Assessment", "3-Day Streak", "Form Mastery"],
+    metrics: [
+      { label: "Symmetry", value: 85, description: "Bilateral balance" },
+      { label: "Stability", value: 78, description: "Core control" }
+    ],
+    safetyWarnings: ["Ensure non-slip surface.", "Stop if panting heavily."]
   };
 }
 

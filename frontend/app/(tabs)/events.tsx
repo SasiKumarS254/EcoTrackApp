@@ -6,7 +6,7 @@ import {
   Linking, Platform, ActivityIndicator,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Svg, { Rect } from "react-native-svg";
+import * as Location from "expo-location";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Radius, Shadow, FontSize } from "@/constants/theme";
@@ -16,6 +16,20 @@ import { fetchEvents, registerForEvent, fetchRegisteredEvents } from "../../serv
 const { width } = Dimensions.get("window");
 
 const CATEGORIES = ["All", "Rescue", "Exhibition", "Adoption", "Training", "Conservation"];
+
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 9999;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// ... existing types
 
 type Event = {
   id: number;
@@ -135,6 +149,25 @@ export default function EventsScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [registered, setRegistered] = useState<number[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearbyOn, setNearbyOn] = useState(false);
+
+  const toggleNearby = async () => {
+    if (!nearbyOn) {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert("Permission Denied", "Location access is required for nearby filtering.");
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+      setNearbyOn(true);
+      Toast.show({ type: 'info', text1: '📍 GPS Active', text2: 'Showing nearest community events.', position: 'bottom' });
+    } else {
+      setNearbyOn(false);
+    }
+  };
 
   // Persistence: Load events & tickets on focus/mount
   useFocusEffect(
@@ -264,12 +297,22 @@ export default function EventsScreen() {
   const [selectedUpiApp, setSelectedUpiApp] = useState("");
 
   const filteredEvents = useMemo(() => {
-    return events.filter((e) => {
+    let list = events.map(e => {
+      const dist = (userLocation && e.coordinates) ? getDistance(userLocation.lat, userLocation.lng, e.coordinates.lat, e.coordinates.lng) : 999;
+      return { ...e, realDistance: dist };
+    });
+
+    if (nearbyOn && userLocation) {
+      list = list.sort((a, b) => a.realDistance - b.realDistance);
+    }
+
+    return list.filter((e) => {
       const matchCat = activeCategory === "All" || e.category === activeCategory;
       const matchSearch = !search || e.title.toLowerCase().includes(search.toLowerCase()) || e.location.toLowerCase().includes(search.toLowerCase());
-      return matchCat && matchSearch;
+      const matchNearby = !nearbyOn || e.realDistance <= 50;
+      return matchCat && matchSearch && matchNearby;
     });
-  }, [events, activeCategory, search]);
+  }, [events, activeCategory, search, nearbyOn, userLocation]);
 
   const handleRegister = (id: number, title: string) => {
     const event = events.find(e => e.id === id);
@@ -627,6 +670,12 @@ export default function EventsScreen() {
                 placeholder="Search events, cities, rescue drives..."
                 placeholderTextColor={colors.textMuted}
               />
+              <TouchableOpacity
+                style={[styles.nearbyBtn, nearbyOn && { backgroundColor: colors.primary }]}
+                onPress={toggleNearby}
+              >
+                <Ionicons name="location-outline" size={20} color={nearbyOn ? "#fff" : colors.primary} />
+              </TouchableOpacity>
             </View>
 
             {/* Category Chips */}
@@ -671,6 +720,11 @@ export default function EventsScreen() {
                     <View style={[styles.eventBody, { paddingBottom: 0 }]}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={styles.eventTitle}>{e.title}</Text>
+                        {(e as any).realDistance < 999 && (
+                          <View style={styles.distTag}>
+                            <Text style={styles.distText}>{(e as any).realDistance.toFixed(1)} km</Text>
+                          </View>
+                        )}
                         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
                       </View>
                       <Text style={styles.eventDate}>📅 {e.date}</Text>
@@ -1206,6 +1260,9 @@ function getStyles(colors: any, isDark: boolean) {
 
     searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: colors.bgCard, borderRadius: Radius.lg, paddingHorizontal: 14, marginBottom: 12, borderWidth: 1, borderColor: colors.border, height: 44, ...Shadow.sm },
     searchInput: { flex: 1, marginLeft: 8, fontSize: FontSize.sm, color: colors.textPrimary },
+    nearbyBtn: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.primary + '10', marginLeft: 8 },
+    distTag: { backgroundColor: colors.primary + '15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+    distText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
 
     chip: {
       backgroundColor: isDark ? colors.bgCard : "#f3f4f6",

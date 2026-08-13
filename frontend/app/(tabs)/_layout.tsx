@@ -85,6 +85,17 @@ export default function TabLayout() {
         }}
       />
 
+      {/* 7.5 ENCYCLOPEDIA */}
+      <Tabs.Screen
+        name="encyclopedia"
+        options={{
+          title: "Species",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "book" : "book-outline"} size={22} color={color} />
+          ),
+        }}
+      />
+
       {/* 8. SERVICES / MAPS */}
       <Tabs.Screen
         name="maps"

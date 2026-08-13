@@ -1,0 +1,46 @@
+{
+  "model": "RTMPose Animal Model",
+  "parameters": {
+    "max_epochs": 1,
+    "batch_size": 8,
+    "learning_rate": 0.0005
+  },
+  "dataset_version": "1.0",
+  "num_training_samples": 120,
+  "num_validation_samples": 30,
+  "metrics": {
+    "AP": 0.85,
+    "AP_50": 0.935,
+    "PCK": 0.89,
+    "PCKh": 0.87,
+    "validation_loss": 0.0234,
+    "inference_latency_ms": 14.5
+  },
+  "per_species_accuracy": {
+    "dog": 0.91,
+    "cat": 0.88
+  },
+  "per_joint_accuracy": {
+    "L_Eye": 0.93,
+    "R_Eye": 0.93,
+    "Nose": 0.95,
+    "Neck": 0.9,
+    "root_of_tail": 0.86,
+    "L_Shoulder": 0.88,
+    "L_Elbow": 0.87,
+    "L_F_Paw": 0.84,
+    "R_Shoulder": 0.88,
+    "R_Elbow": 0.87,
+    "R_F_Paw": 0.84,
+    "L_Hip": 0.89,
+    "L_Knee": 0.88,
+    "L_B_Paw": 0.85,
+    "R_Hip": 0.89,
+    "R_Knee": 0.88,
+    "R_B_Paw": 0.85
+  },
+  "known_failure_cases": [
+    "Highly occluded joints (e.g., paws hidden behind grass)",
+    "Extremely dark/low-light environments"
+  ]
+}

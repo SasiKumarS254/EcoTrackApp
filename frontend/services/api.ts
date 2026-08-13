@@ -7,8 +7,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 // Use 10.0.2.2 for Android emulators to reach the host machine's localhost
-const API_BASE_URL = Platform.OS === 'android' ? "http://10.0.2.2:5000/api" : "http://localhost:5000/api";
-const STORAGE_KEYS = {
+export const API_BASE_URL = Platform.OS === 'android' ? "http://10.0.2.2:5000/api" : "http://localhost:5000/api";
+export const STORAGE_KEYS = {
   ANALYTICS: "@ecotrack_training_analytics",
   SCANS: "@ecotrack_scans_history",
   MARKETPLACE: "@ecotrack_marketplace_items",
@@ -38,6 +38,63 @@ const customFetch = async (url: string | Request | URL, options: any = {}) => {
   }
   return fetch(url, options);
 };
+
+export async function login(credentials: any) {
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(credentials)
+  });
+  const data = await res.json();
+  if (res.ok) {
+    await AsyncStorage.setItem(STORAGE_KEYS.AUTH, data.token);
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, data.user.id);
+    await AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({ ...data.user, token: data.token }));
+  }
+  return { ok: res.ok, data };
+}
+
+export async function signup(userData: any) {
+  const res = await fetch(`${API_BASE_URL}/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(userData)
+  });
+  const data = await res.json();
+  if (res.ok) {
+    await AsyncStorage.setItem(STORAGE_KEYS.AUTH, data.token);
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, data.user.id);
+    await AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({ ...data.user, token: data.token }));
+  }
+  return { ok: res.ok, data };
+}
+
+export async function forgotPassword(email: string) {
+  const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+  return { ok: res.ok, data: await res.json() };
+}
+
+export async function verifyOtp(email: string, otp: string) {
+  const res = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp })
+  });
+  return { ok: res.ok, data: await res.json() };
+}
+
+export async function resetPassword(resetData: any) {
+  const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(resetData)
+  });
+  return { ok: res.ok, data: await res.json() };
+}
 
 export async function fetchTaxonomySpecies(query: string = "", className: string = "All") {
   try {
@@ -351,6 +408,18 @@ export async function toggleFollow(followingId: string) {
     if (res.ok) return await res.json();
   } catch (e) {
     console.warn("Toggle follow offline");
+  }
+  return null;
+}
+
+export async function toggleBookmark(postId: number) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/posts/${postId}/bookmark`, {
+      method: "POST"
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Toggle bookmark offline");
   }
   return null;
 }

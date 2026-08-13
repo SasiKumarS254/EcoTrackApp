@@ -4,6 +4,7 @@ import {
   TextInput, Image, Alert, StatusBar, Dimensions, Modal,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { router, useFocusEffect } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
@@ -18,6 +19,18 @@ import {
 } from "../../services/api";
 
 const { width } = Dimensions.get("window");
+
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 9999;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 type Listing = {
   id: number;
@@ -34,7 +47,9 @@ type Listing = {
   recommendation: string;
   sellerId?: string;
   sellerName?: string;
+  coordinates?: { lat: number; lng: number };
 };
+// ... rest of the file
 
 type Accessory = {
   id: number;
@@ -78,6 +93,25 @@ export default function MarketplaceScreen() {
   const [search, setSearch] = useState("");
   const [favorites, setFavorites] = useState<number[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
+
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearbyOn, setNearbyOn] = useState(false);
+
+  const toggleNearby = async () => {
+    if (!nearbyOn) {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert("Permission Denied", "Location access is required for nearby filtering.");
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+      setNearbyOn(true);
+      Toast.show({ type: 'info', text1: '📍 GPS Sync', text2: 'Showing nearest animal listings.', position: 'bottom' });
+    } else {
+      setNearbyOn(false);
+    }
+  };
 
   // Post modal state
   const [postVisible, setPostVisible] = useState(false);
@@ -155,8 +189,8 @@ export default function MarketplaceScreen() {
                 vaccinated: item.vaccinated || true,
                 type: item.type === "adoption" ? "adoption" : "sale",
                 recommendation: item.description || "Healthy, gentle temperament.",
-                sellerId: item.seller?.id || "usr_user1",
-                sellerName: item.seller?.name || item.sellerName || "Alice Green"
+                sellerId: item.seller?.id,
+                sellerName: item.seller?.name || item.sellerName || "EcoTracker"
               }));
               setListings(mapped);
             } else {
@@ -201,14 +235,26 @@ export default function MarketplaceScreen() {
   }, [listings, userId]);
 
   const filteredListings = useMemo(() => {
-    let list = listings;
+    let list = listings.map(l => {
+      const dist = (userLocation && l.coordinates) ? getDistance(userLocation.lat, userLocation.lng, l.coordinates.lat, l.coordinates.lng) : 999;
+      return { ...l, realDistance: dist };
+    });
+
+    if (nearbyOn && userLocation) {
+      list = list.sort((a, b) => a.realDistance - b.realDistance);
+    }
 
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((l) => l.name.toLowerCase().includes(q) || l.breed.toLowerCase().includes(q));
     }
+
+    if (nearbyOn) {
+      list = list.filter(l => l.realDistance <= 50);
+    }
+
     return list;
-  }, [search, listings]);
+  }, [search, listings, nearbyOn, userLocation]);
 
   const filteredAccessories = useMemo(() => {
     let list = accessories;
@@ -418,6 +464,12 @@ export default function MarketplaceScreen() {
           placeholder={activeTab === "accessories" ? "Search pet food, cages, toys..." : "Search breeds, species, locations..."}
           placeholderTextColor={colors.textMuted}
         />
+        <TouchableOpacity
+          style={[styles.nearbyBtn, nearbyOn && { backgroundColor: colors.primary }]}
+          onPress={toggleNearby}
+        >
+          <Ionicons name="location-outline" size={20} color={nearbyOn ? "#fff" : colors.primary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -460,7 +512,12 @@ export default function MarketplaceScreen() {
                       <View style={styles.metaRow}>
                         <View style={styles.metaItem}><Ionicons name="paw" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.breed}</Text></View>
                         <View style={styles.metaItem}><Ionicons name="time" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.age}</Text></View>
-                        <View style={styles.metaItem}><Ionicons name="location" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.distance}</Text></View>
+                        {(item as any).realDistance < 999 && (
+                          <View style={styles.metaItem}><Ionicons name="location" size={12} color={colors.primary} /><Text style={[styles.metaText, { color: colors.primary, fontWeight: '800' }]}>{(item as any).realDistance.toFixed(1)} km</Text></View>
+                        )}
+                        {!((item as any).realDistance < 999) && (
+                          <View style={styles.metaItem}><Ionicons name="location" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.distance}</Text></View>
+                        )}
                       </View>
 
                       <Text style={styles.recText}>{item.recommendation}</Text>
@@ -801,6 +858,7 @@ function getStyles(colors: any, isDark: boolean) {
 
     searchContainer: { flexDirection: "row", alignItems: "center", backgroundColor: colors.bgCard, borderRadius: Radius.lg, paddingHorizontal: 14, marginHorizontal: 16, marginBottom: 14, borderWidth: 1, borderColor: colors.border, height: 44, ...Shadow.sm },
     searchInput: { flex: 1, marginLeft: 8, fontSize: FontSize.sm, color: colors.textPrimary },
+    nearbyBtn: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.primary + '10', marginLeft: 8 },
 
     listGrid: { paddingHorizontal: 16, gap: 14 },
     card: { backgroundColor: colors.bgCard, borderRadius: Radius.xl, overflow: "hidden", borderWidth: 1, borderColor: colors.border, ...Shadow.sm },
