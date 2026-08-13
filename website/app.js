@@ -469,7 +469,7 @@ function initApp() {
   loadCommunityPosts();
   renderEvents();
   renderServicesGrid();
-  loadProfileTab();
+  if (window.loadProfileTab) window.loadProfileTab();
   loadTrainingAnalytics();
   fetchDashboardMetrics();
 
@@ -532,9 +532,6 @@ function switchTab(tabId) {
     setEl("topPageSub", h[1]);
   }
 
-  if (tabId === "profile") {
-    if (typeof loadProfileTab === "function") loadProfileTab();
-  }
   if (tabId === "community") {
     if (typeof initCommunityFeed === "function") initCommunityFeed();
   }
@@ -1050,7 +1047,7 @@ async function saveCurrentTrainingPlan(species, breed, goal) {
     });
     if (res.ok) {
       showToast(`📋 Training Plan for ${species} saved to your profile!`, "success", 4500);
-      loadProfileTab();
+      if (window.loadProfileTab) window.loadProfileTab();
     } else {
       showToast("Failed to save plan to backend.", "error");
     }
@@ -1075,11 +1072,7 @@ async function saveCurrentTrainingPlan(species, breed, goal) {
 // PROFILE, MARKETPLACE, COMMUNITY, EVENTS, MAPS
 // ══════════════════════════════════════════════════
 
-async function loadProfileTab(userOrEcoId) {
-  if (typeof window.loadProfileTab === "function" && window.loadProfileTab !== loadProfileTab) {
-    return window.loadProfileTab(userOrEcoId);
-  }
-}
+// Profile loading is fully managed by profile.js and exported on window.loadProfileTab
 
 function setEl(id, val) {
   const el = document.getElementById(id);
@@ -1952,7 +1945,7 @@ function clearChatMedia() {
 }
 
 async function openChatModal(id, targetName) {
-  const otherUserId = String(id).startsWith("user_") || String(id).startsWith("seller_") ? String(id) : `user_${id}`;
+  const otherUserId = String(id).startsWith("user_") || String(id).startsWith("seller_") || String(id).startsWith("usr_") || String(id).startsWith("usr") ? String(id) : `user_${id}`;
   currentActiveSeller = { id: otherUserId, sellerName: targetName || "Member" };
   setEl("chatSellerTitle", `💬 Direct Message · ${targetName || "User"}`);
   clearChatMedia();
@@ -1973,11 +1966,23 @@ async function loadRealUserThread() {
 
   box.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);">Loading conversation...</div>`;
 
+  const headers = {};
   try {
-    const res = await fetch(`${API_BASE}/messages/thread/${currentUser.id}/${currentActiveSeller.id}`);
+    const raw = localStorage.getItem("@ecotrack_user_session");
+    if (raw) {
+      const sess = JSON.parse(raw);
+      if (sess && sess.token) {
+        headers["Authorization"] = `Bearer ${sess.token}`;
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const res = await fetch(`${API_BASE}/messages/thread/${currentUser.id}/${currentActiveSeller.id}`, { headers });
     if (res.ok) {
       const thread = await res.json();
       chatHistory[currentActiveSeller.id] = thread.map(m => ({
+        id: m.id,
         sender: m.from_user_id === currentUser.id ? "me" : "other",
         text: m.text,
         media_url: m.media_url,
@@ -2013,7 +2018,16 @@ function renderChatBox() {
 
   msgs.forEach((m, idx) => {
     const isMe = m.sender === "me";
-    const msgDate = m.timestamp ? new Date(m.timestamp) : new Date();
+    let msgDate;
+    if (m.timestamp) {
+      let tStr = m.timestamp;
+      if (typeof tStr === "string" && !tStr.includes("Z") && !tStr.includes("+") && !tStr.includes("GMT")) {
+        tStr = tStr.replace(" ", "T") + "Z";
+      }
+      msgDate = new Date(tStr);
+    } else {
+      msgDate = new Date();
+    }
 
     const today = new Date();
     const yesterday = new Date(today);
@@ -2082,15 +2096,41 @@ function insertEmoji(emoji) {
   }
 }
 
-function deleteChatMessage(sellerId, index) {
-  if (!confirm("Delete this message?")) return;
+async function deleteChatMessage(sellerId, index) {
+  if (!confirm("Are you sure you want to delete this message?")) return;
   if (chatHistory[sellerId]) {
+    const msg = chatHistory[sellerId][index];
+    const messageId = msg ? msg.id : null;
+    
     chatHistory[sellerId].splice(index, 1);
     localStorage.setItem(`@ecotrack_chat_${currentUser.id}`, JSON.stringify(chatHistory));
     renderChatBox();
-    showToast("🗑️ Message deleted for you.", "info");
+    showToast("🗑️ Message deleted.", "info");
+
+    if (messageId) {
+      const headers = {};
+      try {
+        const raw = localStorage.getItem("@ecotrack_user_session");
+        if (raw) {
+          const sess = JSON.parse(raw);
+          if (sess && sess.token) {
+            headers["Authorization"] = `Bearer ${sess.token}`;
+          }
+        }
+      } catch (e) {}
+
+      try {
+        await fetch(`${API_BASE}/messages/${messageId}`, {
+          method: "DELETE",
+          headers
+        });
+      } catch (e) {
+        console.warn("Failed to delete message from server:", e);
+      }
+    }
   }
 }
+window.deleteChatMessage = deleteChatMessage;
 
 async function sendChatMessage() {
   const input = document.getElementById("chatInput");
@@ -2117,10 +2157,21 @@ async function sendChatMessage() {
 
   localStorage.setItem(`@ecotrack_chat_${currentUser.id}`, JSON.stringify(chatHistory));
 
+  const headers = { "Content-Type": "application/json" };
   try {
-    await fetch(`${API_BASE}/messages`, {
+    const raw = localStorage.getItem("@ecotrack_user_session");
+    if (raw) {
+      const sess = JSON.parse(raw);
+      if (sess && sess.token) {
+        headers["Authorization"] = `Bearer ${sess.token}`;
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const res = await fetch(`${API_BASE}/messages`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         from_user_id: currentUser.id,
         to_user_id: currentActiveSeller.id,
@@ -2130,6 +2181,14 @@ async function sendChatMessage() {
         media_type: newMsg.media_type
       })
     });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.msg && data.msg.id) {
+        newMsg.id = data.msg.id;
+        localStorage.setItem(`@ecotrack_chat_${currentUser.id}`, JSON.stringify(chatHistory));
+        renderChatBox();
+      }
+    }
     showToast(`✉️ Message delivered to ${currentActiveSeller.sellerName}!`, "success");
   } catch {
     showToast("Message saved locally. Will sync when server is online.", "warning");
@@ -2930,6 +2989,14 @@ function issueEventTicket(ev, paymentInfo = null) {
   closeEventDetailModal();
   closeEventPaymentModal();
   renderEvents();
+
+  // Background sync registration with backend database
+  if (window.currentUser) {
+    fetch(`${AUTH_CONFIG.apiBase}/events/${ev.id}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    }).catch(err => console.warn("Backend registration sync failed:", err));
+  }
 
   showToast(`🎉 Verified Pass issued for ${ev.title}! Pass Ref: ${serial}`, "success", 6000);
   switchEventsTab("tickets");

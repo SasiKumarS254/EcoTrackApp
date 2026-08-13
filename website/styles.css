@@ -1713,6 +1713,10 @@ body {
   border: 1px solid var(--primary);
 }
 
+.chat-message-group:hover .msg-delete-btn {
+  display: flex !important;
+}
+
 .profile-subtab-btn {
   white-space: nowrap;
   font-size: 13px;
@@ -1920,28 +1924,63 @@ body {
 
 .glass-stat-divider { width: 1px; height: 40px; background: rgba(255,255,255,0.15); margin: 0 0.625rem; }
 
-/* Profile Layout Split */
+/* Profile Layout Single Column with Horizontal Tabs */
 .profile-layout-v2 {
-  display: grid;
-  grid-template-columns: 17.5rem 1fr;
-  gap: 2rem;
-  margin-top: 3.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 4.5rem;
 }
 
-@media (max-width: 1024px) {
-  .profile-layout-v2 {
-    grid-template-columns: 1fr;
-  }
-  .profile-side-nav {
-    flex-direction: row !important;
-    position: static !important;
-    overflow-x: auto;
-    padding-bottom: 1rem;
-    height: auto !important;
-  }
+.profile-tabs-nav {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 0.5rem;
+  background: var(--bg-card);
+  padding: 0.625rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-color);
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  -ms-overflow-style: none;  /* Hide scrollbar for IE/Edge */
 }
 
-.profile-side-nav { display: flex; flex-direction: column; gap: 0.5rem; position: sticky; top: 100px; height: fit-content; }
+.profile-tabs-nav::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Chrome/Safari */
+}
+
+.profile-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+.profile-tab-btn:hover {
+  color: var(--primary);
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.profile-tab-btn.active {
+  background: var(--gradient-primary);
+  color: #fff !important;
+  border-color: transparent;
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.profile-tab-btn i {
+  font-size: 16px;
+}
 
 .side-nav-btn {
   display: flex; align-items: center; gap: 0.875rem;

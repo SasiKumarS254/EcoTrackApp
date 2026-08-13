@@ -3,7 +3,7 @@
  * Functional Account Dashboard with Real-Time Data Sync
  */
 
-let activeProfileTabSection = 'pets';
+let activeProfileTabSection = 'scans';
 let activeProfileData = null;
 window.activeViewedProfileId = null;
 
@@ -142,6 +142,7 @@ function renderProfileDashboard(p, impact, metrics, targetId) {
     if (isOwner) {
       actionsEl.innerHTML = `
         <button class="btn btn-primary scale-hover" onclick="openEditProfileModal()"><i class="fas fa-user-edit"></i> Edit Profile</button>
+        <button class="btn btn-secondary scale-hover" style="margin-left:0.5rem;" onclick="openSettingsModal()"><i class="fas fa-cog"></i> Settings</button>
       `;
     } else {
       const fIcon = p.is_following ? 'fa-check' : 'fa-user-plus';
@@ -158,7 +159,7 @@ function renderProfileDashboard(p, impact, metrics, targetId) {
 
 function switchProfileTabSection(section, btn) {
   activeProfileTabSection = section;
-  document.querySelectorAll('.side-nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.profile-tab-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   else {
      const targetBtn = document.querySelector(`[onclick*="switchProfileTabSection('${section}'"]`);
@@ -193,7 +194,86 @@ async function renderProfileSubTab(section) {
     renderAccountInfo(p, container);
   } else if (section === 'settings') {
     renderSettings(p, container);
+  } else if (section === 'saved') {
+    container.innerHTML = `<div class="tab-loader" style="text-align:center; padding:2rem;"><i class="fas fa-spinner fa-spin"></i><span>Fetching bookmarked items...</span></div>`;
+    const posts = await window.EcoSocialDB.fetchPosts({ saved_only: 'true' });
+    renderPostsGrid(posts || [], container);
+  } else if (section === 'events') {
+    container.innerHTML = `<div class="tab-loader" style="text-align:center; padding:2rem;"><i class="fas fa-spinner fa-spin"></i><span>Fetching registered events...</span></div>`;
+    try {
+      const res = await fetch(`${AUTH_CONFIG.apiBase}/events/registrations/${p.id}`);
+      let events = [];
+      if (res.ok) {
+        events = await res.json();
+      }
+      
+      // Merge with localStorage if this profile belongs to the current user
+      if (isOwner) {
+        const localReg = localStorage.getItem(`@ecotrack_events_registered_${p.id}`);
+        const localRegIds = localReg ? JSON.parse(localReg) : [];
+        const localTickets = localStorage.getItem(`@ecotrack_events_tickets_${p.id}`);
+        const localTicketsData = localTickets ? JSON.parse(localTickets) : [];
+        
+        const savedEvents = localStorage.getItem("@ecotrack_events_list");
+        const allEvents = savedEvents ? JSON.parse(savedEvents) : [];
+        
+        localRegIds.forEach(id => {
+          if (!events.some(ev => ev.id === id)) {
+            const evDetail = allEvents.find(e => e.id === id);
+            if (evDetail) {
+              const ticket = localTicketsData.find(t => t.eventId === id);
+              events.push({
+                ...evDetail,
+                user_registration: {
+                  user_id: p.id,
+                  registered_at: ticket ? ticket.purchaseDate : new Date().toISOString(),
+                  ticket_id: ticket ? ticket.serialNumber : 'Registered'
+                }
+              });
+            }
+          }
+        });
+      }
+
+      renderEventsList(events || [], container);
+    } catch (e) {
+      container.innerHTML = `<div class="empty-state"><h4>Error fetching events</h4></div>`;
+    }
   }
+}
+
+function renderEventsList(events, container) {
+  if (!events.length) {
+    container.innerHTML = `
+      <div class="empty-state" style="text-align:center; padding:4rem 2rem; color:var(--text-muted);">
+        <i class="fas fa-calendar-times fa-3x" style="margin-bottom:1rem; opacity:0.3;"></i>
+        <h4>No Registered Events</h4>
+        <p>You haven't registered for any wildlife conservation events or volunteer drives yet.</p>
+      </div>`;
+    return;
+  }
+  container.innerHTML = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:1.5rem; text-align:left;">
+      ${events.map(ev => `
+        <div class="card" style="padding:0; overflow:hidden; border:1px solid var(--border-color); background:var(--bg-card); border-radius:16px; display:flex; flex-direction:column; justify-content:space-between; height:100%;">
+          <div style="height:140px; background:#000;">
+            <img src="${ev.image || 'https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?w=600'}" style="width:100%; height:100%; object-fit:cover;">
+          </div>
+          <div style="padding:1.25rem; flex:1;">
+            <div style="font-size:0.75rem; font-weight:800; color:var(--primary); text-transform:uppercase; margin-bottom:0.375rem;">${escapeHtml(ev.category || 'Volunteer')}</div>
+            <h4 style="margin:0 0 0.5rem 0; font-size:1.05rem; font-weight:900; color:var(--text-primary);">${escapeHtml(ev.title)}</h4>
+            <div style="font-size:0.8rem; color:var(--text-muted); display:flex; flex-direction:column; gap:4px;">
+              <div><i class="far fa-calendar-alt" style="color:var(--primary); margin-right:6px;"></i>${escapeHtml(ev.date || 'N/A')}</div>
+              <div><i class="fas fa-map-marker-alt" style="color:var(--primary); margin-right:6px;"></i>${escapeHtml(ev.location || 'Online')}</div>
+            </div>
+          </div>
+          <div style="padding:1rem 1.25rem; border-top:1px solid var(--border-color); background:var(--bg-main); display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; font-weight:800; color:var(--text-muted);">Pass ID: ${escapeHtml(ev.user_registration?.ticket_id || 'Registered')}</span>
+            <button class="btn btn-secondary" style="font-size:0.7rem; padding:6px 12px;" onclick="switchTab('events')">View Ticket</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
 }
 
 function renderPetsGrid(pets, container, isOwner) {
@@ -253,39 +333,41 @@ function renderScansList(scans, container) {
 
 async function renderConnections(p, container) {
   container.innerHTML = `<div class="tab-loader" style="text-align:center; padding:2rem;"><i class="fas fa-spinner fa-spin"></i><span>Syncing connections...</span></div>`;
+  const isOwner = isSelfProfile(p.id);
   try {
     const [followers, following] = await Promise.all([
       window.EcoSocialDB.fetchFollowers(p.id),
       window.EcoSocialDB.fetchFollowing(p.id)
     ]);
-    container.innerHTML = `
-      <div class="card" style="border-radius:16px; background:var(--bg-card);">
-        <div class="card-title" style="margin-bottom:2rem; font-weight:800; color:var(--text-primary);"><i class="fas fa-users" style="color:var(--primary);"></i> Network Graph</div>
 
-        <h4 style="font-size:0.75rem; font-weight:900; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:1rem; text-align:left;">Following (${following.length})</h4>
-        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:1rem; margin-bottom:2.5rem;">
-          ${following.length ? following.map(u => `
-            <div class="sidebar-user suggested-user-row" style="margin:0; padding:10px; border-radius:12px;" onclick="viewUserProfile('${u.id}')">
-              <div class="sidebar-avatar" style="width:40px; height:40px;"><img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(u.name)}" style="border-radius:50%; width:100%; height:100%; object-fit:cover;"></div>
-              <div style="overflow:hidden; text-align:left;">
-                <div class="sidebar-user-name" style="font-size:13px; font-weight:800; color:var(--text-primary);">${escapeHtml(u.display_name || u.name)}</div>
-                <div class="sidebar-user-email" style="font-size:10px; color:var(--text-muted);">@${u.ecotrack_id || 'member'}</div>
-              </div>
-            </div>
-          `).join('') : '<p style="font-size:0.85rem; color:var(--text-muted); text-align:left;">Not following any members yet.</p>'}
+    const renderConnectionCard = (u) => `
+      <div class="card" style="display:flex; align-items:center; gap:12px; padding:14px; border-radius:14px; background:var(--bg-card); border:1px solid var(--border-color); transition:box-shadow 0.2s;" onmouseenter="this.style.boxShadow='0 4px 16px rgba(16,185,129,0.1)'" onmouseleave="this.style.boxShadow='none'">
+        <div style="width:46px; height:46px; border-radius:50%; overflow:hidden; flex-shrink:0; cursor:pointer;" onclick="viewUserProfile('${u.id}')">
+          <img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(u.display_name||u.name)+'&background=10b981&color=fff'}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=User&background=10b981&color=fff'">
         </div>
+        <div style="flex:1; overflow:hidden; text-align:left; cursor:pointer;" onclick="viewUserProfile('${u.id}')">
+          <div style="font-size:13.5px; font-weight:800; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(u.display_name || u.name)}</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:1px;">@${escapeHtml(u.ecotrack_id || 'member')}</div>
+        </div>
+        ${isOwner ? `
+        <button class="btn btn-secondary" style="padding:6px 12px; font-size:11px; font-weight:800; border-radius:10px; flex-shrink:0;" onclick="event.stopPropagation(); openDirectMessageModal('${u.id}', '${escapeHtml(u.display_name||u.name).replace(/'/g,"\\'")}')"><i class="fas fa-comment-dots" style="color:var(--primary);"></i> Chat</button>
+        ` : ''}
+      </div>
+    `;
 
-        <h4 style="font-size:0.75rem; font-weight:900; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:1rem; text-align:left;">Followers (${followers.length})</h4>
-        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:1rem;">
-          ${followers.length ? followers.map(u => `
-            <div class="sidebar-user suggested-user-row" style="margin:0; padding:10px; border-radius:12px;" onclick="viewUserProfile('${u.id}')">
-              <div class="sidebar-avatar" style="width:40px; height:40px;"><img src="${u.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(u.name)}" style="border-radius:50%; width:100%; height:100%; object-fit:cover;"></div>
-              <div style="overflow:hidden; text-align:left;">
-                <div class="sidebar-user-name" style="font-size:13px; font-weight:800; color:var(--text-primary);">${escapeHtml(u.display_name || u.name)}</div>
-                <div class="sidebar-user-email" style="font-size:10px; color:var(--text-muted);">@${u.ecotrack_id || 'member'}</div>
-              </div>
-            </div>
-          `).join('') : '<p style="font-size:0.85rem; color:var(--text-muted); text-align:left;">No followers yet.</p>'}
+    container.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:2rem;">
+        <div class="card" style="border-radius:16px; background:var(--bg-card);">
+          <div class="card-title" style="margin-bottom:1.5rem; font-weight:800; color:var(--text-primary);"><i class="fas fa-user-friends" style="color:var(--primary);"></i> Following (${following.length})</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:0.875rem;">
+            ${following.length ? following.map(u => renderConnectionCard(u)).join('') : '<p style="font-size:0.85rem; color:var(--text-muted); text-align:left; grid-column:1/-1;">Not following any members yet.</p>'}
+          </div>
+        </div>
+        <div class="card" style="border-radius:16px; background:var(--bg-card);">
+          <div class="card-title" style="margin-bottom:1.5rem; font-weight:800; color:var(--text-primary);"><i class="fas fa-users" style="color:var(--primary);"></i> Followers (${followers.length})</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:0.875rem;">
+            ${followers.length ? followers.map(u => renderConnectionCard(u)).join('') : '<p style="font-size:0.85rem; color:var(--text-muted); text-align:left; grid-column:1/-1;">No followers yet.</p>'}
+          </div>
         </div>
       </div>`;
   } catch (err) { container.innerHTML = `<div class="empty-state"><h4>Failed to load connections</h4></div>`; }
@@ -355,23 +437,250 @@ function renderSettings(p, container) {
 }
 
 function renderAchievementsList(ach, container) {
-  if (!ach.length) {
-    container.innerHTML = `<div class="empty-state" style="text-align:center; padding:4rem 2rem; color:var(--text-muted);"><i class="fas fa-award fa-3x" style="margin-bottom:1rem; opacity:0.3;"></i><h4>No Achievements Yet</h4><p>Unlock professional badges by participating in rescues and scans.</p></div>`;
-    return;
-  }
-  container.innerHTML = `
-    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1.5rem;">
-      ${ach.map(a => `
-        <div class="card" style="display:flex; align-items:center; gap:1rem; padding:1.25rem; background:var(--bg-card); border:1px solid var(--border-color); border-radius:16px; text-align:left;">
-          <div style="font-size:2.5rem;">${a.icon || '🏆'}</div>
+  const totalScans = activeProfileData?.metrics?.scans?.length || 0;
+  const totalPlans = activeProfileData?.metrics?.programs?.length || 0;
+  const followingCount = activeProfileData?.profile?.following_count || 0;
+
+  const milestones = [
+    { name: "AI Bio-Scanner Pioneer",   code: "AI_PIONEER",          icon: "🔬", desc: "Perform your first AI pose estimation scan.",        current: totalScans,    target: 1,  color: "#3b82f6", gradient: "135deg, #3b82f6, #1d4ed8" },
+    { name: "Elite Species Analyst",    code: "SPECIES_ANALYST",     icon: "🧬", desc: "Perform 5 or more AI pose estimation scans.",         current: totalScans,    target: 5,  color: "#8b5cf6", gradient: "135deg, #8b5cf6, #6d28d9" },
+    { name: "Certified Trainer",        code: "CERTIFIED_TRAINER",   icon: "🏋️", desc: "Register your first custom AI training program.",     current: totalPlans,    target: 1,  color: "#10b981", gradient: "135deg, #10b981, #059669" },
+    { name: "Master Welfare Coach",     code: "WELFARE_COACH",       icon: "🎓", desc: "Register 3 or more AI training programs.",            current: totalPlans,    target: 3,  color: "#f59e0b", gradient: "135deg, #f59e0b, #d97706" },
+    { name: "Community Connector",      code: "COMMUNITY_CONNECTOR", icon: "🤝", desc: "Follow 3 or more members in the EcoTrack network.",   current: followingCount, target: 3, color: "#ec4899", gradient: "135deg, #ec4899, #be185d" }
+  ];
+
+  // Merge: treat any milestone at 100% as earned even if backend hasn't synced yet
+  const earnedNames = new Set(ach.map(a => a.badge_name || a.title));
+  const locallyEarned = milestones.filter(m => m.current >= m.target && !earnedNames.has(m.name));
+  const mergedAch = [
+    ...ach,
+    ...locallyEarned.map(m => ({
+      badge_name: m.name,
+      title: m.name,
+      icon: m.icon,
+      description: m.desc,
+      _local: true
+    }))
+  ];
+
+  const unlockedHtml = mergedAch.map(a => {
+    const milestone = milestones.find(m => m.name === (a.badge_name || a.title));
+    const color = milestone?.color || '#10b981';
+    const gradient = milestone?.gradient || '135deg, #10b981, #059669';
+    return `
+    <div class="card" style="display:flex; flex-direction:column; gap:0; padding:0; background:var(--bg-card); border:none; border-radius:20px; text-align:left; box-shadow:0 8px 24px rgba(0,0,0,0.1); overflow:hidden; position:relative;">
+      <!-- Badge gradient banner -->
+      <div style="background:linear-gradient(${gradient}); padding:20px 20px 28px; position:relative;">
+        <div style="position:absolute; top:0; left:0; right:0; bottom:0; background:url('data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><circle cx=\'80\' cy=\'20\' r=\'30\' fill=\'rgba(255,255,255,0.07)\'></circle><circle cx=\'20\' cy=\'80\' r=\'20\' fill=\'rgba(255,255,255,0.05)\'></circle></svg>'); background-size:cover;"></div>
+        <div style="position:relative; display:flex; align-items:center; gap:16px;">
+          <div style="width:60px; height:60px; border-radius:50%; background:rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; font-size:2rem; backdrop-filter:blur(4px); border:2px solid rgba(255,255,255,0.3); flex-shrink:0;">${a.icon || '🏆'}</div>
           <div>
-            <div style="font-weight:900; color:var(--text-primary);">${escapeHtml(a.badge_name || a.title)}</div>
-            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">${escapeHtml(a.description)}</div>
+            <div style="font-size:10px; font-weight:800; color:rgba(255,255,255,0.75); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:4px;">Achievement Unlocked</div>
+            <div style="font-weight:900; font-size:1.05rem; color:#fff; line-height:1.2;">${escapeHtml(a.badge_name || a.title)}</div>
+          </div>
+          <div style="margin-left:auto; width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <i class="fas fa-check" style="color:#fff; font-size:12px;"></i>
           </div>
         </div>
-      `).join('')}
-    </div>`;
+      </div>
+      <!-- Bottom content -->
+      <div style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--bg-card);">
+        <div style="font-size:0.78rem; color:var(--text-muted); flex:1; padding-right:8px;">${escapeHtml(a.description || milestone?.desc || 'Earned milestone.')}</div>
+        <button class="btn" style="font-size:0.7rem; padding:6px 14px; font-weight:800; color:#fff; background:linear-gradient(${gradient}); border:none; border-radius:10px; flex-shrink:0;" onclick="shareAchievementToFeed('${(a.badge_name || a.title).replace(/'/g, "\\'")}", '${a.icon || '🏆'}')">
+          <i class="fas fa-share-nodes"></i> Share
+        </button>
+      </div>
+    </div>
+  `}).join('');
+
+  const lockedMilestones = milestones.filter(m => !mergedAch.some(a => (a.badge_name || a.title) === m.name));
+  const lockedHtml = lockedMilestones.map(m => {
+    const pct = Math.min(100, Math.round((m.current / m.target) * 100));
+    return `
+      <div class="card" style="display:flex; flex-direction:column; gap:0.75rem; padding:0; background:var(--bg-card); border:1px solid var(--border-color); border-radius:20px; text-align:left; overflow:hidden;">
+        <div style="background:linear-gradient(135deg, var(--bg-main) 0%, var(--border-color) 100%); padding:18px; position:relative;">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div style="width:54px; height:54px; border-radius:50%; background:var(--border-color); display:flex; align-items:center; justify-content:center; font-size:1.75rem; filter:grayscale(80%); flex-shrink:0;">${m.icon}</div>
+            <div style="flex:1;">
+              <div style="font-weight:900; color:var(--text-secondary); font-size:0.95rem;">${m.name}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:3px; line-height:1.4;">${m.desc}</div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:0 18px 16px;">
+          <div style="display:flex; justify-content:space-between; font-size:0.7rem; font-weight:800; color:var(--text-muted); margin-bottom:6px;">
+            <span>Milestone Progress</span>
+            <span style="color:${pct >= 80 ? 'var(--primary)' : 'var(--text-muted)'}">${m.current} / ${m.target} (${pct}%)</span>
+          </div>
+          <div style="height:8px; background:var(--bg-main); border-radius:4px; overflow:hidden; border:1px solid var(--border-color);">
+            <div style="width:${pct}%; height:100%; background:linear-gradient(90deg, ${m.color}80, ${m.color}); transition:width 0.6s ease; border-radius:4px;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:1.25rem;">
+        <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg, #f59e0b, #d97706); display:flex; align-items:center; justify-content:center;">
+          <i class="fas fa-medal" style="color:#fff; font-size:16px;"></i>
+        </div>
+        <div>
+          <h3 style="font-weight:900; font-size:1.1rem; color:var(--text-primary); margin:0;">Earned Badges <span style="color:var(--primary);">(${mergedAch.length})</span></h3>
+          <div style="font-size:0.75rem; color:var(--text-muted);">Your conservation achievements</div>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:1.25rem; margin-bottom:2.5rem;">
+        ${unlockedHtml || `<div style="grid-column:1/-1; background:var(--bg-main); border-radius:16px; padding:2.5rem; text-align:center; border:2px dashed var(--border-color);"><i class="fas fa-award" style="font-size:2.5rem; color:var(--border-color); margin-bottom:12px; display:block;"></i><div style="font-weight:800; color:var(--text-muted);">No badges earned yet</div><div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Participate in AI Scans and training programs to unlock your first badge!</div></div>`}
+      </div>
+
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:1.25rem;">
+        <div style="width:36px; height:36px; border-radius:10px; background:var(--bg-main); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center;">
+          <i class="fas fa-lock" style="color:var(--text-muted); font-size:14px;"></i>
+        </div>
+        <div>
+          <h3 style="font-weight:900; font-size:1.1rem; color:var(--text-primary); margin:0;">Locked Milestones <span style="color:var(--text-muted);">(${lockedMilestones.length})</span></h3>
+          <div style="font-size:0.75rem; color:var(--text-muted);">Keep going to unlock these!</div>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:1.25rem;">
+        ${lockedHtml || '<p style="font-size:0.85rem; color:var(--primary); font-weight:800; text-align:left; grid-column:1/-1;">🎉 All badges unlocked! You are a master ecosystem warden.</p>'}
+      </div>
+    </div>
+  `;
 }
+
+async function shareAchievementToFeed(badgeName, icon) {
+  try {
+    const text = `🏆 I just unlocked the "${badgeName}" achievement on EcoTrack! ${icon}\nJoin me in protecting animal welfare!`;
+    const res = await window.EcoSocialDB.createPost({
+      content: text,
+      post_type: 'achievement'
+    });
+    if (res) {
+      showToast(`Shared "${badgeName}" achievement to community feed!`, 'success');
+      if (window.switchTab) window.switchTab('community');
+      if (window.initCommunityFeed) window.initCommunityFeed();
+    }
+  } catch (e) {
+    showToast('Failed to share achievement.', 'error');
+  }
+}
+window.shareAchievementToFeed = shareAchievementToFeed;
+
+function computeTrainingProgress(prog) {
+  // progress is an object {completed_exercises: [], current_week, total_scans, avg_score}
+  if (typeof prog === 'number') return prog;
+  if (!prog || typeof prog !== 'object') return 0;
+  const completed = Array.isArray(prog.completed_exercises) ? prog.completed_exercises.length : 0;
+  // Estimate total exercises from avg (default 5 drills per week, 4 weeks = 20)
+  const totalWeeks = prog.total_weeks || 4;
+  const drillsPerWeek = 5;
+  const estimated = totalWeeks * drillsPerWeek;
+  if (estimated === 0) return prog.avg_score ? Math.round(prog.avg_score) : 0;
+  return Math.min(100, Math.round((completed / estimated) * 100));
+}
+
+function openTrainingPlanDetail(progIndex) {
+  const prog = activeProfileData?.metrics?.programs?.[progIndex];
+  if (!prog) return;
+
+  const progress = prog.progress || {};
+  const pct = computeTrainingProgress(progress);
+  const completedExs = Array.isArray(progress.completed_exercises) ? progress.completed_exercises : [];
+  const currentWeek = progress.current_week || 1;
+  const totalScans = progress.total_scans || 0;
+  const avgScore = progress.avg_score ? progress.avg_score.toFixed(1) : 'N/A';
+
+  // Build drills list from completed exercises
+  const drillsHtml = completedExs.length
+    ? completedExs.map(ex => `
+        <div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border-color);">
+          <div style="width:28px; height:28px; border-radius:8px; background:rgba(16,185,129,0.1); color:var(--primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fas fa-check" style="font-size:11px;"></i></div>
+          <div style="font-size:13px; font-weight:700; color:var(--text-primary);">${escapeHtml(String(ex))}</div>
+        </div>`).join('')
+    : `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:13px;">No exercises completed yet. Start training!</div>`;
+
+  let existingModal = document.getElementById('trainingDetailModal');
+  if (existingModal) existingModal.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'trainingDetailModal';
+  modal.className = 'modal-backdrop';
+  modal.style.cssText = 'display:flex;';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:580px; padding:0; border-radius:24px; overflow:hidden; max-height:85vh; display:flex; flex-direction:column;">
+      <!-- Header Banner -->
+      <div style="background:linear-gradient(135deg, #10b981, #059669); padding:28px 28px 22px; position:relative;">
+        <div style="position:absolute; top:0; right:0; width:140px; height:140px; border-radius:50%; background:rgba(255,255,255,0.06); transform:translate(40px,-40px);"></div>
+        <button onclick="document.getElementById('trainingDetailModal').remove()" style="position:absolute; top:16px; right:16px; background:rgba(255,255,255,0.2); border:none; color:#fff; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);">✕</button>
+        <div style="display:flex; align-items:center; gap:14px; position:relative;">
+          <div style="width:52px; height:52px; border-radius:16px; background:rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+            <i class="fas fa-dumbbell" style="color:#fff; font-size:22px;"></i>
+          </div>
+          <div>
+            <div style="font-size:11px; font-weight:800; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Training Plan</div>
+            <div style="font-size:1.2rem; font-weight:900; color:#fff;">${escapeHtml(prog.title || (prog.species || 'Animal') + ' Program')}</div>
+            <div style="font-size:12px; color:rgba(255,255,255,0.75); margin-top:3px;">Started ${new Date(prog.started_at).toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}</div>
+          </div>
+        </div>
+        <!-- Progress bar -->
+        <div style="margin-top:18px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:800; color:rgba(255,255,255,0.8); margin-bottom:6px;">
+            <span>Overall Progress</span><span>${pct}% Complete</span>
+          </div>
+          <div style="height:10px; background:rgba(255,255,255,0.2); border-radius:5px; overflow:hidden;">
+            <div style="width:${pct}%; height:100%; background:rgba(255,255,255,0.9); border-radius:5px; transition:width 0.6s ease;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); background:var(--bg-main); border-bottom:1px solid var(--border-color);">
+        <div style="padding:14px; text-align:center; border-right:1px solid var(--border-color);">
+          <div style="font-size:1.3rem; font-weight:900; color:var(--primary);">${currentWeek}</div>
+          <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Week</div>
+        </div>
+        <div style="padding:14px; text-align:center; border-right:1px solid var(--border-color);">
+          <div style="font-size:1.3rem; font-weight:900; color:var(--primary);">${completedExs.length}</div>
+          <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Drills Done</div>
+        </div>
+        <div style="padding:14px; text-align:center;">
+          <div style="font-size:1.3rem; font-weight:900; color:var(--primary);">${totalScans}</div>
+          <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">AI Scans</div>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div style="flex:1; overflow-y:auto; padding:24px;">
+        <div style="font-weight:900; font-size:0.85rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Plan Details</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
+          <div style="background:var(--bg-main); border:1px solid var(--border-color); border-radius:12px; padding:12px;">
+            <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Species</div>
+            <div style="font-weight:800; color:var(--text-primary); margin-top:3px;">${escapeHtml(prog.species || 'General')}</div>
+          </div>
+          <div style="background:var(--bg-main); border:1px solid var(--border-color); border-radius:12px; padding:12px;">
+            <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Goal</div>
+            <div style="font-weight:800; color:var(--text-primary); margin-top:3px;">${escapeHtml(prog.goal || 'General Training')}</div>
+          </div>
+        </div>
+        <div style="font-weight:900; font-size:0.85rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Completed Exercises (${completedExs.length})</div>
+        <div style="background:var(--bg-main); border:1px solid var(--border-color); border-radius:12px; padding:0 16px;">
+          ${drillsHtml}
+        </div>
+        ${avgScore !== 'N/A' ? `
+          <div style="margin-top:16px; padding:14px; background:linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.04)); border:1px solid rgba(16,185,129,0.2); border-radius:12px; display:flex; align-items:center; gap:12px;">
+            <div style="width:40px; height:40px; border-radius:10px; background:linear-gradient(135deg, #10b981, #059669); display:flex; align-items:center; justify-content:center;"><i class="fas fa-star" style="color:#fff; font-size:16px;"></i></div>
+            <div><div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Average Score</div><div style="font-size:1.4rem; font-weight:900; color:var(--primary);">${avgScore}%</div></div>
+          </div>` : ''}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+window.openTrainingPlanDetail = openTrainingPlanDetail;
 
 function renderTrainingGrid(progs, container) {
   if (!progs.length) {
@@ -380,26 +689,36 @@ function renderTrainingGrid(progs, container) {
   }
   container.innerHTML = `
     <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:1.5rem;">
-      ${progs.map(p => `
-        <div class="card" style="padding:1.5rem; background:var(--bg-card); border:1px solid var(--border-color); border-radius:16px; text-align:left;">
-          <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.25rem;">
-            <div style="width:40px; height:40px; border-radius:50%; background:var(--primary-light,#10b98115); color:var(--primary); display:flex; align-items:center; justify-content:center;">
-              <i class="fas fa-dumbbell"></i>
+      ${progs.map((p, idx) => {
+        const pct = computeTrainingProgress(p.progress);
+        return `
+        <div class="card" style="padding:0; background:var(--bg-card); border:1px solid var(--border-color); border-radius:20px; text-align:left; overflow:hidden; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;" onclick="openTrainingPlanDetail(${idx})" onmouseenter="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 12px 32px rgba(16,185,129,0.15)'" onmouseleave="this.style.transform=''; this.style.boxShadow='none'">
+          <!-- Card top accent -->
+          <div style="height:4px; background:linear-gradient(90deg, #10b981, #059669);"></div>
+          <div style="padding:1.5rem;">
+            <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.25rem;">
+              <div style="width:46px; height:46px; border-radius:14px; background:linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.1)); color:var(--primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <i class="fas fa-dumbbell"></i>
+              </div>
+              <div style="flex:1; overflow:hidden;">
+                <div style="font-weight:900; font-size:1rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(p.title || (p.species || 'Animal') + ' Program')}</div>
+                <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">${new Date(p.started_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}</div>
+              </div>
+              <div style="flex-shrink:0; width:36px; height:36px; border-radius:50%; background:var(--bg-main); display:flex; align-items:center; justify-content:center;">
+                <i class="fas fa-chevron-right" style="color:var(--primary); font-size:12px;"></i>
+              </div>
             </div>
-            <div>
-              <div style="font-weight:900; font-size:1rem; color:var(--text-primary);">${escapeHtml(p.title || p.species + ' Program')}</div>
-              <div style="font-size:0.7rem; color:var(--text-muted);">${new Date(p.started_at).toLocaleDateString()}</div>
+            <div style="margin-bottom:0.5rem; display:flex; justify-content:space-between; font-size:0.75rem; font-weight:800;">
+              <span style="color:var(--text-secondary);">Current Progress</span>
+              <span style="color:var(--primary);">${pct}%</span>
             </div>
-          </div>
-          <div style="margin-bottom:0.5rem; display:flex; justify-content:space-between; font-size:0.75rem; font-weight:800;">
-            <span style="color:var(--text-secondary);">Current Progress</span>
-            <span style="color:var(--primary);">${p.progress || 0}%</span>
-          </div>
-          <div style="height:8px; background:var(--bg-main); border-radius:4px; overflow:hidden; border:1px solid var(--border-color);">
-            <div style="width:${p.progress || 0}%; height:100%; background:var(--gradient-primary); transition:width 0.5s ease;"></div>
+            <div style="height:8px; background:var(--bg-main); border-radius:4px; overflow:hidden; border:1px solid var(--border-color);">
+              <div style="width:${pct}%; height:100%; background:linear-gradient(90deg, #10b981, #059669); transition:width 0.5s ease;"></div>
+            </div>
+            <div style="margin-top:12px; font-size:11px; color:var(--text-muted); font-weight:700;">Click to view full training plan →</div>
           </div>
         </div>
-      `).join('')}
+      `}).join('')}
     </div>`;
 }
 
@@ -426,17 +745,22 @@ async function openViewProfileModal(userIdOrEcoId) {
   document.getElementById('viewProfileBadges').innerHTML = "";
   document.getElementById('viewProfilePetsGrid').innerHTML = "";
   document.getElementById('viewProfileBadgesGrid').innerHTML = "";
-  document.getElementById('viewStatRescues').textContent = "0";
+  document.getElementById('viewStatFollowers').textContent = "0";
+  document.getElementById('viewStatFollowing').textContent = "0";
+  document.getElementById('viewStatScans').textContent = "0";
   document.getElementById('viewStatTrainings').textContent = "0";
-  document.getElementById('viewStatConnections').textContent = "0";
   document.getElementById('viewProfileRestrictedNotice').style.display = 'none';
   document.getElementById('viewProfilePublicContent').style.display = 'none';
 
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
+  modal.classList.add('active');
 
   try {
-    const data = await window.EcoSocialDB.fetchProfile(userIdOrEcoId);
+    const [data, metrics] = await Promise.all([
+      window.EcoSocialDB.fetchProfile(userIdOrEcoId),
+      getSupplementalMetrics(userIdOrEcoId)
+    ]);
     if (!data || !data.profile) {
       showToast("Could not retrieve user details.", "error");
       closeViewProfileModal();
@@ -490,9 +814,10 @@ async function openViewProfileModal(userIdOrEcoId) {
     badgesContainer.innerHTML = badgesHtml;
 
     // Engagement stats
-    document.getElementById('viewStatRescues').textContent = data.impactStats?.rescues || '0';
-    document.getElementById('viewStatTrainings').textContent = data.impactStats?.trainingsCompleted || '0';
-    document.getElementById('viewStatConnections').textContent = p.followers_count || '0';
+    document.getElementById('viewStatFollowers').textContent = p.followers_count || '0';
+    document.getElementById('viewStatFollowing').textContent = p.following_count || '0';
+    document.getElementById('viewStatScans').textContent = (metrics && metrics.scans.length) || '0';
+    document.getElementById('viewStatTrainings').textContent = (metrics && metrics.programs.length) || '0';
 
     // Follow button configuration
     const followBtn = document.getElementById('viewProfileFollowBtn');
@@ -611,6 +936,8 @@ async function handleModalFollowToggle(targetId, btnEl) {
 function closeViewProfileModal() {
   const modal = document.getElementById('viewProfileModal');
   if (modal) {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
     modal.classList.add('hidden');
     window.activeViewedProfileId = null;
   }
@@ -650,6 +977,16 @@ function closeEditProfileModal() {
 async function handleEditProfileSubmit(e) {
   e.preventDefault();
 
+  const session = getSession();
+  const currentUserId = session ? session.id : null;
+  const p = activeProfileData?.profile;
+
+  // Security: block editing other users' profiles
+  if (!p || p.id !== currentUserId) {
+    showToast('Unauthorized: You cannot edit another user\'s profile.', 'error');
+    return;
+  }
+
   const display_name = document.getElementById('editProfileName').value.trim();
   const bio = document.getElementById('editProfileBio').value.trim();
   const profession = document.getElementById('editProfileProfession').value.trim();
@@ -660,54 +997,78 @@ async function handleEditProfileSubmit(e) {
   const privacy_setting = document.getElementById('editProfilePrivacy').value;
   const avatarUrlInput = document.getElementById('editProfileAvatarUrl').value.trim();
 
-  let avatar_url = avatarUrlInput;
-
-  // Handle file uploads if present
-  const fileInput = document.getElementById('editProfileAvatarFile');
-  if (fileInput && fileInput.files && fileInput.files[0]) {
-    const file = fileInput.files[0];
-    const reader = new FileReader();
-
-    const dataUrlPromise = new Promise((resolve) => {
-      reader.onload = (event) => resolve(event.target.result);
-      reader.readAsDataURL(file);
-    });
-
-    const base64Data = await dataUrlPromise;
-    const uploadedUrl = await window.EcoSocialDB.uploadAvatar(base64Data);
-    if (uploadedUrl) {
-      avatar_url = uploadedUrl;
-    }
+  // Validation: Display name is required
+  if (!display_name) {
+    showToast('Display Name is required.', 'error');
+    return;
   }
 
-  const result = await window.EcoSocialDB.updateProfile({
-    display_name,
-    bio,
-    profession,
-    organization,
-    city,
-    country,
-    vet_status,
-    privacy_setting,
-    avatar_url
-  });
+  const saveBtn = document.getElementById('editProfileSaveBtn');
+  let originalHtml = '';
+  if (saveBtn) {
+    originalHtml = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Saving...`;
+  }
 
-  if (result) {
-    showToast('Profile updated successfully!', 'success');
-    closeEditProfileModal();
+  try {
+    let avatar_url = avatarUrlInput;
 
-    // Refresh authenticated session UI
-    const freshUser = await window.EcoSocialDB.refreshMySession();
-    if (freshUser) {
-      syncUserInterface(freshUser);
+    // Handle file uploads if present
+    const fileInput = document.getElementById('editProfileAvatarFile');
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+
+      const dataUrlPromise = new Promise((resolve) => {
+        reader.onload = (event) => resolve(event.target.result);
+        reader.readAsDataURL(file);
+      });
+
+      const base64Data = await dataUrlPromise;
+      const uploadedUrl = await window.EcoSocialDB.uploadAvatar(base64Data);
+      if (uploadedUrl) {
+        avatar_url = uploadedUrl;
+      }
     }
 
-    // Reload active dashboard
-    if (window.currentUser) {
-      loadProfileTab(window.currentUser.id);
+    const result = await window.EcoSocialDB.updateProfile({
+      display_name,
+      bio,
+      profession,
+      organization,
+      city,
+      country,
+      vet_status,
+      privacy_setting,
+      avatar_url
+    });
+
+    if (result) {
+      showToast('Profile updated successfully!', 'success');
+      closeEditProfileModal();
+
+      // Refresh authenticated session UI
+      const freshUser = await window.EcoSocialDB.refreshMySession();
+      if (freshUser) {
+        syncUserInterface(freshUser);
+      }
+
+      // Reload active dashboard
+      if (window.currentUser) {
+        loadProfileTab(window.currentUser.id);
+      }
+    } else {
+      showToast('Failed to update profile.', 'error');
     }
-  } else {
-    showToast('Failed to update profile.', 'error');
+  } catch (err) {
+    console.error('Edit Profile submit error:', err);
+    showToast('An error occurred while saving your profile.', 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = originalHtml;
+    }
   }
 }
 
@@ -716,13 +1077,67 @@ function setElText(id, txt) { const el = document.getElementById(id); if (el) el
 function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function isSelfProfile(id) { const s = getSession(); return s && s.id === id; }
 
+// ── SETTINGS MODAL HANDLERS ──
+function openSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  if (!modal || !activeProfileData || !activeProfileData.profile) return;
+  
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+  modal.classList.add('active');
+  
+  switchSettingsTab('account');
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+    modal.classList.add('hidden');
+  }
+}
+
+function switchSettingsTab(tabName) {
+  const accountBtn = document.getElementById('settingsAccountTabBtn');
+  const prefBtn = document.getElementById('settingsPrefTabBtn');
+  const container = document.getElementById('settingsModalBody');
+  if (!container || !activeProfileData) return;
+  
+  const p = activeProfileData.profile;
+  
+  if (tabName === 'account') {
+    accountBtn.classList.add('active');
+    accountBtn.style.color = 'var(--primary)';
+    accountBtn.style.borderBottom = '3px solid var(--primary)';
+    
+    prefBtn.classList.remove('active');
+    prefBtn.style.color = 'var(--text-muted)';
+    prefBtn.style.borderBottom = '3px solid transparent';
+    
+    renderAccountInfo(p, container);
+  } else {
+    prefBtn.classList.add('active');
+    prefBtn.style.color = 'var(--primary)';
+    prefBtn.style.borderBottom = '3px solid var(--primary)';
+    
+    accountBtn.classList.remove('active');
+    accountBtn.style.color = 'var(--text-muted)';
+    accountBtn.style.borderBottom = '3px solid transparent';
+    
+    renderSettings(p, container);
+  }
+}
+
 // Globalize functions
 window.loadProfileTab = loadProfileTab;
 window.switchProfileTabSection = switchProfileTabSection;
 window.openEditProfileModal = openEditProfileModal;
 window.closeEditProfileModal = closeEditProfileModal;
 window.handleEditProfileSubmit = handleEditProfileSubmit;
-window.openDirectMessageModal = openDirectMessageModal;
 window.openViewProfileModal = openViewProfileModal;
 window.closeViewProfileModal = closeViewProfileModal;
+window.openSettingsModal = openSettingsModal;
+window.closeSettingsModal = closeSettingsModal;
+window.switchSettingsTab = switchSettingsTab;
 window.viewFullReport = (id) => { window.location.href = `aiscanner.html?reportId=${id}`; };

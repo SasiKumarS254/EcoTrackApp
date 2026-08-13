@@ -6,7 +6,10 @@
 const AUTH_CONFIG = {
   sessionKey: "@ecotrack_web_session",
   themeKey: "@ecotrack_theme",
-  apiBase: "http://localhost:5000/api"
+  // Use 127.0.0.1 for CI stability
+  apiBase: (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
+           ? "http://127.0.0.1:5000/api"
+           : "https://SasiKumarS254.github.io/EcoTrackApp/api"
 };
 
 /**

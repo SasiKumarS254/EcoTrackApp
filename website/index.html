@@ -650,48 +650,33 @@
       <!-- Dashboard Layout -->
       <div class="profile-layout-v2">
 
-        <!-- Left Sidebar Navigation -->
-        <aside class="profile-side-nav">
-          <button class="side-nav-btn active" onclick="switchProfileTabSection('pets', this)">
-            <i class="fas fa-shield-cat"></i> <span>Animal Vault</span>
-          </button>
-          <button class="side-nav-btn" onclick="switchProfileTabSection('scans', this)">
+        <!-- Horizontal Responsive Tab Bar -->
+        <nav class="profile-tabs-nav">
+          <button class="profile-tab-btn active" onclick="switchProfileTabSection('scans', this)">
             <i class="fas fa-microscope"></i> <span>Scan History</span>
           </button>
-          <button class="side-nav-btn" onclick="switchProfileTabSection('posts', this)">
-            <i class="fas fa-rss"></i> <span>Activity Feed</span>
-          </button>
-          <button class="side-nav-btn" onclick="switchProfileTabSection('training', this)">
+          <button class="profile-tab-btn" onclick="switchProfileTabSection('training', this)">
             <i class="fas fa-bolt-lightning"></i> <span>Training Logs</span>
           </button>
-          <button class="side-nav-btn" onclick="switchProfileTabSection('achievements', this)">
+          <button class="profile-tab-btn" onclick="switchProfileTabSection('pets', this)">
+            <i class="fas fa-shield-cat"></i> <span>Animal Vault</span>
+          </button>
+          <button class="profile-tab-btn" onclick="switchProfileTabSection('achievements', this)">
             <i class="fas fa-award"></i> <span>Achievements</span>
           </button>
-          <button class="side-nav-btn" onclick="switchProfileTabSection('connections', this)">
+          <button class="profile-tab-btn" onclick="switchProfileTabSection('connections', this)">
             <i class="fas fa-users"></i> <span>Connections</span>
           </button>
-          <button class="side-nav-btn" onclick="switchProfileTabSection('account', this)">
-            <i class="fas fa-id-card"></i> <span>Account Info</span>
+          <button class="profile-tab-btn" onclick="switchProfileTabSection('posts', this)">
+            <i class="fas fa-rss"></i> <span>Activity Feed</span>
           </button>
-          <button class="side-nav-btn" onclick="switchProfileTabSection('settings', this)">
-            <i class="fas fa-cog"></i> <span>Settings</span>
+          <button class="profile-tab-btn" onclick="switchProfileTabSection('events', this)">
+            <i class="fas fa-calendar-alt"></i> <span>Events</span>
           </button>
-
-          <!-- Impact Mini-Card -->
-          <div class="impact-mini-card">
-            <div class="mini-card-title">Environmental Impact</div>
-            <div class="mini-impact-row">
-              <div class="mini-impact-item">
-                <i class="fas fa-leaf" style="color:var(--primary);"></i>
-                <div id="statCo2Saved">0 kg</div>
-              </div>
-              <div class="mini-impact-item">
-                <i class="fas fa-sun" style="color:#f59e0b;"></i>
-                <div id="statTreesPlanted">0</div>
-              </div>
-            </div>
-          </div>
-        </aside>
+          <button class="profile-tab-btn" onclick="switchProfileTabSection('saved', this)">
+            <i class="fas fa-bookmark"></i> <span>Saved Items</span>
+          </button>
+        </nav>
 
         <!-- Right Content Dynamic Area -->
         <div class="profile-content-v2" id="profileTabContentArea">
@@ -897,6 +882,27 @@
     </form>
   </div>
 </div>
+
+
+<!-- DYNAMIC SETTINGS MODAL -->
+<div id="settingsModal" class="modal-backdrop hidden" onclick="closeModalOnBg(event,'settingsModal')">
+  <div class="modal-card" style="max-width: 600px; width: 95%; border-radius: 24px; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+    <div class="modal-header" style="padding: 18px 24px; border-bottom: 1px solid var(--border-color); background: var(--bg-card);">
+      <h3 class="modal-title" style="font-weight: 900; margin: 0; display: flex; align-items: center; gap: 8px;"><i class="fas fa-cog" style="color: var(--primary);"></i> Settings & Account Info</h3>
+      <button class="modal-close" onclick="closeSettingsModal()">✕</button>
+    </div>
+    
+    <div style="display: flex; border-bottom: 1px solid var(--border-color); padding: 0 24px; background: var(--card-bg-subtle, rgba(255,255,255,0.02)); gap: 16px;">
+      <button class="tab-btn active" id="settingsAccountTabBtn" onclick="switchSettingsTab('account')" style="padding: 12px 4px; font-weight: 800; border-bottom: 3px solid var(--primary); background: none; border: none; color: var(--primary); cursor: pointer;">Account Info</button>
+      <button class="tab-btn" id="settingsPrefTabBtn" onclick="switchSettingsTab('preferences')" style="padding: 12px 4px; font-weight: 800; border-bottom: 3px solid transparent; background: none; border: none; color: var(--text-muted); cursor: pointer;">Preferences</button>
+    </div>
+
+    <div class="modal-body" id="settingsModalBody" style="padding: 24px; flex: 1; overflow-y: auto; max-height: 60vh;">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+
 
 
 <!-- FOLLOWERS & FOLLOWING LIST MODAL -->
@@ -1600,16 +1606,20 @@
       <!-- Stats Container -->
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; text-align: center;">
         <div style="background: var(--card-bg-subtle, rgba(255,255,255,0.03)); padding: 10px; border-radius: 12px; border: 1px solid var(--border-color);">
-          <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Rescues</div>
-          <div id="viewStatRescues" style="font-size: 18px; font-weight: 900; color: var(--primary);">0</div>
+          <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Followers</div>
+          <div id="viewStatFollowers" style="font-size: 18px; font-weight: 900; color: var(--primary);">0</div>
+        </div>
+        <div style="background: var(--card-bg-subtle, rgba(255,255,255,0.03)); padding: 10px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Following</div>
+          <div id="viewStatFollowing" style="font-size: 18px; font-weight: 900; color: var(--primary);">0</div>
+        </div>
+        <div style="background: var(--card-bg-subtle, rgba(255,255,255,0.03)); padding: 10px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">AI Scans</div>
+          <div id="viewStatScans" style="font-size: 18px; font-weight: 900; color: var(--primary);">0</div>
         </div>
         <div style="background: var(--card-bg-subtle, rgba(255,255,255,0.03)); padding: 10px; border-radius: 12px; border: 1px solid var(--border-color);">
           <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Trainings</div>
           <div id="viewStatTrainings" style="font-size: 18px; font-weight: 900; color: var(--primary);">0</div>
-        </div>
-        <div style="background: var(--card-bg-subtle, rgba(255,255,255,0.03)); padding: 10px; border-radius: 12px; border: 1px solid var(--border-color);">
-          <div style="font-size: 10.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Followers</div>
-          <div id="viewStatConnections" style="font-size: 18px; font-weight: 900; color: var(--primary);">0</div>
         </div>
       </div>
       
