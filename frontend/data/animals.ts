@@ -29,6 +29,70 @@ export interface Animal {
   breeds?: string[];
 }
 
+const VERIFIED_WIKIMEDIA_IMAGE_BANK: Record<string, { url: string }> = {
+  "bengal tiger": { url: "https://upload.wikimedia.org/wikipedia/commons/1/17/Tiger_in_Ranthambhore.jpg" },
+  "siberian tiger": { url: "https://upload.wikimedia.org/wikipedia/commons/1/17/Tiger_in_Ranthambhore.jpg" },
+  "tiger": { url: "https://upload.wikimedia.org/wikipedia/commons/1/17/Tiger_in_Ranthambhore.jpg" },
+  "african lion": { url: "https://upload.wikimedia.org/wikipedia/commons/7/73/Lion_waiting_in_Namibia.jpg" },
+  "lion": { url: "https://upload.wikimedia.org/wikipedia/commons/7/73/Lion_waiting_in_Namibia.jpg" },
+  "cheetah": { url: "https://upload.wikimedia.org/wikipedia/commons/0/09/Cheetah_%28Acinonyx_jubatus%29_female_2.jpg" },
+  "jaguar": { url: "https://upload.wikimedia.org/wikipedia/commons/0/0a/Standing_jaguar.jpg" },
+  "african leopard": { url: "https://upload.wikimedia.org/wikipedia/commons/a/a1/African_leopard_male.jpg" },
+  "leopard": { url: "https://upload.wikimedia.org/wikipedia/commons/a/a1/African_leopard_male.jpg" },
+  "gray wolf": { url: "https://upload.wikimedia.org/wikipedia/commons/5/5a/Canis_lupus_standing_in_snow.jpg" },
+  "wolf": { url: "https://upload.wikimedia.org/wikipedia/commons/5/5a/Canis_lupus_standing_in_snow.jpg" },
+  "red fox": { url: "https://upload.wikimedia.org/wikipedia/commons/3/30/Vulpes_vulpes_standing_in_snow2.jpg" },
+  "fox": { url: "https://upload.wikimedia.org/wikipedia/commons/3/30/Vulpes_vulpes_standing_in_snow2.jpg" },
+  "grizzly bear": { url: "https://upload.wikimedia.org/wikipedia/commons/7/71/Brown_bear_in_Finland.jpg" },
+  "bear": { url: "https://upload.wikimedia.org/wikipedia/commons/7/71/Brown_bear_in_Finland.jpg" },
+  "african elephant": { url: "https://upload.wikimedia.org/wikipedia/commons/3/37/African_Bush_Elephant.jpg" },
+  "elephant": { url: "https://upload.wikimedia.org/wikipedia/commons/3/37/African_Bush_Elephant.jpg" },
+  "giraffe": { url: "https://upload.wikimedia.org/wikipedia/commons/9/9e/Giraffe_Masai_Mara.jpg" },
+  "zebra": { url: "https://upload.wikimedia.org/wikipedia/commons/e/e3/Plains_Zebra_Equus_quagga.jpg" },
+  "mountain gorilla": { url: "https://upload.wikimedia.org/wikipedia/commons/0/0d/Mountain_Gorilla_Rwanda.jpg" },
+  "gorilla": { url: "https://upload.wikimedia.org/wikipedia/commons/0/0d/Mountain_Gorilla_Rwanda.jpg" },
+  "monkey": { url: "https://upload.wikimedia.org/wikipedia/commons/4/40/Tufted_Capuchin_Sapajus_apella.jpg" },
+  "common bottlenose dolphin": { url: "https://upload.wikimedia.org/wikipedia/commons/1/10/Tursiops_truncatus_01.jpg" },
+  "dolphin": { url: "https://upload.wikimedia.org/wikipedia/commons/1/10/Tursiops_truncatus_01.jpg" },
+  "german shepherd": { url: "https://upload.wikimedia.org/wikipedia/commons/d/d0/German_Shepherd_-_DSC_0171_%282189940656%29.jpg" },
+  "dog": { url: "https://upload.wikimedia.org/wikipedia/commons/2/26/Yellow_Labrador_Retriever_2008-05-02.jpg" },
+  "cat": { url: "https://upload.wikimedia.org/wikipedia/commons/1/15/White_Persian_Cat.jpg" },
+  "bald eagle": { url: "https://upload.wikimedia.org/wikipedia/commons/1/1a/About_to_Launch_%282607818027%29.jpg" },
+  "eagle": { url: "https://upload.wikimedia.org/wikipedia/commons/1/1a/About_to_Launch_%282607818027%29.jpg" },
+  "falcon": { url: "https://upload.wikimedia.org/wikipedia/commons/c/c3/Peregrine_Falcon_USFWS.jpg" },
+  "owl": { url: "https://upload.wikimedia.org/wikipedia/commons/a/a2/Snowy_Owl_-_Bubo_scandiacus.jpg" },
+  "frog": { url: "https://upload.wikimedia.org/wikipedia/commons/5/55/Red-eyed_Tree_Frog_%28Agalychnis_callidryas%29_1.jpg" },
+  "turtle": { url: "https://upload.wikimedia.org/wikipedia/commons/9/91/Green_turtle_swimming.jpg" }
+};
+
+export function getSpeciesImage(name: string): string {
+  const n = name.toLowerCase().trim();
+  const keys = Object.keys(VERIFIED_WIKIMEDIA_IMAGE_BANK).sort((a, b) => b.length - a.length);
+  for (const k of keys) {
+    if (n.includes(k)) return VERIFIED_WIKIMEDIA_IMAGE_BANK[k].url;
+  }
+  if (n.includes("elephant")) return VERIFIED_WIKIMEDIA_IMAGE_BANK["elephant"].url;
+  if (n.includes("tiger"))    return VERIFIED_WIKIMEDIA_IMAGE_BANK["tiger"].url;
+  if (n.includes("lion"))     return VERIFIED_WIKIMEDIA_IMAGE_BANK["lion"].url;
+  if (n.includes("gorilla"))  return VERIFIED_WIKIMEDIA_IMAGE_BANK["gorilla"].url;
+  if (n.includes("dolphin") || n.includes("whale")) return VERIFIED_WIKIMEDIA_IMAGE_BANK["dolphin"].url;
+  if (n.includes("wolf"))     return VERIFIED_WIKIMEDIA_IMAGE_BANK["wolf"].url;
+  if (n.includes("bear"))     return VERIFIED_WIKIMEDIA_IMAGE_BANK["bear"].url;
+  if (n.includes("fox"))      return VERIFIED_WIKIMEDIA_IMAGE_BANK["fox"].url;
+  if (n.includes("leopard"))  return VERIFIED_WIKIMEDIA_IMAGE_BANK["leopard"].url;
+  if (n.includes("eagle"))    return VERIFIED_WIKIMEDIA_IMAGE_BANK["eagle"].url;
+  if (n.includes("owl"))      return VERIFIED_WIKIMEDIA_IMAGE_BANK["owl"].url;
+  if (n.includes("frog"))     return VERIFIED_WIKIMEDIA_IMAGE_BANK["frog"].url;
+  if (n.includes("turtle"))   return VERIFIED_WIKIMEDIA_IMAGE_BANK["turtle"].url;
+  if (n.includes("monkey") || n.includes("primate") || n.includes("ape")) return VERIFIED_WIKIMEDIA_IMAGE_BANK["monkey"].url;
+  if (n.includes("giraffe"))  return VERIFIED_WIKIMEDIA_IMAGE_BANK["giraffe"].url;
+  if (n.includes("zebra"))    return VERIFIED_WIKIMEDIA_IMAGE_BANK["zebra"].url;
+  if (n.includes("dog"))      return VERIFIED_WIKIMEDIA_IMAGE_BANK["dog"].url;
+  if (n.includes("cat"))      return VERIFIED_WIKIMEDIA_IMAGE_BANK["cat"].url;
+
+  return VERIFIED_WIKIMEDIA_IMAGE_BANK["dolphin"].url;
+}
+
 const curatedBase: Animal[] = [
   {
     id: 1,
@@ -51,7 +115,7 @@ const curatedBase: Animal[] = [
     funFact: "Elephants are the only animals that cannot jump.",
     emoji: "🐘",
     tags: ["mammal", "large", "africa", "endangered"],
-    imageUrl: "assets/species_images/species_1.jpg",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/3/37/African_Bush_Elephant.jpg",
     longDescription: "The African elephant is a genus comprising two living elephant species, the African bush elephant and the smaller African forest elephant.",
     breeds: ["African Bush Elephant", "African Forest Elephant"],
   },
@@ -76,7 +140,7 @@ const curatedBase: Animal[] = [
     funFact: "Tigers are the only cat species that is a truly solitary hunter.",
     emoji: "🐯",
     tags: ["mammal", "cat", "asia", "predator", "endangered"],
-    imageUrl: "assets/species_images/species_2.jpg",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/17/Tiger_in_Ranthambhore.jpg",
   },
   {
     id: 38,
@@ -99,7 +163,7 @@ const curatedBase: Animal[] = [
     funFact: "Gorillas build a new nest every night.",
     emoji: "🦍",
     tags: ["mammal", "primate", "africa", "intelligent"],
-    imageUrl: "assets/species_images/species_38.jpg",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/0/0d/Mountain_Gorilla_Rwanda.jpg",
   },
   {
     id: 31,
@@ -122,7 +186,7 @@ const curatedBase: Animal[] = [
     funFact: "A giraffe's tongue can be 45 cm long.",
     emoji: "🦒",
     tags: ["mammal", "tall", "africa"],
-    imageUrl: "assets/species_images/species_31.jpg",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/9/9e/Giraffe_Masai_Mara.jpg",
   },
   {
     id: 60,
@@ -145,7 +209,7 @@ const curatedBase: Animal[] = [
     funFact: "No two zebras have the same stripe pattern.",
     emoji: "🦓",
     tags: ["mammal", "stripes", "africa"],
-    imageUrl: "assets/species_images/species_60.jpg",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/e/e3/Plains_Zebra_Equus_quagga.jpg",
   }
 ];
 
@@ -228,7 +292,7 @@ const generatedAnimals: Animal[] = animalNames.map((name, index) => {
     funFact: `The ${name} is recognized globally for its unique biological traits.`,
     emoji: "🐾",
     tags: ["curated", "verified", "hd"],
-    imageUrl: `assets/species_images/species_${30 + index}.jpg`
+    imageUrl: getSpeciesImage(name)
   };
 });
 

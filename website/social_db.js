@@ -7,7 +7,7 @@
  */
 
 const EcoSocialDB = {
-  apiBase: 'http://localhost:5000/api/social',
+  apiBase: (typeof AUTH_CONFIG !== 'undefined' && AUTH_CONFIG.apiBase) ? `${AUTH_CONFIG.apiBase}/social` : 'http://127.0.0.1:5000/api/social',
 
   // ── Helper: get auth token from session ──
   getAuthHeader() {
@@ -15,15 +15,14 @@ const EcoSocialDB = {
       const raw = localStorage.getItem(AUTH_CONFIG.sessionKey);
       if (raw) {
         const sess = JSON.parse(raw);
-        if (sess && sess.token) {
-          return {
-            'Authorization': `Bearer ${sess.token}`,
-            'Content-Type': 'application/json'
-          };
-        }
+        const headers = { 'Content-Type': 'application/json' };
+        if (sess && sess.id) headers['x-user-id'] = sess.id;
+        if (sess && sess.token) headers['Authorization'] = `Bearer ${sess.token}`;
+        return headers;
       }
     } catch (e) {}
-    return { 'Content-Type': 'application/json' };
+    const curId = (typeof currentUser !== 'undefined' && currentUser?.id) || (typeof window !== 'undefined' && window.currentUser?.id) || 'usr1';
+    return { 'Content-Type': 'application/json', 'x-user-id': curId };
   },
 
   // ── POSTS ──
@@ -102,6 +101,7 @@ const EcoSocialDB = {
     return null;
   },
 
+
   async addComment(postId, text) {
     try {
       const res = await fetch(`${this.apiBase}/posts/${postId}/comments`, {
@@ -110,11 +110,14 @@ const EcoSocialDB = {
         body: JSON.stringify({ text })
       });
       if (res.ok) return await res.json();
+      const errBody = await res.json().catch(() => ({}));
+      console.warn('addComment failed:', res.status, errBody);
     } catch (e) {
       console.warn('addComment API failed:', e.message);
     }
     return null;
   },
+
 
   async addReply(commentId, postId, text) {
     try {
@@ -412,7 +415,7 @@ const EcoSocialDB = {
   // ── NOTIFICATIONS ──
   async fetchNotifications() {
     try {
-      const res = await fetch('http://localhost:5000/api/social/notifications', {
+      const res = await fetch(`${this.apiBase}/notifications`, {
         headers: this.getAuthHeader()
       });
       if (res.ok) {

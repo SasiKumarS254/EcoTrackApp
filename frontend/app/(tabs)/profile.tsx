@@ -1,476 +1,1306 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
-  Alert, TextInput, Modal, StatusBar, Dimensions, ActivityIndicator,
-  FlatList, Share
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Image, TextInput, Alert, StatusBar, Modal, Dimensions, Share
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize, Spacing } from "@/constants/theme";
-import { router, useFocusEffect } from "expo-router";
+import { Radius, Shadow, FontSize } from "@/constants/theme";
 import {
-  fetchMySocialProfile,
-  updateSocialProfile,
-  fetchScanHistory,
-  fetchFollowers,
-  fetchFollowing,
-  fetchSavedPosts,
   fetchRegisteredEvents,
   fetchCommunityPosts,
-  fetchTrainingPrograms,
-  fetchEvents,
+  fetchFullUserProfile,
+  addPet,
   createCommunityPost,
-  STORAGE_KEYS
 } from "../../services/api";
 
-const { width } = Dimensions.get("window");
 
-type TabConfig = {
-  id: string;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-};
-
-const TABS: TabConfig[] = [
-  { id: "pets", label: "Vault", icon: "paw" },
-  { id: "scans", label: "Scans", icon: "scan" },
-  { id: "posts", label: "Posts", icon: "document-text" },
-  { id: "training", label: "Training", icon: "fitness" },
-  { id: "achievements", label: "Badges", icon: "trophy" },
-  { id: "connections", label: "Network", icon: "people" },
-  { id: "saved", label: "Bookmarks", icon: "bookmark" },
-  { id: "events", label: "Tickets", icon: "calendar" }
-];
 
 export default function ProfileScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, toggleTheme } = useTheme();
+  const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
 
-  const [profile, setProfile] = useState<any>(null);
-  const [pets, setPets] = useState<any[]>([]);
-  const [scans, setScans] = useState<any[]>([]);
-  const [posts, setPosts] = useState<any[]>([]);
-  const [programs, setPrograms] = useState<any[]>([]);
-  const [achievements, setAchievements] = useState<any[]>([]);
-  const [followers, setFollowers] = useState<any[]>([]);
-  const [following, setFollowing] = useState<any[]>([]);
-  const [savedPosts, setSavedPosts] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<"posts" | "saved" | "passes" | "scans" | "pets" | "achievements">("posts");
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("pets");
-  const [editModal, setEditModal] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  // Edit Profile Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [name, setName] = useState("");
+  const [bio, setBio] = useState("");
+  const [location, setLocation] = useState("");
+  const [role, setRole] = useState("");
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
-  const [editForm, setEditForm] = useState({
-    display_name: "",
-    bio: "",
-    profession: "",
-    organization: "",
-    city: "",
-    country: ""
-  });
+  // Animal Vault Modal & Form
+  const [showAddPetModal, setShowAddPetModal] = useState(false);
+  const [petName, setPetName] = useState("");
+  const [petSpecies, setPetSpecies] = useState("");
+  const [petBreed, setPetBreed] = useState("");
+  const [petAge, setPetAge] = useState("");
+  const [petWeight, setPetWeight] = useState("");
+  const [isSavingPet, setIsSavingPet] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchFullProfile();
-    }, [])
-  );
+  const [myPosts, setMyPosts] = useState<any[]>([]);
+  const [myScans, setMyScans] = useState<any[]>([]);
+  const [myPasses, setMyPasses] = useState<any[]>([]);
+  const [myPets, setMyPets] = useState<any[]>([]);
+  const [myAchievements, setMyAchievements] = useState<any[]>([
+    {
+      id: "ach_1",
+      name: "Certified Trainer",
+      icon: "🏋️",
+      desc: "Register your first custom AI training program.",
+      color: "#10b981",
+    },
+    {
+      id: "ach_2",
+      name: "Master Welfare Coach",
+      icon: "🎓",
+      desc: "Register 3 or more AI training programs.",
+      color: "#f59e0b",
+    },
+    {
+      id: "ach_3",
+      name: "AI Bio-Scanner Pioneer",
+      icon: "🔬",
+      desc: "Perform your first AI pose estimation scan.",
+      color: "#06b6d4",
+    },
+    {
+      id: "ach_4",
+      name: "Elite Species Analyst",
+      icon: "🧬",
+      desc: "Perform 5 or more AI pose estimation scans.",
+      color: "#8b5cf6",
+    },
+  ]);
 
-  const fetchFullProfile = async () => {
+  const handlePickAvatar = async () => {
     try {
-      setIsLoading(true);
-      const data = await fetchMySocialProfile();
-      if (data && data.profile) {
-        setProfile(data.profile);
-        setPets(data.pets || []);
-        setAchievements(data.achievements || []);
-
-        setEditForm({
-          display_name: data.profile.display_name || data.profile.name || "",
-          bio: data.profile.bio || "",
-          profession: data.profile.profession || "",
-          organization: data.profile.organization || "",
-          city: data.profile.city || "",
-          country: data.profile.country || ""
-        });
-
-        const uId = data.profile.id;
-        const [scansData, postsData, programsData, followersData, followingData, savedData, eventsData] = await Promise.all([
-          fetchScanHistory(uId).catch(() => []),
-          fetchCommunityPosts(uId).catch(() => []),
-          fetchTrainingPrograms(uId).catch(() => []),
-          fetchFollowers(uId).catch(() => []),
-          fetchFollowing(uId).catch(() => []),
-          fetchSavedPosts().catch(() => []),
-          fetchRegisteredEvents(uId).catch(() => [])
-        ]);
-
-        setScans(scansData || []);
-        setPosts(postsData || []);
-        setPrograms(programsData || []);
-        setFollowers(followersData || []);
-        setFollowing(followingData || []);
-        setSavedPosts(savedData || []);
-        setEvents(eventsData || []);
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Required", "Media library access is needed to choose profile photo.");
+        return;
       }
-    } catch (e) {
-      console.warn("Profile fetch error", e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSaveProfile = async () => {
-    setIsSaving(true);
-    try {
-      const res = await updateSocialProfile(editForm);
-      if (res) {
-        setEditModal(false);
-        fetchFullProfile();
-        Alert.alert("Success", "Profile updated successfully.");
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        setAvatarUri(res.assets[0].uri);
       }
     } catch {
-      Alert.alert("Error", "Could not sync changes.");
-    } finally {
-      setIsSaving(false);
+      Alert.alert("Picker Error", "Could not choose photo from gallery.");
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert("Logout", "Sign out of your session?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: async () => {
-        await AsyncStorage.multiRemove([STORAGE_KEYS.AUTH, STORAGE_KEYS.USER_ID, STORAGE_KEYS.SESSION]);
-        router.replace("/auth");
-      }}
-    ]);
+  const handleTakeAvatarPhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Camera Permission Required", "Camera access is needed to capture profile photo.");
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        setAvatarUri(res.assets[0].uri);
+      }
+    } catch (e) {
+      Alert.alert("Camera Error", "Could not open camera.");
+    }
   };
 
-  if (isLoading) {
-    return (
-      <View style={[styles.center, { backgroundColor: colors.bgLight }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
 
-  const locText = (profile?.city && profile?.country) ? `${profile.city}, ${profile.country}` : (profile?.city || profile?.country || "Earth");
+  useEffect(() => {
+    let active = true;
+
+    async function loadData() {
+      try {
+        const sessionRaw = await AsyncStorage.getItem("@ecotrack_user_session");
+        if (!active || !sessionRaw) return;
+
+        const u = JSON.parse(sessionRaw);
+        setUser(u);
+        setAvatarUri(u.avatar_url || u.avatar || null);
+        const resolvedName = u.name || u.display_name || (u.email ? u.email.split("@")[0] : "EcoTrack Member");
+        setName(resolvedName);
+        setBio(u.bio || "EcoTrack Wildlife & Companion Animal Welfare Member");
+        setLocation(u.location || "Active Member");
+        setRole(
+          u.role === "admin"
+            ? "System Administrator"
+            : u.role === "seller"
+            ? "Verified Shelter / Breeder"
+            : "Community Member"
+        );
+
+        const activeId = u.user_id || u.id;
+        if (activeId) {
+          // Fetch real passes from registered events
+          try {
+            const passes = await fetchRegisteredEvents(activeId);
+            if (active && Array.isArray(passes)) {
+              setMyPasses(
+                passes.map((p: any) => ({
+                  id: p.ticket_id || `PASS-${p.id || "REG"}`,
+                  title: p.title || p.name || "Community Event",
+                  venue: p.location || "EcoTrack Venue",
+                  date: p.date || p.date_str || "Scheduled",
+                }))
+              );
+            }
+          } catch (err) {
+            console.warn("Could not load passes:", err);
+          }
+
+          // Fetch real community posts created by this user
+          try {
+            const allPosts = await fetchCommunityPosts();
+            if (active && Array.isArray(allPosts)) {
+              const userPosts = allPosts.filter(
+                (p: any) => p.user_id === activeId || p.author_name === resolvedName
+              );
+              setMyPosts(
+                userPosts.map((p: any) => ({
+                  id: p.id,
+                  title: p.caption || p.content || "Community Update",
+                  date: p.created_at || "Recent",
+                  likes: p.likes_count ?? p.likes ?? 0,
+                  comments: Array.isArray(p.comments) ? p.comments.length : 0,
+                }))
+              );
+            }
+          } catch (err) {
+            console.warn("Could not load user posts:", err);
+          }
+
+          // Fetch user scans from local history or backend
+          try {
+            const scansRaw = await AsyncStorage.getItem("@ecotrack_scans_history");
+            if (active && scansRaw) {
+              const parsedScans = JSON.parse(scansRaw);
+              if (Array.isArray(parsedScans)) {
+                setMyScans(
+                  parsedScans.map((s: any, idx: number) => ({
+                    id: s.id || `scan_${idx + 1}`,
+                    species: s.species || "Canine",
+                    exercise: s.exercise || "Gait Kinematics",
+                    grade: s.grade || "Grade A",
+                    score: s.score || 93,
+                    date: s.date || "Recent Scan",
+                  }))
+                );
+              }
+            }
+          } catch (err) {
+            console.warn("Could not load scans:", err);
+          }
+
+          // Fetch full profile (Animal Vault & Achievements)
+          try {
+            const full = await fetchFullUserProfile(activeId);
+            if (active && full) {
+              if (Array.isArray(full.pets)) setMyPets(full.pets);
+              if (Array.isArray(full.achievements) && full.achievements.length > 0) {
+                setMyAchievements(
+                  full.achievements.map((a: any) => ({
+                    id: a.id || a.badge_code || `ach_${Math.random()}`,
+                    name: a.badge_name || a.name || a.title || "Welfare Advocate",
+                    icon: a.icon || "🏆",
+                    desc: a.description || a.desc || "Conservation achievement unlocked.",
+                    color: a.color || "#10b981",
+                  }))
+                );
+              }
+            }
+          } catch (err) {
+            console.warn("Could not load full profile data:", err);
+          }
+        }
+      } catch (e) {
+        console.warn("Error loading user profile", e);
+      }
+    }
+
+    loadData();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSaveProfile = async () => {
+    const updated = {
+      ...user,
+      name,
+      display_name: name,
+      bio,
+      location,
+      role,
+      avatar_url: avatarUri || user?.avatar_url || user?.avatar,
+      avatar: avatarUri || user?.avatar || user?.avatar_url,
+    };
+    setUser(updated);
+    await AsyncStorage.setItem("@ecotrack_user_session", JSON.stringify(updated));
+    setShowEditModal(false);
+    Alert.alert("Profile Updated ✨", "Your profile details have been saved.");
+  };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to log out of your EcoTrack account?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: async () => {
+            await AsyncStorage.removeItem("@ecotrack_user_session");
+            await AsyncStorage.removeItem("@ecotrack_auth_token");
+            await AsyncStorage.setItem("@ecotrack_logged_out", "true");
+            router.replace("/auth/login");
+          },
+        },
+      ]
+    );
+  };
+
+  const handleShareAchievement = async (badgeName: string, icon: string) => {
+    try {
+      const text = `🏆 I just unlocked the "${badgeName}" achievement on EcoTrack! ${icon}\nJoin me in protecting animal welfare!`;
+      try {
+        await createCommunityPost({
+          content: text,
+          caption: text,
+          post_type: "achievement",
+        });
+      } catch (e) {}
+
+      await Share.share({
+        message: text,
+        title: `EcoTrack Achievement: ${badgeName}`,
+      });
+    } catch (err: any) {
+      Alert.alert("Achievement Unlocked! 🏆", `Shared "${badgeName}" achievement.`);
+    }
+  };
+
+  const handleAddPetSubmit = async () => {
+    if (!petName.trim() || !petSpecies.trim()) {
+      Alert.alert("Required Fields", "Please enter both Animal Name and Species.");
+      return;
+    }
+    setIsSavingPet(true);
+    try {
+      const newPet = {
+        name: petName.trim(),
+        species: petSpecies.trim(),
+        breed: petBreed.trim() || "Standard Breed",
+        age: petAge.trim() || "1 Year",
+        weight: petWeight.trim() || "10 kg",
+      };
+      const res = await addPet(newPet);
+      if (res && res.pet) {
+        setMyPets((prev) => [res.pet, ...prev]);
+      } else {
+        setMyPets((prev) => [{ id: `pet_${Date.now()}`, ...newPet }, ...prev]);
+      }
+      setShowAddPetModal(false);
+      setPetName("");
+      setPetSpecies("");
+      setPetBreed("");
+      setPetAge("");
+      setPetWeight("");
+      Alert.alert("Animal Registered 🐾", `${newPet.name} has been added to your Animal Vault!`);
+    } catch (e: any) {
+      Alert.alert("Registration Failed", e?.message || "Could not register animal.");
+    } finally {
+      setIsSavingPet(false);
+    }
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bgLight }]}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.bgLight} />
 
-      {/* HERO SECTION */}
-      <View style={styles.hero}>
-        <Image source={{ uri: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=800" }} style={styles.heroCover} />
-        <LinearGradient colors={["transparent", "rgba(0,0,0,0.85)"]} style={styles.heroOverlay} />
+      {/* TOP HEADER */}
+      <View style={styles.topHeader}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/(tabs)");
+              }
+            }}
+          >
+            <Ionicons name="arrow-back" size={18} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <View style={styles.topIconWrap}>
+            <Ionicons name="person" size={20} color="#fff" />
+          </View>
+          <View>
+            <Text style={styles.topTitle}>My Profile</Text>
+            <Text style={styles.topSub}>Credentials & Welfare Records</Text>
+          </View>
+        </View>
 
-        <View style={styles.heroContent}>
-          <View style={styles.profileRow}>
-            <View style={[styles.avatarBox, { borderColor: colors.primary }]}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, { backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }]}>
-                  <Text style={styles.avatarInitial}>{(profile?.display_name || profile?.name || "E").charAt(0).toUpperCase()}</Text>
-                </View>
-              )}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={16} color={colors.danger} />
+          <Text style={styles.logoutBtnText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* HERO CARD */}
+        <View style={styles.profileHeroCard}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.avatarWrap}>
+              <Text style={styles.avatarText}>
+                {name ? name.charAt(0).toUpperCase() : "U"}
+              </Text>
             </View>
-            <View style={styles.profileMeta}>
-              <Text style={styles.profileName} numberOfLines={1}>{profile?.display_name || profile?.name}</Text>
-              <Text style={styles.profileRole}>{profile?.profession || "EcoTracker"}</Text>
-              <View style={styles.locRow}>
-                <Ionicons name="location" size={12} color="#10b981" />
-                <Text style={styles.locText}>{locText}</Text>
+
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <Text style={styles.profileName}>{name || "EcoTrack Member"}</Text>
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
+                </View>
+              </View>
+
+              <Text style={styles.profileRole}>{role || "Community Member"}</Text>
+
+              <View style={styles.metaRow}>
+                <Ionicons name="mail-outline" size={12} color={colors.textMuted} />
+                <Text style={styles.metaText}>{user?.email || "verified_member@ecotrack.org"}</Text>
+              </View>
+
+              <View style={styles.metaRow}>
+                <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+                <Text style={styles.metaText}>{location || "Active Member"}</Text>
+                <Text style={styles.metaDot}>•</Text>
+                <Text style={styles.metaText}>Member since 2026</Text>
               </View>
             </View>
           </View>
 
-          <View style={styles.statRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statVal}>{followers.length}</Text>
-              <Text style={styles.statLab}>Followers</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statVal}>{scans.length}</Text>
-              <Text style={styles.statLab}>Scans</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statVal}>{profile?.reputation_score || 100}</Text>
-              <Text style={styles.statLab}>XP</Text>
-            </View>
-          </View>
-        </View>
+          <Text style={styles.profileBio}>{bio || "EcoTrack Wildlife & Companion Animal Welfare Member"}</Text>
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerBtn} onPress={() => setEditModal(true)}>
-            <Ionicons name="create-outline" size={20} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerBtn} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* TABS */}
-      <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-          {TABS.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[styles.tabItem, activeTab === tab.id && { borderBottomColor: colors.primary, borderBottomWidth: 3 }]}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              <Ionicons name={tab.icon} size={16} color={activeTab === tab.id ? colors.primary : colors.textMuted} style={{ marginRight: 6 }} />
-              <Text style={[styles.tabText, { color: activeTab === tab.id ? colors.primary : colors.textMuted }]}>{tab.label}</Text>
+          {/* Action Buttons Row */}
+          <View style={styles.profileActionRow}>
+            <TouchableOpacity style={styles.editProfileBtn} onPress={() => setShowEditModal(true)}>
+              <Ionicons name="create-outline" size={15} color={colors.primary} />
+              <Text style={styles.editProfileBtnText}>Edit Profile</Text>
             </TouchableOpacity>
-          ))}
+
+            <TouchableOpacity
+              style={styles.switchAccountBtn}
+              onPress={() => router.push("/auth/login")}
+            >
+              <Ionicons name="swap-horizontal" size={15} color="#0284c7" />
+              <Text style={styles.switchAccountBtnText}>Switch / Web Login</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Glass Stats Bar */}
+          <View style={styles.statsBar}>
+            <View style={styles.statBox}>
+              <Text style={styles.statVal}>{user?.reputation_score || 100}</Text>
+              <Text style={styles.statLab}>REPUTATION</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statBox}>
+              <Text style={styles.statVal}>{myScans.length}</Text>
+              <Text style={styles.statLab}>SCANS</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statBox}>
+              <Text style={styles.statVal}>{myPosts.length}</Text>
+              <Text style={styles.statLab}>POSTS</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statBox}>
+              <Text style={styles.statVal}>{myPasses.length}</Text>
+              <Text style={styles.statLab}>PASSES</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* TABS NAVIGATION */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: 16, marginTop: 14 }}>
+          <View style={[styles.tabsRow, { marginHorizontal: 0, marginTop: 0 }]}>
+            {[
+              { key: "posts", label: "My Posts" },
+              { key: "scans", label: "AI Scans" },
+              { key: "passes", label: "Pass Vault" },
+              { key: "pets", label: "Animal Vault" },
+              { key: "achievements", label: "Badges" },
+            ].map((t) => (
+              <TouchableOpacity
+                key={t.key}
+                style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]}
+                onPress={() => setActiveTab(t.key as any)}
+              >
+                <Text style={[styles.tabBtnText, activeTab === t.key && styles.tabBtnTextActive]}>
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </ScrollView>
-      </View>
 
-      {/* CONTENT */}
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* PETS VAULT */}
-        {activeTab === "pets" && (
-          <View style={styles.grid}>
-            {pets.length === 0 ? (
-              <View style={styles.empty}><Text style={{ color: colors.textMuted }}>No registered pets</Text></View>
-            ) : (
-              pets.map((p, i) => (
-                <View key={i} style={[styles.petCard, { backgroundColor: colors.bgCard }]}>
-                  <Image source={{ uri: p.image || "https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?w=200" }} style={styles.petThumb} />
-                  <Text style={[styles.petName, { color: colors.textPrimary }]}>{p.name}</Text>
-                  <Text style={styles.petSub}>{p.breed || p.species}</Text>
-                </View>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* SCANS HISTORY */}
-        {activeTab === "scans" && (
-          <View style={styles.list}>
-            {scans.length === 0 ? (
-              <View style={styles.empty}><Text style={{ color: colors.textMuted }}>No scan history</Text></View>
-            ) : (
-              scans.map((s, i) => (
-                <TouchableOpacity key={i} style={[styles.scanItem, { backgroundColor: colors.bgCard }]} onPress={() => router.push({ pathname: "/scanReport", params: { data: JSON.stringify(s) } })}>
-                  <View style={[styles.gradeCircle, { backgroundColor: colors.primary + "20" }]}>
-                    <Text style={[styles.gradeText, { color: colors.primary }]}>{s.grade || "B"}</Text>
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>{s.detectedSpecies} Analysis</Text>
-                    <Text style={styles.itemSub}>{new Date(s.timestamp).toLocaleDateString()} • {s.exerciseName || "Free Scan"}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* POSTS */}
+        {/* TAB CONTENTS */}
         {activeTab === "posts" && (
-          <View style={styles.list}>
-            {posts.length === 0 ? (
-              <View style={styles.empty}><Text style={{ color: colors.textMuted }}>No shared posts</Text></View>
-            ) : (
-              posts.map((p, i) => (
-                <View key={i} style={[styles.postCard, { backgroundColor: colors.bgCard }]}>
-                  <Text style={[styles.postText, { color: colors.textPrimary }]}>{p.caption || p.content}</Text>
-                  <Text style={styles.postDate}>{p.time || new Date(p.timestamp).toLocaleDateString()}</Text>
-                </View>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* TRAINING PROGRAMS */}
-        {activeTab === "training" && (
-          <View style={styles.list}>
-            {programs.length === 0 ? (
-              <View style={styles.empty}><Text style={{ color: colors.textMuted }}>No active programs</Text></View>
-            ) : (
-              programs.map((p, i) => (
-                <TouchableOpacity key={i} style={[styles.progCard, { backgroundColor: colors.bgCard }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>{p.name || p.species}</Text>
-                    <View style={styles.progBarBg}><View style={[styles.progBarFill, { width: `${p.progress || 0}%`, backgroundColor: colors.primary }]} /></View>
-                    <Text style={styles.itemSub}>Completion: {p.progress || 0}%</Text>
-                  </View>
-                  <Ionicons name="fitness" size={24} color={colors.primary} />
+          <View style={styles.tabContentList}>
+            {myPosts.length === 0 ? (
+              <View style={styles.emptyActivity}>
+                <Ionicons name="chatbubbles-outline" size={36} color={colors.textMuted} />
+                <Text style={styles.emptyTitle}>No Posts Yet</Text>
+                <Text style={styles.emptySub}>Share observations and updates in the Community feed.</Text>
+                <TouchableOpacity style={styles.emptyActionBtn} onPress={() => router.push("/community")}>
+                  <Text style={styles.emptyActionBtnText}>Go to Community</Text>
                 </TouchableOpacity>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* ACHIEVEMENTS */}
-        {activeTab === "achievements" && (
-          <View style={styles.grid}>
-            {achievements.length === 0 ? (
-              <View style={styles.empty}><Text style={{ color: colors.textMuted }}>No badges earned yet</Text></View>
+              </View>
             ) : (
-              achievements.map((a, i) => (
-                <View key={i} style={[styles.achCard, { backgroundColor: colors.bgCard }]}>
-                  <Text style={styles.achEmoji}>{a.icon || "🏆"}</Text>
-                  <Text style={[styles.achName, { color: colors.textPrimary }]} numberOfLines={1}>{a.badge_name}</Text>
-                  <Text style={styles.achDesc} numberOfLines={2}>{a.description}</Text>
+              myPosts.map((p, idx) => (
+                <View key={`post-${p.id || idx}-${idx}`} style={styles.itemCard}>
+                  <Text style={styles.itemTitle}>{p.title}</Text>
+                  <View style={styles.itemMetaRow}>
+                    <Text style={styles.itemDate}>{p.date}</Text>
+                    <Text style={styles.metaDot}>•</Text>
+                    <Text style={styles.itemDate}>❤️ {p.likes} Likes</Text>
+                    <Text style={styles.metaDot}>•</Text>
+                    <Text style={styles.itemDate}>💬 {p.comments} Comments</Text>
+                  </View>
                 </View>
               ))
             )}
           </View>
         )}
 
-        {/* TICKETS VAULT */}
-        {activeTab === "events" && (
-          <View style={styles.list}>
-            {events.length === 0 ? (
-              <View style={styles.empty}><Text style={{ color: colors.textMuted }}>No digital passes found</Text></View>
+        {activeTab === "scans" && (
+          <View style={styles.tabContentList}>
+            {myScans.length === 0 ? (
+              <View style={styles.emptyActivity}>
+                <Ionicons name="scan-outline" size={36} color={colors.textMuted} />
+                <Text style={styles.emptyTitle}>No Scans Recorded</Text>
+                <Text style={styles.emptySub}>Analyze quadruped gait and postures with the AI Scanner.</Text>
+                <TouchableOpacity style={styles.emptyActionBtn} onPress={() => router.push("/aiscanner")}>
+                  <Text style={styles.emptyActionBtnText}>Launch AI Scanner</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
-              events.map((ev, i) => {
-                const serial = ev.user_registration?.ticket_id || `ET-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x250&data=VERIFIED_PASS_${serial}`;
-                return (
-                  <View key={i} style={[styles.ticketCard, { backgroundColor: colors.bgCard, borderColor: colors.primary }]}>
-                    <View style={styles.ticketHeader}>
-                      <Text style={[styles.ticketTag, { color: colors.primary }]}>OFFICIAL ENTRY PASS</Text>
-                      <View style={[styles.statusTag, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.statusText}>VALID</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.ticketBody}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.ticketTitle, { color: colors.textPrimary }]}>{ev.title}</Text>
-                        <Text style={styles.ticketDetail}>📍 {ev.location}</Text>
-                        <Text style={styles.ticketDetail}>🗓️ {ev.date}</Text>
-                      </View>
-                      <Image source={{ uri: qrUrl }} style={styles.qrCode} />
-                    </View>
-
-                    <View style={styles.ticketFooter}>
-                      <Text style={styles.serialLab}>REF ID</Text>
-                      <Text style={[styles.serialVal, { color: colors.textPrimary }]}>{serial}</Text>
-                      <TouchableOpacity style={styles.sharePass} onPress={() => Share.share({ message: `My Verified EcoTrack Entry Pass: ${serial}` })}>
-                        <Ionicons name="share-social" size={16} color={colors.primary} />
-                      </TouchableOpacity>
+              myScans.map((s, idx) => (
+                <View key={`scan-${s.id || idx}-${idx}`} style={styles.itemCard}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <Text style={styles.itemTitle}>{s.exercise}</Text>
+                    <View style={styles.scanGradeBadge}>
+                      <Text style={styles.scanGradeText}>{s.grade} ({s.score}%)</Text>
                     </View>
                   </View>
-                );
-              })
+                  <Text style={styles.scanSpeciesText}>{s.species}</Text>
+                  <Text style={styles.itemDate}>{s.date}</Text>
+                </View>
+              ))
             )}
           </View>
         )}
+
+        {activeTab === "passes" && (
+          <View style={styles.tabContentList}>
+            {myPasses.length === 0 ? (
+              <View style={styles.emptyActivity}>
+                <Ionicons name="ticket-outline" size={36} color={colors.textMuted} />
+                <Text style={styles.emptyTitle}>Pass Vault Empty</Text>
+                <Text style={styles.emptySub}>Register for workshops or rescue drives to receive your entry pass.</Text>
+                <TouchableOpacity style={styles.emptyActionBtn} onPress={() => router.push("/events")}>
+                  <Text style={styles.emptyActionBtnText}>Browse Events</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              myPasses.map((pass, idx) => (
+                <View key={`pass-${pass.id || idx}-${idx}`} style={styles.itemCard}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <Text style={styles.itemTitle}>{pass.title}</Text>
+                    <View style={styles.passBadge}>
+                      <Text style={styles.passBadgeText}>{pass.id}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.scanSpeciesText}>📍 {pass.venue}</Text>
+                  <Text style={styles.itemDate}>📅 {pass.date}</Text>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
+        {activeTab === "pets" && (
+          <View style={styles.tabContentList}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: "800", color: colors.textPrimary }}>
+                  Registered Animals ({myPets.length})
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.textMuted }}>Digital animal vault & health records</Text>
+              </View>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.primary,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: Radius.md,
+                }}
+                onPress={() => setShowAddPetModal(true)}
+              >
+                <Ionicons name="add" size={16} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Add Animal</Text>
+              </TouchableOpacity>
+            </View>
+
+            {myPets.length === 0 ? (
+              <View style={styles.emptyActivity}>
+                <Ionicons name="paw-outline" size={36} color={colors.textMuted} />
+                <Text style={styles.emptyTitle}>No Registered Animals</Text>
+                <Text style={styles.emptySub}>Digitally register your animals for AI monitoring and health tracking.</Text>
+                <TouchableOpacity style={styles.emptyActionBtn} onPress={() => setShowAddPetModal(true)}>
+                  <Text style={styles.emptyActionBtnText}>+ Register Animal</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                {myPets.map((pet, idx) => (
+                  <View key={`pet-${pet.id || idx}-${idx}`} style={styles.itemCard}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <Text style={styles.itemTitle}>{pet.name}</Text>
+                      <View style={styles.passBadge}>
+                        <Text style={styles.passBadgeText}>{pet.species || pet.breed || "Animal"}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.scanSpeciesText}>Breed: {pet.breed || "Standard"} • Age: {pet.age || "1 Year"}</Text>
+                    <Text style={styles.itemDate}>Weight: {pet.weight || "10 kg"}</Text>
+                  </View>
+                ))}
+                <TouchableOpacity
+                  style={[styles.itemCard, { borderStyle: "dashed", borderWidth: 1.5, borderColor: colors.primary, alignItems: "center", justifyContent: "center", paddingVertical: 18, backgroundColor: isDark ? "rgba(16,185,129,0.08)" : "rgba(16,185,129,0.04)" }]}
+                  onPress={() => setShowAddPetModal(true)}
+                >
+                  <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(16,185,129,0.15)", alignItems: "center", justifyContent: "center", marginBottom: 6 }}>
+                    <Ionicons name="add" size={22} color={colors.primary} />
+                  </View>
+                  <Text style={{ fontWeight: "800", fontSize: 14, color: colors.textPrimary }}>+ Add Another Animal</Text>
+                  <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>Register a new animal to your digital vault</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
+
+        {activeTab === "achievements" && (
+          <View style={styles.tabContentList}>
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontSize: 16, fontWeight: "800", color: colors.textPrimary }}>
+                Earned Badges ({myAchievements.length})
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.textMuted }}>Your conservation achievements</Text>
+            </View>
+
+            {myAchievements.map((ach, idx) => (
+              <View key={`ach-${ach.id || idx}-${idx}`} style={[styles.itemCard, { borderLeftWidth: 4, borderLeftColor: ach.color || colors.primary }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <Text style={{ fontSize: 28 }}>{ach.icon || "🏆"}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemTitle, { fontSize: 15 }]}>{ach.name}</Text>
+                    <Text style={[styles.scanSpeciesText, { marginTop: 2 }]}>{ach.desc}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: colors.primary,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 4,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: Radius.md,
+                    }}
+                    onPress={() => handleShareAchievement(ach.name, ach.icon || "🏆")}
+                  >
+                    <Ionicons name="share-social-outline" size={13} color="#fff" />
+                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>Share</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* SETTINGS CARD */}
+        <View style={styles.settingsCard}>
+          <Text style={styles.settingsTitle}>Preferences & System</Text>
+
+          <TouchableOpacity style={styles.settingItem} onPress={toggleTheme}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Ionicons name={isDark ? "sunny" : "moon"} size={20} color={colors.primary} />
+              <Text style={styles.settingText}>Dark Mode</Text>
+            </View>
+            <Ionicons name={isDark ? "toggle" : "toggle-outline"} size={28} color={colors.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Alert.alert("Offline AI Engine", "EcoTrack ML models are cached offline for field inference.")}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Ionicons name="hardware-chip" size={20} color={colors.secondary} />
+              <Text style={styles.settingText}>Offline Computer Vision Status</Text>
+            </View>
+            <Text style={styles.statusOnlineText}>Active</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* EDIT MODAL */}
-      <Modal visible={editModal} animationType="slide" transparent>
-        <View style={styles.modalBg}>
-          <View style={[styles.modalCard, { backgroundColor: colors.bgCard }]}>
+      {/* EDIT PROFILE MODAL */}
+      <Modal visible={showEditModal} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Edit Profile</Text>
-              <TouchableOpacity onPress={() => setEditModal(false)}><Ionicons name="close" size={24} color={colors.textPrimary} /></TouchableOpacity>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Ionicons name="close-circle" size={24} color={colors.textMuted} />
+              </TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.inputLab}>Display Name</Text>
-              <TextInput style={[styles.input, { color: colors.textPrimary, borderColor: colors.border }]} value={editForm.display_name} onChangeText={(v) => setEditForm({...editForm, display_name: v})} />
-              
-              <Text style={styles.inputLab}>Profession</Text>
-              <TextInput style={[styles.input, { color: colors.textPrimary, borderColor: colors.border }]} value={editForm.profession} onChangeText={(v) => setEditForm({...editForm, profession: v})} />
-              
-              <Text style={styles.inputLab}>Bio</Text>
-              <TextInput style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, height: 80 }]} value={editForm.bio} onChangeText={(v) => setEditForm({...editForm, bio: v})} multiline />
 
-              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSaveProfile} disabled={isSaving}>
-                {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Profile Photo Picker */}
+              <View style={styles.avatarEditWrap}>
+                <View style={styles.avatarEditImgBox}>
+                  <Image
+                    source={{
+                      uri: avatarUri || user?.avatar_url || user?.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
+                    }}
+                    style={styles.avatarEditImg}
+                  />
+                  <View style={styles.avatarEditBadge}>
+                    <Ionicons name="camera" size={14} color="#fff" />
+                  </View>
+                </View>
+
+                <View style={styles.avatarBtnRow}>
+                  <TouchableOpacity style={styles.avatarPickBtn} onPress={handlePickAvatar} activeOpacity={0.8}>
+                    <Ionicons name="images-outline" size={14} color={colors.primary} />
+                    <Text style={styles.avatarPickBtnText}>Upload Photo</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.avatarPickBtn} onPress={handleTakeAvatarPhoto} activeOpacity={0.8}>
+                    <Ionicons name="camera-outline" size={14} color={colors.primary} />
+                    <Text style={styles.avatarPickBtnText}>Take Photo</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Name"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.inputLabel}>Role / Specialty</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={role}
+                onChangeText={setRole}
+                placeholder="Role / Title"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.inputLabel}>Location</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={location}
+                onChangeText={setLocation}
+                placeholder="City, Country"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.inputLabel}>Bio</Text>
+              <TextInput
+                style={[styles.modalInput, { height: 70, textAlignVertical: "top" }]}
+                value={bio}
+                onChangeText={setBio}
+                placeholder="Describe your role in animal welfare..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+              />
+
+              <TouchableOpacity style={styles.submitBtn} onPress={handleSaveProfile}>
+                <Text style={styles.submitBtnText}>Save Changes</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
       </Modal>
-    </View>
+
+      {/* ADD PET MODAL */}
+      <Modal visible={showAddPetModal} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>🐾 Add Animal to Vault</Text>
+              <TouchableOpacity onPress={() => setShowAddPetModal(false)}>
+                <Ionicons name="close-circle" size={24} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.inputLabel}>Animal Name *</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={petName}
+                onChangeText={setPetName}
+                placeholder="e.g. Happy"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.inputLabel}>Species *</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={petSpecies}
+                onChangeText={setPetSpecies}
+                placeholder="e.g. Dog, Cat, Elephant"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.inputLabel}>Breed</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={petBreed}
+                onChangeText={setPetBreed}
+                placeholder="e.g. Standard Breed"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.inputLabel}>Age</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={petAge}
+                onChangeText={setPetAge}
+                placeholder="e.g. 1 Year"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.inputLabel}>Weight</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={petWeight}
+                onChangeText={setPetWeight}
+                placeholder="e.g. 10 kg"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <TouchableOpacity
+                style={[styles.submitBtn, isSavingPet && { opacity: 0.6 }]}
+                onPress={handleAddPetSubmit}
+                disabled={isSavingPet}
+              >
+                <Text style={styles.submitBtnText}>{isSavingPet ? "Registering..." : "Add to Vault"}</Text>
+              </TouchableOpacity>
+
+              <View style={{ height: 30 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  hero: { height: 280, position: "relative" },
-  heroCover: { width: "100%", height: "100%" },
-  heroOverlay: { ...StyleSheet.absoluteFillObject },
-  heroContent: { position: "absolute", bottom: 20, left: 20, right: 20 },
-  profileRow: { flexDirection: "row", alignItems: "center", gap: 15 },
-  avatarBox: { width: 90, height: 90, borderRadius: 30, borderWidth: 3, padding: 3, overflow: "hidden" },
-  avatar: { width: "100%", height: "100%", borderRadius: 24 },
-  avatarInitial: { color: "#fff", fontSize: 36, fontWeight: "900" },
-  profileMeta: { flex: 1 },
-  profileName: { color: "#fff", fontSize: 24, fontWeight: "900" },
-  profileRole: { color: "#10b981", fontSize: 14, fontWeight: "700" },
-  locRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
-  locText: { color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "600" },
-  statRow: { flexDirection: "row", marginTop: 20, gap: 20 },
-  stat: { alignItems: "center" },
-  statVal: { color: "#fff", fontSize: 16, fontWeight: "900" },
-  statLab: { color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
-  headerActions: { position: "absolute", top: 50, right: 15, flexDirection: "row", gap: 10 },
-  headerBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
+function getStyles(colors: any, isDark: boolean) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.bgLight,
+    },
+    topHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      backgroundColor: colors.bgCard,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      maxWidth: 1000,
+      width: "100%",
+      alignSelf: "center",
+    },
+    backBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: Radius.md,
+      backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginRight: 2,
+    },
+    topIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: "#10b981",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    topTitle: {
+      fontSize: 18,
+      fontWeight: "900",
+      color: colors.textPrimary,
+    },
+    topSub: {
+      fontSize: 10.5,
+      fontWeight: "700",
+      color: colors.textSecondary,
+    },
+    logoutBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: isDark ? "#450a0a" : "#fee2e2",
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: Radius.full,
+      gap: 4,
+    },
+    logoutBtnText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: colors.danger,
+    },
 
-  tabBar: { borderBottomWidth: 1 },
-  tabItem: { flexDirection: "row", alignItems: "center", paddingVertical: 15, paddingHorizontal: 16, borderBottomWidth: 3, borderBottomColor: "transparent" },
-  tabText: { fontSize: 13, fontWeight: "800" },
+    scrollContent: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      maxWidth: 1000,
+      width: "100%",
+      alignSelf: "center",
+    },
 
-  content: { padding: 16 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  list: { gap: 12 },
-  empty: { height: 150, justifyContent: "center", alignItems: "center", borderStyle: "dashed", borderWidth: 2, borderColor: "#cbd5e1", borderRadius: 20, width: "100%" },
+    profileHeroCard: {
+      backgroundColor: colors.bgCard,
+      borderRadius: Radius.xl,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 16,
+      ...Shadow.sm,
+    },
+    heroTopRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    avatarWrap: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: colors.primary,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    avatarText: {
+      color: "#fff",
+      fontSize: 26,
+      fontWeight: "900",
+    },
+    profileName: {
+      fontSize: FontSize.lg,
+      fontWeight: "900",
+      color: colors.textPrimary,
+    },
+    verifiedBadge: {
+      paddingTop: 2,
+    },
+    profileRole: {
+      fontSize: FontSize.xs,
+      color: colors.primary,
+      fontWeight: "700",
+      marginBottom: 4,
+    },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    metaText: {
+      fontSize: 11,
+      color: colors.textMuted,
+      fontWeight: "600",
+    },
+    metaDot: {
+      color: colors.textMuted,
+      marginHorizontal: 2,
+    },
 
-  petCard: { width: (width - 44) / 2, padding: 12, borderRadius: 20, ...Shadow.sm },
-  petThumb: { width: "100%", height: 110, borderRadius: 16, marginBottom: 10 },
-  petName: { fontWeight: "900", fontSize: 15 },
-  petSub: { color: "#64748b", fontSize: 12, fontWeight: "600" },
+    profileBio: {
+      fontSize: FontSize.xs,
+      color: colors.textSecondary,
+      lineHeight: 18,
+      marginBottom: 14,
+    },
+    profileActionRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginBottom: 16,
+    },
+    editProfileBtn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
+      paddingVertical: 9,
+      borderRadius: Radius.md,
+      gap: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    editProfileBtnText: {
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+      color: colors.primary,
+    },
+    switchAccountBtn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: isDark ? "#082f49" : "#e0f2fe",
+      paddingVertical: 9,
+      borderRadius: Radius.md,
+      gap: 6,
+      borderWidth: 1,
+      borderColor: isDark ? "#0369a1" : "#bae6fd",
+    },
+    switchAccountBtnText: {
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+      color: "#0284c7",
+    },
+    emptyActivity: {
+      backgroundColor: colors.bgCard,
+      borderRadius: Radius.lg,
+      padding: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginVertical: 4,
+    },
+    emptyTitle: {
+      fontSize: FontSize.sm,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    emptySub: {
+      fontSize: FontSize.xs,
+      color: colors.textMuted,
+      textAlign: "center",
+      marginBottom: 12,
+      maxWidth: 240,
+    },
+    emptyActionBtn: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: Radius.md,
+    },
+    emptyActionBtnText: {
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+      color: "#fff",
+    },
 
-  scanItem: { flexDirection: "row", alignItems: "center", padding: 14, borderRadius: 18, ...Shadow.sm },
-  gradeCircle: { width: 46, height: 46, borderRadius: 23, justifyContent: "center", alignItems: "center" },
-  gradeText: { fontSize: 18, fontWeight: "900" },
-  itemTitle: { fontWeight: "800", fontSize: 15 },
-  itemSub: { color: "#64748b", fontSize: 12, marginTop: 2 },
+    statsBar: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+      padding: 12,
+      borderRadius: Radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    statBox: {
+      flex: 1,
+      alignItems: "center",
+    },
+    statVal: {
+      fontSize: FontSize.md,
+      fontWeight: "900",
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    statLab: {
+      fontSize: 8.5,
+      fontWeight: "800",
+      color: colors.textMuted,
+      letterSpacing: 0.5,
+    },
+    statDivider: {
+      width: 1,
+      height: 20,
+      backgroundColor: colors.border,
+    },
 
-  postCard: { padding: 16, borderRadius: 18, ...Shadow.sm },
-  postText: { fontSize: 14, fontWeight: "600", lineHeight: 20 },
-  postDate: { color: "#94a3b8", fontSize: 11, marginTop: 8 },
+    tabsRow: {
+      flexDirection: "row",
+      gap: 8,
+      marginBottom: 14,
+    },
+    tabBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: "center",
+      borderRadius: Radius.full,
+      backgroundColor: colors.bgCard,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    tabBtnActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    tabBtnText: {
+      fontSize: FontSize.xs,
+      fontWeight: "700",
+      color: colors.textSecondary,
+    },
+    tabBtnTextActive: {
+      color: "#fff",
+      fontWeight: "800",
+    },
 
-  progCard: { flexDirection: "row", alignItems: "center", padding: 16, borderRadius: 18, ...Shadow.sm },
-  progBarBg: { height: 6, backgroundColor: "rgba(0,0,0,0.05)", borderRadius: 3, marginVertical: 8 },
-  progBarFill: { height: "100%", borderRadius: 3 },
+    tabContentList: {
+      gap: 10,
+      marginBottom: 16,
+    },
+    itemCard: {
+      backgroundColor: colors.bgCard,
+      padding: 14,
+      borderRadius: Radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...Shadow.sm,
+    },
+    itemTitle: {
+      fontSize: FontSize.sm,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    itemMetaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    itemDate: {
+      fontSize: 11,
+      color: colors.textMuted,
+      fontWeight: "600",
+    },
+    scanGradeBadge: {
+      backgroundColor: isDark ? "#064e3b" : "#dcfce7",
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: Radius.full,
+    },
+    scanGradeText: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: colors.primary,
+    },
+    scanSpeciesText: {
+      fontSize: FontSize.xs,
+      color: colors.primary,
+      fontWeight: "700",
+      marginBottom: 4,
+    },
+    passBadge: {
+      backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: Radius.full,
+    },
+    passBadgeText: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: colors.primary,
+    },
 
-  achCard: { width: (width - 44) / 2, padding: 16, borderRadius: 20, alignItems: "center", ...Shadow.sm },
-  achEmoji: { fontSize: 36, marginBottom: 8 },
-  achName: { fontWeight: "900", fontSize: 13, textAlign: "center" },
-  achDesc: { fontSize: 10, color: "#64748b", textAlign: "center", marginTop: 4 },
+    settingsCard: {
+      backgroundColor: colors.bgCard,
+      borderRadius: Radius.xl,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 12,
+    },
+    settingsTitle: {
+      fontSize: FontSize.md,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    settingItem: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    settingText: {
+      fontSize: FontSize.sm,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+    statusOnlineText: {
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+      color: colors.primary,
+    },
 
-  ticketCard: { borderRadius: 24, borderWidth: 2, borderStyle: "dashed", padding: 20, ...Shadow.sm },
-  ticketHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 15 },
-  ticketTag: { fontSize: 10, fontWeight: "900", letterSpacing: 1 },
-  statusTag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusText: { color: "#fff", fontSize: 10, fontWeight: "900" },
-  ticketBody: { flexDirection: "row", gap: 15, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.05)", paddingBottom: 15 },
-  ticketTitle: { fontSize: 18, fontWeight: "900", marginBottom: 5 },
-  ticketDetail: { fontSize: 13, color: "#64748b", marginBottom: 3 },
-  qrCode: { width: 80, height: 80, borderRadius: 12, backgroundColor: "#fff" },
-  ticketFooter: { flexDirection: "row", alignItems: "center", paddingTop: 15 },
-  serialLab: { fontSize: 9, color: "#94a3b8", fontWeight: "800" },
-  serialVal: { fontSize: 14, fontWeight: "900", marginLeft: 8, flex: 1 },
-  sharePass: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(16,185,129,0.1)", justifyContent: "center", alignItems: "center" },
-
-  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalCard: { borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, maxHeight: "80%" },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 25 },
-  modalTitle: { fontSize: 20, fontWeight: "900" },
-  inputLab: { fontSize: 12, fontWeight: "800", color: "#64748b", marginBottom: 6, textTransform: "uppercase" },
-  input: { height: 50, borderWidth: 1, borderRadius: 12, paddingHorizontal: 15, marginBottom: 20, fontSize: 15 },
-  saveBtn: { height: 56, borderRadius: 16, justifyContent: "center", alignItems: "center", marginTop: 10, ...Shadow.md },
-  saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "900" }
-});
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.55)",
+      justifyContent: "flex-end",
+      alignItems: "center",
+    },
+    modalSheet: {
+      backgroundColor: colors.bgCard,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      padding: 22,
+      maxWidth: 640,
+      width: "100%",
+      maxHeight: "85%",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    modalTitle: {
+      fontSize: FontSize.lg,
+      fontWeight: "900",
+      color: colors.textPrimary,
+    },
+    inputLabel: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginBottom: 6,
+    },
+    modalInput: {
+      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: Radius.md,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: FontSize.sm,
+      color: colors.textPrimary,
+      marginBottom: 12,
+    },
+    avatarEditWrap: {
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
+    avatarEditImgBox: {
+      position: "relative",
+      width: 84,
+      height: 84,
+      borderRadius: 42,
+      marginBottom: 10,
+    },
+    avatarEditImg: {
+      width: 84,
+      height: 84,
+      borderRadius: 42,
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    avatarEditBadge: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      backgroundColor: colors.primary,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: colors.bgCard,
+    },
+    avatarBtnRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    avatarPickBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: Radius.full,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 5,
+    },
+    avatarPickBtnText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+    submitBtn: {
+      backgroundColor: colors.primary,
+      paddingVertical: 14,
+      borderRadius: Radius.md,
+      alignItems: "center",
+      marginTop: 6,
+      marginBottom: 10,
+    },
+    submitBtnText: {
+      color: "#fff",
+      fontSize: FontSize.sm,
+      fontWeight: "800",
+    },
+  });
+}

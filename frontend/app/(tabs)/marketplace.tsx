@@ -1,968 +1,1908 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Image, Alert, StatusBar, Dimensions, Modal,
+  Image, TextInput, Modal, Alert, StatusBar, Dimensions
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import * as Location from "expo-location";
-import { router, useFocusEffect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import { router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Radius, Shadow, FontSize } from "@/constants/theme";
 import { useTheme } from "../../context/ThemeContext";
-import {
-  fetchCart, addToCart as apiAddToCart, removeFromCart as apiRemoveFromCart,
-  updateCart as apiUpdateCart, checkoutCart as apiCheckoutCart,
-  fetchFavorites as apiFetchFavorites, toggleFavorite as apiToggleFavorite,
-  fetchListings as apiFetchListings, createListing as apiCreateListing
-} from "../../services/api";
+import { Radius, Shadow, FontSize } from "@/constants/theme";
+import { fetchMarketplaceAnimals, fetchMarketplaceProducts, createListing } from "../../services/api";
 
-const { width } = Dimensions.get("window");
 
-function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return 9999;
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
 
-type Listing = {
-  id: number;
-  name: string;
-  age: string;
-  price: string;
-  location: string;
-  distance: string;
-  image: string;
-  verified: boolean;
-  vaccinated: boolean;
-  type: "sale" | "adoption";
-  breed: string;
-  recommendation: string;
-  sellerId?: string;
-  sellerName?: string;
-  coordinates?: { lat: number; lng: number };
-};
-// ... rest of the file
-
-type Accessory = {
-  id: number;
-  name: string;
-  priceNum: number;
-  priceStr: string;
-  image: string;
-  category: string;
-  speciesTarget: string;
+const resolveItemImage = (img?: string | null, fallback = "https://images.unsplash.com/photo-1541599540903-216a46ca1dc0?w=600") => {
+  if (!img) return fallback;
+  if (img.startsWith("http://") || img.startsWith("https://")) return img;
+  if (img.startsWith("assets/")) {
+    const assetMap: Record<string, string> = {
+      "assets/pet_bed.jpg": "https://images.unsplash.com/photo-1541599540903-216a46ca1dc0?w=600",
+      "assets/bird_cage.jpg": "https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=600",
+      "assets/pet_shampoo.jpg": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600",
+      "assets/dog_tracker.jpg": "https://images.unsplash.com/photo-1576201836106-db1758fd1c97?w=600",
+      "assets/dog_harness.jpg": "https://images.unsplash.com/photo-1576201836106-db1758fd1c97?w=600",
+      "assets/organic_kibble.jpg": "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=600",
+      "assets/dog_kibble.jpg": "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=600",
+      "assets/saline_wash.jpg": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600",
+      "assets/dog_bowl.jpg": "https://images.unsplash.com/photo-1541599540903-216a46ca1dc0?w=600",
+    };
+    return assetMap[img] || fallback;
+  }
+  return img;
 };
 
-const INITIAL_LISTINGS: Listing[] = [];
-
-const INITIAL_ACCESSORIES: Accessory[] = [
-  { id: 1, name: "Premium Dog Food (5kg)", priceNum: 1200, priceStr: "₹1,200", image: "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=300", category: "Food", speciesTarget: "Dog" },
-  { id: 10, name: "Adjustable Dumbbell Set (20kg)", priceNum: 4500, priceStr: "₹4,500", image: "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=300", category: "Accessories", speciesTarget: "Human" },
-  { id: 2, name: "Large Bird Cage & Perch", priceNum: 3500, priceStr: "₹3,500", image: "https://images.unsplash.com/photo-1549737221-bef65e2604a6?w=300", category: "Housing", speciesTarget: "Parrot / Bird" },
-  { id: 11, name: "Yoga Mat (Extra Thick)", priceNum: 950, priceStr: "₹950", image: "https://images.unsplash.com/photo-1592432676556-38174f07352b?w=300", category: "Accessories", speciesTarget: "Human" },
-  { id: 3, name: "Multi-Level Cat Tree", priceNum: 2800, priceStr: "₹2,800", image: "https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?w=300", category: "Furniture", speciesTarget: "Cat" },
-  { id: 4, name: "Ergonomic Dog Leash Set", priceNum: 850, priceStr: "₹850", image: "https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=300", category: "Accessories", speciesTarget: "Dog" },
-  { id: 12, name: "Resistance Band Set", priceNum: 1100, priceStr: "₹1,100", image: "https://images.unsplash.com/photo-1598289439248-b1114d499335?w=300", category: "Accessories", speciesTarget: "Human" },
-  { id: 5, name: "Emergency Vet Care Kit", priceNum: 1900, priceStr: "₹1,900", image: "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=300", category: "Health", speciesTarget: "All Animals" },
-  { id: 6, name: "Aquarium Tank (60L)", priceNum: 4500, priceStr: "₹4,500", image: "https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?w=300", category: "Housing", speciesTarget: "Fish" },
+const BASE_ANIMALS = [
+  {
+    id: 101,
+    name: "Purebred German Shepherd Pup",
+    title: "Purebred German Shepherd Pup",
+    species: "Dog",
+    gender: "Male",
+    type: "sale",
+    age: "8 Weeks",
+    price: "₹15,000",
+    priceStr: "₹15,000",
+    priceNum: 15000,
+    location: "Chennai, TN",
+    image: "https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?w=600",
+    breed: "German Shepherd",
+    description: "AKC-line purebred with full vaccination certificate. Health tested parents.",
+    vaccinated: true,
+    sellerId: "usr_apex_k9",
+    sellerName: "Apex K9 Kennels",
+    seller: "Apex K9 Kennels",
+  },
+  {
+    id: 104,
+    name: "Golden Retriever (Adoption)",
+    title: "Golden Retriever (Adoption)",
+    species: "Dog",
+    gender: "Female",
+    type: "adoption",
+    age: "2 Years",
+    price: "Free Adoption",
+    priceStr: "Free Adoption",
+    priceNum: 0,
+    location: "Hyderabad, TS",
+    image: "https://images.unsplash.com/photo-1552053831-71594a27632d?w=400",
+    breed: "Golden Retriever",
+    description: "Rescued Golden Retriever. Neutered, vaccinated, socialized. Needs a loving home.",
+    vaccinated: true,
+    sellerId: "usr_golden_haven",
+    sellerName: "Golden Haven Sanctuary",
+    seller: "Golden Haven Sanctuary",
+  },
+  {
+    id: 107,
+    name: "Rescued Indie Puppy - Bruno",
+    title: "Rescued Indie Puppy - Bruno",
+    species: "Dog",
+    gender: "Male",
+    type: "adoption",
+    age: "3 Months",
+    price: "Free Adoption",
+    priceStr: "Free Adoption",
+    priceNum: 0,
+    location: "Chennai, TN",
+    image: "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=600",
+    breed: "Indian Pariah",
+    description: "Playful and loving Indie pup rescued from the streets. Fully vaccinated and dewormed.",
+    vaccinated: true,
+    sellerId: "usr_paws_rescue",
+    sellerName: "Paws Rescue Trust",
+    seller: "Paws Rescue Trust",
+  },
+  {
+    id: 108,
+    name: "Rescued Persian Cat - Luna",
+    title: "Rescued Persian Cat - Luna",
+    species: "Cat",
+    gender: "Female",
+    type: "adoption",
+    age: "1 Year",
+    price: "Free Adoption",
+    priceStr: "Free Adoption",
+    priceNum: 0,
+    location: "Bangalore, KA",
+    image: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600",
+    breed: "Persian",
+    description: "Gentle and affectionate Persian cat looking for a quiet, warm home. Vaccinated and litter trained.",
+    vaccinated: true,
+    sellerId: "usr_kavita_persian",
+    sellerName: "Kavita Reddy",
+    seller: "Kavita Reddy",
+  },
+  {
+    id: 109,
+    name: "Hand-Reared Sun Conure - Rio",
+    title: "Hand-Reared Sun Conure - Rio",
+    species: "Bird",
+    gender: "Male",
+    type: "sale",
+    age: "6 Months",
+    price: "₹8,500",
+    priceStr: "₹8,500",
+    priceNum: 8500,
+    location: "Mumbai, MH",
+    image: "https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=600",
+    breed: "Sun Conure",
+    description: "Tame, step-up trained hand-reared Sun Conure. Vibrant plumage and high cognitive intelligence.",
+    vaccinated: true,
+    sellerId: "usr_avian_care",
+    sellerName: "Avian Care World",
+    seller: "Avian Care World",
+  },
+  {
+    id: 110,
+    name: "Thoroughbred Colt - Sultan",
+    title: "Thoroughbred Colt - Sultan",
+    species: "Horse",
+    gender: "Male",
+    type: "sale",
+    age: "3 Years",
+    price: "₹185,000",
+    priceStr: "₹185,000",
+    priceNum: 185000,
+    location: "Pune, MH",
+    image: "https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=600",
+    breed: "Marwari / Thoroughbred",
+    description: "Healthy and agile athletic young stallion with excellent stamina and regal carriage.",
+    vaccinated: true,
+    sellerId: "usr_royal_stables",
+    sellerName: "Royal Equine Stables",
+    seller: "Royal Equine Stables",
+  },
+  {
+    id: 111,
+    name: "Holland Lop Bunny - Thumper",
+    title: "Holland Lop Bunny - Thumper",
+    species: "Rabbit",
+    gender: "Male",
+    type: "adoption",
+    age: "5 Months",
+    price: "Free Adoption",
+    priceStr: "Free Adoption",
+    priceNum: 0,
+    location: "Chennai, TN",
+    image: "https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?w=600",
+    breed: "Holland Lop",
+    description: "Super calm and friendly indoor bunny rabbit. Dewormed and loves fresh greens.",
+    vaccinated: true,
+    sellerId: "usr_chennai_paws",
+    sellerName: "Chennai Animal Rescue",
+    seller: "Chennai Animal Rescue",
+  },
 ];
 
-const TABS = [
-  { key: "animals", label: "Animals & Adoption", icon: "paw" },
-  { key: "accessories", label: "Products & Supplies", icon: "bag" },
-  { key: "favorites", label: "Saved & Liked", icon: "heart" },
+const BASE_PRODUCTS = [
+  {
+    id: 102,
+    name: "Orthopedic Memory Foam Pet Bed",
+    title: "Orthopedic Memory Foam Pet Bed",
+    category: "Gear",
+    price: 1499,
+    priceNum: 1499,
+    priceStr: "₹1,499",
+    image: "https://images.unsplash.com/photo-1541599540903-216a46ca1dc0?w=600",
+    description: "High-density memory foam with waterproof cover. Suitable for dogs up to 30kg.",
+    location: "Bangalore, KA",
+    sellerId: "usr_comfort_paws",
+    sellerName: "ComfortPaws Pet Supplies",
+    seller: "ComfortPaws Pet Supplies",
+  },
+  {
+    id: 103,
+    name: "Premium Bird Habitat Cage (Large)",
+    title: "Premium Bird Habitat Cage (Large)",
+    category: "Housing",
+    price: 3500,
+    priceNum: 3500,
+    priceStr: "₹3,500",
+    image: "https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=600",
+    description: "Powder-coated steel cage with multiple perches, feeding stations and tray.",
+    location: "Mumbai, MH",
+    sellerId: "usr_avian_care",
+    sellerName: "Avian Care World",
+    seller: "Avian Care World",
+  },
+  {
+    id: 105,
+    name: "Organic Aloe & Oatmeal Pet Shampoo",
+    title: "Organic Aloe & Oatmeal Pet Shampoo",
+    category: "Supplies",
+    price: 499,
+    priceNum: 499,
+    priceStr: "₹499",
+    image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600",
+    description: "Soothing organic aloe vera formula for dogs and cats. Relieves itchy skin.",
+    location: "Chennai, TN",
+    sellerId: "usr_vetcare_meds",
+    sellerName: "VetCare Organics",
+    seller: "VetCare Organics",
+  },
+  {
+    id: 106,
+    name: "Ergonomic GPS Animal Tracker Harness",
+    title: "Ergonomic GPS Animal Tracker Harness",
+    category: "Gear",
+    price: 1899,
+    priceNum: 1899,
+    priceStr: "₹1,899",
+    image: "https://images.unsplash.com/photo-1576201836106-db1758fd1c97?w=600",
+    description: "Real-time GPS tracker harness with reflective safety strips.",
+    location: "Bangalore, KA",
+    sellerId: "usr_rex_gear",
+    sellerName: "Rex Gear Official",
+    seller: "Rex Gear Official",
+  },
+  {
+    id: 201,
+    name: "Organic Canine Kibble 10kg",
+    title: "Organic Canine Kibble 10kg",
+    category: "Food",
+    price: 2499,
+    priceNum: 2499,
+    priceStr: "₹2,499",
+    image: "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=600",
+    description: "Grain-free canine nutrition formulated for active dogs. High protein with chicken and brown rice.",
+    location: "Chennai, TN",
+    sellerId: "usr_ecopet",
+    sellerName: "EcoPet Supplies",
+    seller: "EcoPet Supplies",
+  },
+  {
+    id: 203,
+    name: "Sterile Saline Wash & Antiseptic First Aid",
+    title: "Sterile Saline Wash & Antiseptic First Aid",
+    category: "Medical",
+    price: 450,
+    priceNum: 450,
+    priceStr: "₹450",
+    image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600",
+    description: "Essential veterinary first-aid antiseptic saline for cleaning animal wounds and eye flushing.",
+    location: "Chennai, TN",
+    sellerId: "usr_vetcare_meds",
+    sellerName: "VetCare Organics",
+    seller: "VetCare Organics",
+  },
 ];
-
-const ACCESSORY_CATS = ["All", "Food", "Housing", "Furniture", "Accessories", "Health"];
 
 export default function MarketplaceScreen() {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
 
-  const [listings, setListings] = useState<Listing[]>(INITIAL_LISTINGS);
-  const [accessories, setAccessories] = useState<Accessory[]>(INITIAL_ACCESSORIES);
-  const [activeTab, setActiveTab] = useState("animals");
-  const [search, setSearch] = useState("");
-  const [favorites, setFavorites] = useState<number[]>([]);
+  // Tab: 'animals' | 'products' | 'saved'
+  const [activeTab, setActiveTab] = useState<"animals" | "products" | "saved">("animals");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
 
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [nearbyOn, setNearbyOn] = useState(false);
+  // Data lists
+  const [animalsList, setAnimalsList] = useState<any[]>(BASE_ANIMALS);
+  const [productsList, setProductsList] = useState<any[]>(BASE_PRODUCTS);
+  const [favorites, setFavorites] = useState<Record<number, boolean>>({});
+  const [cart, setCart] = useState<any[]>([]);
 
-  const toggleNearby = async () => {
-    if (!nearbyOn) {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert("Permission Denied", "Location access is required for nearby filtering.");
+  // Modals
+  const [showCartModal, setShowCartModal] = useState(false);
+  const [showListingModal, setShowListingModal] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [newType, setNewType] = useState("adoption");
+  const [newListingImage, setNewListingImage] = useState<string | null>(null);
+
+  const handlePickListingImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Required", "Media library access is needed to choose listing photos.");
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({});
-      setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-      setNearbyOn(true);
-      Toast.show({ type: 'info', text1: '📍 GPS Sync', text2: 'Showing nearest animal listings.', position: 'bottom' });
-    } else {
-      setNearbyOn(false);
-    }
-  };
-
-  // Post modal state
-  const [postVisible, setPostVisible] = useState(false);
-  const [postImage, setPostImage] = useState<string | null>(null);
-  const [postTitle, setPostTitle] = useState("");
-  const [postBreed, setPostBreed] = useState("");
-  const [postPrice, setPostPrice] = useState("");
-  const [postLocation, setPostLocation] = useState("");
-  const [postDesc, setPostDesc] = useState("");
-  const [postType, setPostType] = useState<"sale" | "adoption" | "accessory">("sale");
-
-  // Cart state
-  const [cart, setCart] = useState<{ item: Accessory; qty: number }[]>([]);
-  const [cartVisible, setCartVisible] = useState(false);
-  const [checkoutDone, setCheckoutDone] = useState(false);
-
-  const [userId, setUserId] = useState<string | null>(null);
-
-  // Persistence: Load on focus/mount
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-      const loadMarketplace = async () => {
-        try {
-          const raw = await AsyncStorage.getItem("@ecotrack_user_session");
-          let currentUid = null;
-          if (raw) {
-            const sess = JSON.parse(raw);
-            currentUid = sess.user_id;
-            if (userId !== sess.user_id) {
-              // Reset state for new user
-              setCart([]);
-              setFavorites([]);
-              setListings([]);
-            }
-            setUserId(sess.user_id);
-            
-            // Load cart from backend
-            const backendCart = await fetchCart(sess.user_id);
-            if (isMounted) setCart(backendCart || []);
-
-            // Load favorites from backend
-            const backendFavs = await apiFetchFavorites(sess.user_id);
-            if (isMounted) setFavorites(backendFavs || []);
-          } else {
-            if (userId !== null) {
-              setCart([]);
-              setFavorites([]);
-              setListings([]);
-            }
-            setUserId(null);
-            
-            // fallback offline
-            const storedCart = await AsyncStorage.getItem("@ecotrack_cart");
-            if (storedCart && isMounted) setCart(JSON.parse(storedCart));
-
-            const storedFavs = await AsyncStorage.getItem("@ecotrack_favorites");
-            if (storedFavs && isMounted) setFavorites(JSON.parse(storedFavs));
-          }
-
-          // Load listings from backend
-          const backendListings = await apiFetchListings();
-          if (isMounted) {
-            if (backendListings && backendListings.length > 0) {
-              const mapped = backendListings.map((item: any) => ({
-                id: item.id,
-                name: item.title,
-                breed: item.breed || "Mixed Breed",
-                age: item.age || "Unknown",
-                price: item.price === 0 ? "Free" : `₹${item.price.toLocaleString("en-IN")}`,
-                location: item.location || "Local",
-                distance: "Local",
-                image: item.image_url || item.image || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400",
-                verified: item.seller?.verified || true,
-                vaccinated: item.vaccinated || true,
-                type: item.type === "adoption" ? "adoption" : "sale",
-                recommendation: item.description || "Healthy, gentle temperament.",
-                sellerId: item.seller?.id,
-                sellerName: item.seller?.name || item.sellerName || "EcoTracker"
-              }));
-              setListings(mapped);
-            } else {
-              const uId = currentUid || userId;
-              const key = uId ? `@ecotrack_listings_${uId}` : "@ecotrack_listings";
-              const storedListings = await AsyncStorage.getItem(key);
-              if (storedListings && isMounted) setListings(JSON.parse(storedListings));
-            }
-          }
-        } catch (e) {
-          console.warn("Error loading marketplace state", e);
-        }
-      };
-      loadMarketplace();
-      return () => { isMounted = false; };
-    }, [userId])
-  );
-
-  // Persistence: Save on change
-  useEffect(() => {
-    if (userId) {
-      AsyncStorage.setItem(`@ecotrack_cart_${userId}`, JSON.stringify(cart)).catch(() => {});
-    } else {
-      AsyncStorage.setItem("@ecotrack_cart", JSON.stringify(cart)).catch(() => {});
-    }
-  }, [cart, userId]);
-
-  useEffect(() => {
-    if (userId) {
-      AsyncStorage.setItem(`@ecotrack_favorites_${userId}`, JSON.stringify(favorites)).catch(() => {});
-    } else {
-      AsyncStorage.setItem("@ecotrack_favorites", JSON.stringify(favorites)).catch(() => {});
-    }
-  }, [favorites, userId]);
-
-  useEffect(() => {
-    if (userId) {
-      AsyncStorage.setItem(`@ecotrack_listings_${userId}`, JSON.stringify(listings)).catch(() => {});
-    } else {
-      AsyncStorage.setItem("@ecotrack_listings", JSON.stringify(listings)).catch(() => {});
-    }
-  }, [listings, userId]);
-
-  const filteredListings = useMemo(() => {
-    let list = listings.map(l => {
-      const dist = (userLocation && l.coordinates) ? getDistance(userLocation.lat, userLocation.lng, l.coordinates.lat, l.coordinates.lng) : 999;
-      return { ...l, realDistance: dist };
-    });
-
-    if (nearbyOn && userLocation) {
-      list = list.sort((a, b) => a.realDistance - b.realDistance);
-    }
-
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((l) => l.name.toLowerCase().includes(q) || l.breed.toLowerCase().includes(q));
-    }
-
-    if (nearbyOn) {
-      list = list.filter(l => l.realDistance <= 50);
-    }
-
-    return list;
-  }, [search, listings, nearbyOn, userLocation]);
-
-  const filteredAccessories = useMemo(() => {
-    let list = accessories;
-    if (selectedCategory !== "All") list = list.filter((a) => a.category === selectedCategory);
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((a) => a.name.toLowerCase().includes(q) || a.speciesTarget.toLowerCase().includes(q));
-    }
-    return list;
-  }, [selectedCategory, search, accessories]);
-
-  const toggleFav = async (id: number) => {
-    setFavorites((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-    if (userId) {
-      await apiToggleFavorite(userId, id);
-    }
-  };
-
-  const addToCart = async (item: Accessory) => {
-    setCart((prev) => {
-      const existing = prev.find((c) => c.item.id === item.id);
-      if (existing) {
-        return prev.map((c) => c.item.id === item.id ? { ...c, qty: c.qty + 1 } : c);
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        setNewListingImage(res.assets[0].uri);
       }
-      return [...prev, { item, qty: 1 }];
-    });
-    if (userId) {
-      await apiAddToCart(userId, { id: item.id, name: item.name, price: item.priceNum, priceStr: item.priceStr, category: item.category });
-    }
-    Toast.show({
-      type: 'success',
-      text1: '🛒 Added to Cart',
-      text2: `${item.name} is ready for checkout.`,
-      position: 'bottom',
-      bottomOffset: 90
-    });
-  };
-
-  const removeFromCart = async (id: number) => {
-    setCart((prev) => prev.filter((c) => c.item.id !== id));
-    if (userId) {
-      await apiRemoveFromCart(userId, id);
+    } catch {
+      Alert.alert("Picker Error", "Could not choose photo from gallery.");
     }
   };
 
-  const updateCartQty = async (id: number, delta: number) => {
-    let updatedCart: { item: Accessory; qty: number }[] = [];
+  const handleTakeListingPhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Camera Permission Required", "Camera access is needed to capture listing photos.");
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        setNewListingImage(res.assets[0].uri);
+      }
+    } catch (e) {
+      Alert.alert("Camera Error", "Could not open camera.");
+    }
+  };
+
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [a, p] = await Promise.all([
+          fetchMarketplaceAnimals().catch(() => null),
+          fetchMarketplaceProducts().catch(() => null),
+        ]);
+        if (a && Array.isArray(a) && a.length > 0) {
+          const formatted = a.map((item: any) => {
+            const sellerId = item.sellerId || item.seller_id || (typeof item.seller === "object" ? item.seller?.id : null) || item.user_id || `usr_seller_${item.id}`;
+            const sellerName = typeof item.seller === "object" ? item.seller?.name : (item.seller || item.sellerName || "Verified Caretaker");
+            return {
+              id: item.id,
+              name: item.name || item.title,
+              title: item.title || item.name,
+              species: item.specs?.species || item.species || "Dog",
+              gender: item.specs?.gender || item.gender || "Male",
+              type: item.type || "adoption",
+              age: item.age || "Young",
+              price: item.price === 0 || item.type === "adoption" ? "Free Adoption" : (typeof item.price === "number" ? `₹${item.price.toLocaleString("en-IN")}` : String(item.price || "₹1,000")),
+              priceStr: item.price === 0 || item.type === "adoption" ? "Free Adoption" : (typeof item.price === "number" ? `₹${item.price.toLocaleString("en-IN")}` : String(item.price || "₹1,000")),
+              location: item.location || "Chennai, TN",
+              image: resolveItemImage(item.image_url || item.image, "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=600"),
+              breed: item.breed || item.specs?.breed || "Companion",
+              description: item.description || "Verified animal listing.",
+              vaccinated: Boolean(item.vaccinated),
+              sellerId: String(sellerId),
+              sellerName: String(sellerName),
+              seller: String(sellerName),
+              sellerDetails: item.seller,
+            };
+          });
+          setAnimalsList(formatted);
+        }
+        if (p && Array.isArray(p) && p.length > 0) {
+          const formatted = p.map((item: any) => {
+            const sellerId = item.sellerId || item.seller_id || (typeof item.seller === "object" ? item.seller?.id : null) || item.user_id || `usr_seller_${item.id}`;
+            const sellerName = typeof item.seller === "object" ? item.seller?.name : (item.seller || item.sellerName || "Official Store");
+            return {
+              id: item.id,
+              name: item.name || item.title,
+              title: item.title || item.name,
+              category: item.category || "Gear",
+              price: typeof item.price === "number" ? item.price : 499,
+              priceNum: typeof item.price === "number" ? item.price : 499,
+              priceStr: typeof item.price === "number" ? `₹${item.price.toLocaleString("en-IN")}` : String(item.price || "₹499"),
+              image: resolveItemImage(item.image_url || item.image, "https://images.unsplash.com/photo-1541599540903-216a46ca1dc0?w=600"),
+              description: item.description || "EcoTrack verified accessory.",
+              location: item.location || "Available for delivery",
+              sellerId: String(sellerId),
+              sellerName: String(sellerName),
+              seller: String(sellerName),
+              sellerDetails: item.seller,
+            };
+          });
+          setProductsList(formatted);
+        }
+      } catch (e) {
+        console.warn("Using offline marketplace catalog");
+      }
+    })();
+  }, []);
+
+  const toggleFavorite = (id: number) => {
+    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const addToCart = (product: any) => {
     setCart((prev) => {
-      updatedCart = prev
-        .map((c) => c.item.id === id ? { ...c, qty: c.qty + delta } : c)
-        .filter((c) => c.qty > 0);
-      return updatedCart;
+      const existing = prev.find((item) => item.id === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.id === product.id ? { ...item, qty: item.qty + 1 } : item
+        );
+      }
+      return [...prev, { ...product, qty: 1 }];
     });
-    if (userId) {
-      setTimeout(async () => {
-        await apiUpdateCart(userId, updatedCart);
-      }, 0);
-    }
+    Alert.alert("Added to Cart 🛍️", `${product.name} added to your shopping cart.`);
+  };
+
+  const updateCartQty = (id: number, delta: number) => {
+    setCart((prev) =>
+      prev
+        .map((item) => (item.id === id ? { ...item, qty: item.qty + delta } : item))
+        .filter((item) => item.qty > 0)
+    );
   };
 
   const cartTotal = useMemo(() => {
-    return cart.reduce((sum, c) => sum + c.item.priceNum * c.qty, 0);
+    return cart.reduce((sum, item) => sum + (item.price || item.priceNum || 0) * item.qty, 0);
   }, [cart]);
 
-  const pickImage = async () => {
-    const r = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-    if (!r.canceled) setPostImage(r.assets[0].uri);
-  };
-
-  const handlePostItem = async () => {
-    if (!postTitle.trim() || !postPrice.trim() || !postLocation.trim()) {
-      Alert.alert("Missing Information", "Please enter title, price, and location.");
+  const handleCreateListing = async () => {
+    if (!newTitle.trim()) {
+      Alert.alert("Missing Field", "Please enter listing title.");
       return;
     }
-
-    const priceVal = parseFloat(postPrice.replace(/[^0-9.]/g, "")) || 0;
-    const listingData = {
-      title: postTitle,
-      category: postType === "accessory" ? "Accessories" : "Pets",
-      price: priceVal,
-      location: postLocation,
-      image_url: postImage || (postType === "accessory" ? "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=300" : "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400"),
-      type: postType === "accessory" ? "accessory" : (postPrice.toLowerCase().includes("free") ? "adoption" : "sale"),
-      age: "1 Year",
-      breed: postBreed || "Mixed Breed",
-      description: postDesc || "Healthy, gentle temperament."
+    const item = {
+      id: Date.now(),
+      name: newTitle.trim(),
+      species: "Dog",
+      type: newType,
+      age: "Young",
+      price: newType === "adoption" ? "Free Adoption" : (newPrice ? `₹${newPrice}` : "₹1,000"),
+      location: "Local Community",
+      image: newListingImage || "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=600",
+      breed: "Standard",
+      description: newDesc || "Community animal listing.",
+      vaccinated: true,
+      seller: "You (Active User)",
     };
 
-    setPostVisible(false);
-
     try {
-      await apiCreateListing(listingData);
-      const backendListings = await apiFetchListings();
-      if (backendListings && backendListings.length > 0) {
-        const mapped = backendListings.map((item: any) => ({
-          id: item.id,
-          name: item.title,
-          breed: item.breed || "Mixed Breed",
-          age: item.age || "Unknown",
-          price: item.price === 0 ? "Free" : `₹${item.price.toLocaleString("en-IN")}`,
-          location: item.location || "Local",
-          distance: "Local",
-          image: item.image_url || item.image || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400",
-          verified: item.seller?.verified || true,
-          vaccinated: item.vaccinated || true,
-          type: item.type === "adoption" ? "adoption" : "sale",
-          recommendation: item.description || "Healthy, gentle temperament."
-        }));
-        setListings(mapped);
-      }
-    } catch {
-      if (postType === "accessory") {
-        const newAcc: Accessory = {
-          id: Date.now(),
-          name: postTitle,
-          priceNum: priceVal,
-          priceStr: `₹${postPrice}`,
-          image: postImage || "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=300",
-          category: "Accessories",
-          speciesTarget: "General",
-        };
-        setAccessories((prev) => [newAcc, ...prev]);
-      } else {
-        const newListing: Listing = {
-          id: Date.now(),
-          name: postTitle,
-          breed: postBreed || "Mixed Breed",
-          age: "1 Year",
-          price: postPrice.toLowerCase().includes("free") ? "Free" : `₹${postPrice}`,
-          location: postLocation,
-          distance: "1.0 km",
-          image: postImage || "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400",
-          type: postType as "sale" | "adoption",
-          verified: true,
-          vaccinated: true,
-          recommendation: postDesc || "Healthy, gentle temperament.",
-        };
-        setListings((prev) => [newListing, ...prev]);
-      }
+      await createListing({
+        title: newTitle.trim(),
+        price: newType === "adoption" ? 0 : (parseInt(newPrice) || 1000),
+        category: "Pets",
+        type: newType,
+        description: newDesc || "Community animal listing.",
+        location: "Local Community",
+        image: newListingImage || undefined,
+      });
+    } catch (e) {
+      console.warn("Could not sync listing to backend:", e);
     }
 
-    Alert.alert("🎉 Success!", `${postTitle} is now live on the EcoTrack marketplace.`);
-    setPostTitle(""); setPostBreed(""); setPostPrice(""); setPostLocation(""); setPostDesc(""); setPostImage(null);
-    setActiveTab(postType === "accessory" ? "accessories" : postType);
+    setAnimalsList([item, ...animalsList]);
+    setShowListingModal(false);
+    setNewTitle("");
+    setNewPrice("");
+    setNewDesc("");
+    setNewListingImage(null);
+    Alert.alert("Listing Published 🎉", "Your animal listing has been published to the community marketplace.");
   };
 
+  // Direct Real User-to-User Chat with Seller
+  const openChatWithSeller = (item: any) => {
+    const sellerId =
+      item.sellerId ||
+      item.seller_id ||
+      (typeof item.seller === "object" ? item.seller?.id : null) ||
+      item.user_id ||
+      item.sellerDetails?.id ||
+      `usr_seller_${item.id}`;
+    const sellerName =
+      typeof item.seller === "object"
+        ? item.seller?.name
+        : (item.seller || item.sellerName || item.sellerDetails?.name || "Verified Seller");
+
+    router.push({
+      pathname: "/chat/[id]",
+      params: {
+        id: String(sellerId),
+        name: String(sellerName),
+        listingId: String(item.id),
+      },
+    });
+  };
+
+  // Filtered List
+  const displayedItems = useMemo(() => {
+    let list: any[] = [];
+    if (activeTab === "animals") {
+      list = animalsList;
+      if (selectedCategory !== "All") {
+        const cat = selectedCategory.toLowerCase();
+        if (cat === "adoption") {
+          list = list.filter((item) => item.type === "adoption" || String(item.price || "").toLowerCase().includes("free"));
+        } else if (cat === "sale") {
+          list = list.filter((item) => item.type === "sale" && !String(item.price || "").toLowerCase().includes("free") && item.price !== 0);
+        } else {
+          list = list.filter((item) => item.species?.toLowerCase() === cat || item.breed?.toLowerCase().includes(cat));
+        }
+      }
+    } else if (activeTab === "products") {
+      list = productsList;
+      if (selectedCategory !== "All") {
+        list = list.filter((item) => item.category?.toLowerCase() === selectedCategory.toLowerCase());
+      }
+    } else if (activeTab === "saved") {
+      list = [...animalsList, ...productsList].filter((item) => favorites[item.id]);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (item) =>
+          item.name?.toLowerCase().includes(q) ||
+          item.species?.toLowerCase().includes(q) ||
+          item.breed?.toLowerCase().includes(q) ||
+          item.location?.toLowerCase().includes(q) ||
+          item.category?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [activeTab, animalsList, productsList, favorites, selectedCategory, searchQuery]);
+
+  const secondaryFilters = useMemo(() => {
+    if (activeTab === "animals") return ["All", "Adoption", "Sale", "Dog", "Cat", "Bird", "Horse", "Rabbit"];
+    if (activeTab === "products") return ["All", "Food", "Gear", "Medical", "Housing", "Supplies"];
+    return [];
+  }, [activeTab]);
+
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.bgLight} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={{ flex: 1, paddingRight: 8 }}>
-          <Text style={styles.headerTitle} numberOfLines={1}>🛍️ Marketplace</Text>
-          <Text style={styles.headerSub} numberOfLines={1}>Verified animal supplies & listings</Text>
+      {/* TOP HEADER */}
+      <View style={styles.topHeader}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={styles.topIconWrap}>
+            <Ionicons name="cart" size={20} color="#fff" />
+          </View>
+          <View>
+            <Text style={styles.topTitle}>Boutique Marketplace</Text>
+            <Text style={styles.topSub}>Verified Supplies & Adoption</Text>
+          </View>
         </View>
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-          <TouchableOpacity style={styles.headerActionBtn} onPress={() => setPostVisible(true)}>
-            <Ionicons name="add" size={24} color={colors.primary} />
+
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity style={styles.headerActionBtn} onPress={() => setShowListingModal(true)}>
+            <Ionicons name="add-circle" size={16} color={colors.primary} />
+            <Text style={styles.headerActionBtnText}>New</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerActionBtn} onPress={() => setCartVisible(true)}>
-            <Ionicons name="cart" size={22} color={colors.primary} />
+
+          <TouchableOpacity style={styles.cartIconBadge} onPress={() => setShowCartModal(true)}>
+            <Ionicons name="cart" size={18} color={colors.primary} />
             {cart.length > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{cart.reduce((s, c) => s + c.qty, 0)}</Text>
+              <View style={styles.badgeCount}>
+                <Text style={styles.badgeCountText}>{cart.length}</Text>
               </View>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.profileHeaderBtn}
+            onPress={() => router.push("/(tabs)/profile")}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="person-circle" size={26} color={colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Navigation Tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.tabBar}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
-      >
-        {TABS.map((tab) => (
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* SEARCH BAR */}
+        <View style={styles.searchBarWrap}>
+          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search breeds, species, supplies, or locations..."
+            placeholderTextColor={colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* PRIMARY TABS */}
+        <View style={styles.primaryTabsRow}>
           <TouchableOpacity
-            key={tab.key}
-            style={[styles.tabBtn, activeTab === tab.key && styles.tabBtnActive]}
-            onPress={() => setActiveTab(tab.key)}
+            style={[styles.primaryTab, activeTab === "animals" && styles.primaryTabActive]}
+            onPress={() => {
+              setActiveTab("animals");
+              setSelectedCategory("All");
+            }}
           >
-            <Ionicons
-              name={tab.icon as any}
-              size={18}
-              color={activeTab === tab.key ? "#fff" : colors.textSecondary}
-            />
-            <Text style={[styles.tabBtnText, activeTab === tab.key && styles.tabBtnTextActive]}>
-              {tab.label}
+            <Text style={[styles.primaryTabText, activeTab === "animals" && styles.primaryTabTextActive]}>
+              🐾 Animals & Adoption
             </Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
 
-      {/* Search Input */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={18} color={colors.textMuted} />
-        <TextInput
-          style={styles.searchInput}
-          value={search}
-          onChangeText={setSearch}
-          placeholder={activeTab === "accessories" ? "Search pet food, cages, toys..." : "Search breeds, species, locations..."}
-          placeholderTextColor={colors.textMuted}
-        />
-        <TouchableOpacity
-          style={[styles.nearbyBtn, nearbyOn && { backgroundColor: colors.primary }]}
-          onPress={toggleNearby}
-        >
-          <Ionicons name="location-outline" size={20} color={nearbyOn ? "#fff" : colors.primary} />
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[styles.primaryTab, activeTab === "products" && styles.primaryTabActive]}
+            onPress={() => {
+              setActiveTab("products");
+              setSelectedCategory("All");
+            }}
+          >
+            <Text style={[styles.primaryTabText, activeTab === "products" && styles.primaryTabTextActive]}>
+              🛍️ Products & Supplies
+            </Text>
+          </TouchableOpacity>
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* ANIMALS & ADOPTION LISTINGS */}
-        {activeTab === "animals" && (
-          filteredListings.length === 0 ? (
-            <View style={[styles.emptyCart, { width: width - 32, alignSelf: 'center', marginTop: 40 }]}>
-              <Ionicons name="paw-outline" size={56} color={colors.textMuted} />
-              <Text style={styles.emptyText}>No animal listings found. Click '+' to post a new listing.</Text>
+          <TouchableOpacity
+            style={[styles.primaryTab, activeTab === "saved" && styles.primaryTabActiveSaved]}
+            onPress={() => setActiveTab("saved")}
+          >
+            <Ionicons
+              name={activeTab === "saved" ? "heart" : "heart-outline"}
+              size={14}
+              color={activeTab === "saved" ? "#fff" : colors.danger}
+            />
+            <Text style={[styles.primaryTabText, activeTab === "saved" && styles.primaryTabTextActive]}>
+              Saved ({Object.values(favorites).filter(Boolean).length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* SECONDARY FILTER CHIPS */}
+        {secondaryFilters.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.secondaryScroll}>
+            {secondaryFilters.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={[styles.secChip, selectedCategory === cat && styles.secChipActive]}
+                onPress={() => setSelectedCategory(cat)}
+              >
+                <Text style={[styles.secChipText, selectedCategory === cat && styles.secChipTextActive]}>
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* CATALOG LIST */}
+        <View style={styles.catalogGrid}>
+          {displayedItems.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="basket-outline" size={48} color={colors.textMuted} />
+              <Text style={styles.emptyTitle}>No Listings Found</Text>
+              <Text style={styles.emptySub}>Try searching with different keywords or filter criteria.</Text>
             </View>
           ) : (
-            <View style={styles.listGrid}>
-              {filteredListings.map((item) => {
-                const isFav = favorites.includes(item.id);
-                return (
-                  <View key={item.id} style={styles.card}>
-                    <View style={styles.imageBox}>
-                      <Image source={{ uri: item.image }} style={styles.cardImg} />
-                      <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(item.id)}>
-                        <Ionicons name={isFav ? "heart" : "heart-outline"} size={18} color={isFav ? colors.danger : "#fff"} />
-                      </TouchableOpacity>
-                      <View style={styles.cardBadges}>
-                        {item.verified && (
-                          <View style={styles.verifiedTag}>
-                            <Ionicons name="shield-checkmark" size={10} color="#fff" />
-                            <Text style={styles.tagText}>Verified</Text>
-                          </View>
-                        )}
-                        <View style={[styles.typeBadge, { backgroundColor: item.type === 'adoption' ? colors.secondary : colors.primary }]}>
-                          <Text style={styles.tagText}>{item.type === 'adoption' ? 'Adoption' : 'For Sale'}</Text>
+            displayedItems.map((item, idx) => {
+              const isFav = Boolean(favorites[item.id]);
+              const isAnimal = Boolean(item.species);
+
+              return (
+                <View key={`market-${item.id || idx}-${idx}`} style={styles.card}>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => setSelectedDetailItem(item)}
+                    style={styles.cardImageContainer}
+                  >
+                    <Image source={{ uri: item.image }} style={styles.cardImage} />
+
+                    {/* Tag badge */}
+                    <View style={styles.cardBadge}>
+                      <Text style={styles.cardBadgeText}>
+                        {isAnimal ? (item.type === "adoption" ? "Free Adoption" : "Verified Breeder") : item.category}
+                      </Text>
+                    </View>
+
+                    {/* Heart button */}
+                    <TouchableOpacity
+                      style={styles.cardHeartBtn}
+                      onPress={() => toggleFavorite(item.id)}
+                    >
+                      <Ionicons
+                        name={isFav ? "heart" : "heart-outline"}
+                        size={18}
+                        color={isFav ? colors.danger : "#fff"}
+                      />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+
+                  <View style={styles.cardBody}>
+                    <View style={styles.cardHeaderLine}>
+                      <Text style={styles.cardPrice}>{item.priceStr || item.price}</Text>
+                      {item.vaccinated && (
+                        <View style={styles.vaxBadge}>
+                          <Ionicons name="shield-checkmark" size={11} color={colors.primary} />
+                          <Text style={styles.vaxText}>Vaccinated</Text>
                         </View>
-                      </View>
+                      )}
                     </View>
 
-                    <View style={styles.cardContent}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.cardTitle}>{item.name}</Text>
-                        <Text style={[styles.priceTag, item.price === 'Free' && { color: colors.secondary }]}>{item.price}</Text>
-                      </View>
-                      <View style={styles.metaRow}>
-                        <View style={styles.metaItem}><Ionicons name="paw" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.breed}</Text></View>
-                        <View style={styles.metaItem}><Ionicons name="time" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.age}</Text></View>
-                        {(item as any).realDistance < 999 && (
-                          <View style={styles.metaItem}><Ionicons name="location" size={12} color={colors.primary} /><Text style={[styles.metaText, { color: colors.primary, fontWeight: '800' }]}>{(item as any).realDistance.toFixed(1)} km</Text></View>
-                        )}
-                        {!((item as any).realDistance < 999) && (
-                          <View style={styles.metaItem}><Ionicons name="location" size={12} color={colors.textMuted} /><Text style={styles.metaText}>{item.distance}</Text></View>
-                        )}
-                      </View>
+                    <TouchableOpacity onPress={() => setSelectedDetailItem(item)} activeOpacity={0.8}>
+                      <Text style={styles.cardTitle} numberOfLines={2}>
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
 
-                      <Text style={styles.recText}>{item.recommendation}</Text>
+                    <Text style={styles.cardDesc} numberOfLines={2}>
+                      {item.description}
+                    </Text>
 
+                    <View style={styles.cardMetaRow}>
+                      <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+                      <Text style={styles.cardMetaText}>{item.location}</Text>
+                      <Text style={styles.metaDot}>•</Text>
+                      <Text style={styles.cardMetaText}>{item.seller}</Text>
+                    </View>
+
+                    {/* Action Buttons */}
+                    <View style={styles.cardActionsRow}>
                       <TouchableOpacity
-                        style={styles.contactBtn}
-                        onPress={() => router.push(`/chat/${item.sellerId || item.id}?name=${encodeURIComponent(item.sellerName || item.name)}`)}
+                        style={styles.detailsBtn}
+                        onPress={() => setSelectedDetailItem(item)}
+                        activeOpacity={0.8}
                       >
-                        <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
-                        <Text style={styles.contactText}>Message Seller</Text>
+                        <Ionicons name="information-circle-outline" size={15} color="#fff" />
+                        <Text style={styles.detailsBtnText}>Details</Text>
                       </TouchableOpacity>
+
+                      {isAnimal ? (
+                        <TouchableOpacity
+                          style={styles.chatSellerBtn}
+                          onPress={() => openChatWithSeller(item)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="chatbubble-ellipses" size={15} color={colors.primary} />
+                          <Text style={styles.chatSellerBtnText}>Chat</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <>
+                          <TouchableOpacity
+                            style={styles.addToCartBtn}
+                            onPress={() => addToCart(item)}
+                          >
+                            <Ionicons name="cart" size={15} color="#fff" />
+                            <Text style={styles.addToCartBtnText}>Add</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.chatSellerBtn}
+                            onPress={() => openChatWithSeller(item)}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="chatbubble-ellipses" size={15} color={colors.primary} />
+                            <Text style={styles.chatSellerBtnText}>Chat</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
                     </View>
                   </View>
-                );
-              })}
-            </View>
-          )
-        )}
+                </View>
+              );
+            })
+          )}
+        </View>
 
-        {/* PRODUCTS & ACCESSORIES */}
-        {activeTab === "accessories" && (
-          <View style={{ paddingHorizontal: 16 }}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-              {ACCESSORY_CATS.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.catChip, selectedCategory === cat && styles.catChipActive]}
-                  onPress={() => setSelectedCategory(cat)}
-                >
-                  <Text style={[styles.catChipText, selectedCategory === cat && styles.catChipTextActive]}>{cat}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={styles.accGrid}>
-              {filteredAccessories.map((acc) => {
-                const isFav = favorites.includes(acc.id);
-                return (
-                  <View key={acc.id} style={styles.accCard}>
-                    <View style={styles.accImageWrapper}>
-                      <Image source={{ uri: acc.image }} style={styles.accImg} />
-                      <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(acc.id)}>
-                        <Ionicons name={isFav ? "heart" : "heart-outline"} size={18} color={isFav ? colors.danger : "#fff"} />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.accInfo}>
-                      <Text style={styles.accCategory}>{acc.category}</Text>
-                      <Text style={styles.accName} numberOfLines={1}>{acc.name}</Text>
-                      <Text style={styles.accPrice}>{acc.priceStr}</Text>
-                      <TouchableOpacity style={styles.addToCartBtn} onPress={() => addToCart(acc)} activeOpacity={0.85}>
-                        <Ionicons name="cart-outline" size={14} color="#fff" />
-                        <Text style={styles.addToCartBtnText}>Add to Cart</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        {/* SAVED & LIKED FAVORITES */}
-        {activeTab === "favorites" && (
-          <View style={{ paddingHorizontal: 16 }}>
-            <Text style={styles.sectionTitle}>❤️ Saved Animals & Liked Items ({favorites.length})</Text>
-            {favorites.length === 0 ? (
-              <View style={styles.emptyCart}>
-                <Ionicons name="heart-outline" size={56} color={colors.textMuted} />
-                <Text style={styles.emptyText}>No saved items yet.</Text>
-                <TouchableOpacity style={styles.continueBtn} onPress={() => setActiveTab("animals")}>
-                  <Text style={styles.continueText}>Explore Animals & Products</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.listGrid}>
-                {listings.filter(item => favorites.includes(item.id)).map((item) => (
-                  <View key={item.id} style={styles.card}>
-                    <View style={styles.imageBox}>
-                      <Image source={{ uri: item.image }} style={styles.cardImg} />
-                      <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(item.id)}>
-                        <Ionicons name="heart" size={18} color={colors.danger} />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.cardContent}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.cardTitle}>{item.name}</Text>
-                        <Text style={styles.priceTag}>{item.price}</Text>
-                      </View>
-                      <Text style={[styles.metaText, { marginTop: 4 }]}>📍 {item.location} • {item.distance}</Text>
-                      <TouchableOpacity
-                        style={styles.contactBtn}
-                        onPress={() => router.push(`/chat/${item.sellerId || item.id}?name=${encodeURIComponent(item.sellerName || item.name)}`)}
-                      >
-                        <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
-                        <Text style={styles.contactText}>Message Seller</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-                {accessories.filter(item => favorites.includes(item.id)).map((acc) => (
-                  <View key={acc.id} style={styles.card}>
-                    <View style={styles.imageBox}>
-                      <Image source={{ uri: acc.image }} style={styles.cardImg} />
-                      <TouchableOpacity style={styles.favBtn} onPress={() => toggleFav(acc.id)}>
-                        <Ionicons name="heart" size={18} color={colors.danger} />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.cardContent}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.cardTitle}>{acc.name}</Text>
-                        <Text style={styles.priceTag}>{acc.priceStr}</Text>
-                      </View>
-                      <Text style={[styles.metaText, { marginTop: 4 }]}>🛍️ Category: {acc.category}</Text>
-                      <TouchableOpacity
-                        style={[styles.contactBtn, { backgroundColor: colors.primary }]}
-                        onPress={() => addToCart(acc)}
-                      >
-                        <Ionicons name="cart" size={16} color="#fff" />
-                        <Text style={styles.contactText}>Add to Cart</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
-        <View style={{ height: 100 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* POST NEW ITEM MODAL */}
-      <Modal visible={postVisible} animationType="slide" transparent onRequestClose={() => setPostVisible(false)}>
-        <View style={styles.modalBg}>
-          <View style={[styles.postCard, { maxHeight: '90%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
+      {/* CART MODAL */}
+      <Modal visible={showCartModal} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-               <Text style={styles.postHeader}>➕ Post Listing</Text>
-               <TouchableOpacity onPress={() => setPostVisible(false)}>
-                 <Ionicons name="close-circle" size={26} color={colors.textSecondary} />
-               </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.postSub}>Publish items locally to EcoTrack network offline.</Text>
-
-              <View style={styles.typeRow}>
-                {(["sale", "adoption", "accessory"] as const).map((t) => (
-                  <TouchableOpacity
-                    key={t}
-                    style={[styles.typeBtn, postType === t && styles.typeBtnActive]}
-                    onPress={() => setPostType(t)}
-                  >
-                    <Text style={[styles.typeText, postType === t && styles.typeTextActive]}>
-                      {t === "sale" ? "Sell Animal" : t === "adoption" ? "Free Adoption" : "Product / Supplies"}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="cart" size={20} color={colors.primary} />
+                <Text style={styles.modalTitle}>Your Shopping Cart</Text>
               </View>
-
-              {postImage ? (
-                <View style={styles.previewBox}>
-                  <Image source={{ uri: postImage }} style={styles.previewImg} />
-                  <TouchableOpacity style={styles.removeImg} onPress={() => setPostImage(null)}>
-                    <Ionicons name="close" size={18} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
-                  <Ionicons name="camera" size={32} color={colors.primary} />
-                  <Text style={styles.uploadText}>Upload Listing Photo</Text>
-                </TouchableOpacity>
-              )}
-
-              <Text style={styles.label}>Title / Item Name *</Text>
-              <TextInput style={styles.input} value={postTitle} onChangeText={setPostTitle} placeholder="e.g. Persian Cat, Dog Food 5kg" placeholderTextColor={colors.textMuted} />
-
-              <Text style={styles.label}>Breed / Category</Text>
-              <TextInput style={styles.input} value={postBreed} onChangeText={setPostBreed} placeholder="e.g. Purebred Persian, Housing" placeholderTextColor={colors.textMuted} />
-
-              <Text style={styles.label}>Price (₹) *</Text>
-              <TextInput style={styles.input} value={postPrice} onChangeText={setPostPrice} keyboardType="numeric" placeholder="e.g. 5000 (Type 'Free' for adoption)" placeholderTextColor={colors.textMuted} />
-
-              <Text style={styles.label}>Location / City *</Text>
-              <TextInput style={styles.input} value={postLocation} onChangeText={setPostLocation} placeholder="e.g. Chennai, Madurai" placeholderTextColor={colors.textMuted} />
-
-              <Text style={styles.label}>Description</Text>
-              <TextInput style={[styles.input, { height: 75 }]} value={postDesc} onChangeText={setPostDesc} placeholder="Describe item, condition, vaccination records..." placeholderTextColor={colors.textMuted} multiline />
-
-              <TouchableOpacity style={styles.submitBtn} onPress={() => { handlePostItem(); setPostVisible(false); }}>
-                <Ionicons name="cloud-upload" size={20} color="#fff" />
-                <Text style={styles.submitText}>Publish Listing</Text>
-              </TouchableOpacity>
-              <View style={{ height: 30 }} />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* SHOPPING CART MODAL */}
-      <Modal visible={cartVisible} animationType="slide" transparent onRequestClose={() => setCartVisible(false)}>
-        <View style={styles.modalBg}>
-          <View style={styles.cartModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>🛒 Offline Shopping Cart</Text>
-              <TouchableOpacity onPress={() => setCartVisible(false)}>
-                <Ionicons name="close-circle" size={26} color={colors.textSecondary} />
+              <TouchableOpacity onPress={() => setShowCartModal(false)}>
+                <Ionicons name="close-circle" size={24} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
 
             {cart.length === 0 ? (
-              <View style={styles.emptyCart}>
-                <Ionicons name="cart-outline" size={64} color={colors.textMuted} />
-                <Text style={styles.emptyText}>Your cart is empty</Text>
-                <TouchableOpacity style={styles.continueBtn} onPress={() => setCartVisible(false)}>
-                   <Text style={styles.continueText}>Continue Shopping</Text>
-                </TouchableOpacity>
+              <View style={styles.emptyCartBox}>
+                <Ionicons name="cart-outline" size={48} color={colors.textMuted} />
+                <Text style={styles.emptyTitle}>Cart is Empty</Text>
+                <Text style={styles.emptySub}>Browse supplies and add products to your cart.</Text>
               </View>
             ) : (
-              <View style={{ flex: 1 }}>
-                <View style={styles.orderSummaryHeader}>
-                  <Text style={styles.orderSummaryTitle}>Order Summary</Text>
-                  <Text style={styles.orderSummaryCount}>{cart.reduce((s, c) => s + c.qty, 0)} Items</Text>
-                </View>
-                <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-                  {cart.map(({ item, qty }) => (
-                    <View key={item.id} style={styles.cartItemRow}>
-                      <Image source={{ uri: item.image }} style={styles.cartThumb} />
-                      <View style={{ flex: 1, marginLeft: 14 }}>
-                        <Text style={styles.cartItemName}>{item.name}</Text>
-                        <Text style={styles.cartItemPrice}>{item.priceStr}</Text>
-                      </View>
-
-                      <View style={styles.cartActions}>
-                        <View style={styles.qtyRow}>
-                          <TouchableOpacity onPress={() => updateCartQty(item.id, -1)} style={styles.qtyBtn}>
-                            <Ionicons name="remove" size={14} color="#fff" />
-                          </TouchableOpacity>
-                          <Text style={styles.qtyText}>{qty}</Text>
-                          <TouchableOpacity onPress={() => updateCartQty(item.id, 1)} style={styles.qtyBtn}>
-                            <Ionicons name="add" size={14} color="#fff" />
-                          </TouchableOpacity>
-                        </View>
-                        <TouchableOpacity onPress={() => removeFromCart(item.id)} style={styles.trashBtn}>
-                          <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                        </TouchableOpacity>
-                      </View>
+              <ScrollView style={{ maxHeight: 360 }}>
+                {cart.map((c, idx) => (
+                  <View key={`cart-item-${c.id}-${idx}`} style={styles.cartItemRow}>
+                    <Image source={{ uri: c.image }} style={styles.cartItemImg} />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.cartItemName} numberOfLines={1}>{c.name}</Text>
+                      <Text style={styles.cartItemPrice}>{c.priceStr || `₹${c.price}`}</Text>
                     </View>
-                  ))}
-                </ScrollView>
-
-                <View style={styles.checkoutFooter}>
-                  <View style={styles.billRow}>
-                    <Text style={styles.billLabel}>Subtotal</Text>
-                    <Text style={styles.billVal}>₹{cartTotal.toLocaleString("en-IN")}</Text>
+                    <View style={styles.qtyControl}>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={() => updateCartQty(c.id, -1)}>
+                        <Text style={styles.qtyBtnText}>-</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.qtyVal}>{c.qty}</Text>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={() => updateCartQty(c.id, 1)}>
+                        <Text style={styles.qtyBtnText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={styles.billRow}>
-                    <Text style={styles.billLabel}>Tax & Handling (Simulated)</Text>
-                    <Text style={styles.billVal}>₹{(cartTotal * 0.05).toFixed(0)}</Text>
-                  </View>
-                  <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Grand Total</Text>
-                    <Text style={styles.totalVal}>₹{(cartTotal * 1.05).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</Text>
-                  </View>
-
-                  <TouchableOpacity
-                    style={styles.checkoutBtn}
-                    onPress={() => {
-                      if (userId) {
-                        apiCheckoutCart(userId, cartTotal * 1.05);
-                      }
-                      setCheckoutDone(true);
-                      setCart([]);
-                      setTimeout(() => { setCheckoutDone(false); setCartVisible(false); }, 2000);
-                    }}
-                  >
-                    <Ionicons name="lock-closed" size={18} color="#fff" style={{ marginRight: 10 }} />
-                    <Text style={styles.checkoutText}>Secure Checkout</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+                ))}
+              </ScrollView>
             )}
 
-            {checkoutDone && (
-              <View style={styles.successBanner}>
-                <Ionicons name="checkmark-circle" size={32} color={colors.success} />
-                <Text style={styles.successText}>Order Confirmed! Receipt Saved Offline.</Text>
+            {cart.length > 0 && (
+              <View style={styles.cartFooter}>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Order Total:</Text>
+                  <Text style={styles.totalVal}>₹{cartTotal.toLocaleString()}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.checkoutBtn}
+                  onPress={() => {
+                    setShowCartModal(false);
+                    setCart([]);
+                    Alert.alert("Order Placed 🎉", "Your order has been submitted to verified partner suppliers.");
+                  }}
+                >
+                  <Text style={styles.checkoutBtnText}>Proceed to Checkout</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
         </View>
       </Modal>
 
-      {/* FLOATING PERSISTENT CART BAR */}
-      {cart.length > 0 && (
-        <TouchableOpacity style={styles.floatingCartBtn} onPress={() => setCartVisible(true)} activeOpacity={0.9}>
-          <View style={styles.floatingCartLeft}>
-            <Ionicons name="cart" size={22} color="#fff" />
-            <Text style={styles.floatingCartCount}>{cart.reduce((s, c) => s + c.qty, 0)} Items</Text>
+      {/* NEW LISTING MODAL */}
+      <Modal visible={showListingModal} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Publish Animal / Product Listing</Text>
+              <TouchableOpacity onPress={() => setShowListingModal(false)}>
+                <Ionicons name="close-circle" size={24} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.listingTypeRow}>
+                <TouchableOpacity
+                  style={[styles.typeBtn, newType === "adoption" && styles.typeBtnActive]}
+                  onPress={() => setNewType("adoption")}
+                >
+                  <Text style={[styles.typeBtnText, newType === "adoption" && styles.typeBtnTextActive]}>
+                    🐾 Free Adoption
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.typeBtn, newType === "sale" && styles.typeBtnActive]}
+                  onPress={() => setNewType("sale")}
+                >
+                  <Text style={[styles.typeBtnText, newType === "sale" && styles.typeBtnTextActive]}>
+                    🛍️ For Sale
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.inputLabel}>Title *</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. Friendly Labrador Pup Looking for Home"
+                placeholderTextColor={colors.textMuted}
+                value={newTitle}
+                onChangeText={setNewTitle}
+              />
+
+              {newType === "sale" && (
+                <>
+                  <Text style={styles.inputLabel}>Price (₹) *</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="e.g. 5000"
+                    placeholderTextColor={colors.textMuted}
+                    value={newPrice}
+                    onChangeText={setNewPrice}
+                    keyboardType="numeric"
+                  />
+                </>
+              )}
+
+              <Text style={styles.inputLabel}>Description & Health Notes</Text>
+              <TextInput
+                style={[styles.modalInput, { height: 80, textAlignVertical: "top" }]}
+                placeholder="Describe animal temperaments, vaccination status, and special care needs..."
+                placeholderTextColor={colors.textMuted}
+                value={newDesc}
+                onChangeText={setNewDesc}
+                multiline
+              />
+
+              {/* Photo Upload Section */}
+              <View style={styles.imagePickerContainer}>
+                <Text style={styles.inputLabel}>Listing Photo</Text>
+                {newListingImage ? (
+                  <View style={styles.imagePreviewBox}>
+                    <Image source={{ uri: newListingImage }} style={styles.imagePreview} />
+                    <TouchableOpacity style={styles.removeImageBtn} onPress={() => setNewListingImage(null)}>
+                      <Ionicons name="close" size={18} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.mediaButtonsRow}>
+                    <TouchableOpacity style={styles.mediaBtn} onPress={handlePickListingImage} activeOpacity={0.8}>
+                      <Ionicons name="images-outline" size={18} color={colors.primary} />
+                      <Text style={styles.mediaBtnText}>Upload Photo</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.mediaBtn} onPress={handleTakeListingPhoto} activeOpacity={0.8}>
+                      <Ionicons name="camera-outline" size={18} color={colors.primary} />
+                      <Text style={styles.mediaBtnText}>Take Photo</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              <TouchableOpacity style={styles.submitListingBtn} onPress={handleCreateListing}>
+                <Text style={styles.submitListingBtnText}>Publish Listing</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-          <View style={styles.floatingCartRight}>
-            <Text style={styles.floatingCartTotal}>₹{cartTotal.toLocaleString("en-IN")}</Text>
-            <Text style={styles.floatingCartViewText}>View Cart →</Text>
+        </View>
+      </Modal>
+
+      {/* LISTING DETAILS MODAL (MATCHING WEBSITE INTEL REPORT / PRODUCT SPECS) */}
+      <Modal visible={Boolean(selectedDetailItem)} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.detailModalSheet}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                <Ionicons
+                  name={selectedDetailItem?.species ? "paw" : "cube"}
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text style={styles.modalTitle} numberOfLines={1}>
+                  {selectedDetailItem?.species ? "Animal Intelligence Report" : "Product Specifications"}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedDetailItem(null)}>
+                <Ionicons name="close-circle" size={26} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+              {/* Hero Image */}
+              <View style={styles.detailHeroImgWrap}>
+                <Image source={{ uri: selectedDetailItem?.image }} style={styles.detailHeroImg} />
+                <View style={styles.detailImgBadges}>
+                  <View style={styles.detailSpeciesBadge}>
+                    <Text style={styles.detailSpeciesBadgeText}>
+                      {selectedDetailItem?.species || selectedDetailItem?.category || "Verified"}
+                    </Text>
+                  </View>
+                  {selectedDetailItem?.vaccinated && (
+                    <View style={styles.detailVaxBadge}>
+                      <Ionicons name="shield-checkmark" size={12} color="#fff" />
+                      <Text style={styles.detailVaxBadgeText}>Vaccinated</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Title & Price Header */}
+              <View style={styles.detailTitlePriceRow}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={styles.detailItemName}>{selectedDetailItem?.name}</Text>
+                  <Text style={styles.detailItemSub}>
+                    {selectedDetailItem?.breed
+                      ? `Breed: ${selectedDetailItem?.breed}`
+                      : `Category: ${selectedDetailItem?.category || "Pet Supply"}`}
+                  </Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={styles.detailPriceVal}>
+                    {selectedDetailItem?.priceStr || selectedDetailItem?.price}
+                  </Text>
+                  <Text style={styles.detailPriceSub}>
+                    {selectedDetailItem?.type === "adoption" || String(selectedDetailItem?.price).toLowerCase().includes("free")
+                      ? "Free Adoption"
+                      : "Boutique Pricing"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Animal Chips */}
+              {selectedDetailItem?.species && (
+                <View style={styles.detailChipsRow}>
+                  {selectedDetailItem?.species && (
+                    <View style={[styles.detailChip, { backgroundColor: isDark ? "#064e3b30" : "#ecfdf5", borderColor: "#10b98140" }]}>
+                      <Text style={[styles.detailChipText, { color: colors.primary }]}>🐾 {selectedDetailItem.species}</Text>
+                    </View>
+                  )}
+                  {selectedDetailItem?.breed && (
+                    <View style={[styles.detailChip, { backgroundColor: isDark ? "#0c4a6e30" : "#f0f9ff", borderColor: "#0284c740" }]}>
+                      <Text style={[styles.detailChipText, { color: "#0284c7" }]}>🧬 {selectedDetailItem.breed}</Text>
+                    </View>
+                  )}
+                  {selectedDetailItem?.gender && (
+                    <View style={[styles.detailChip, { backgroundColor: isDark ? "#581c8730" : "#fdf4ff", borderColor: "#9333ea40" }]}>
+                      <Text style={[styles.detailChipText, { color: "#9333ea" }]}>
+                        {selectedDetailItem.gender === "Male" ? "♂ Male" : "♀ Female"}
+                      </Text>
+                    </View>
+                  )}
+                  {selectedDetailItem?.age && (
+                    <View style={[styles.detailChip, { backgroundColor: isDark ? "#7c2d1230" : "#fff7ed", borderColor: "#ea580c40" }]}>
+                      <Text style={[styles.detailChipText, { color: "#ea580c" }]}>⏳ {selectedDetailItem.age}</Text>
+                    </View>
+                  )}
+                  {selectedDetailItem?.vaccinated && (
+                    <View style={[styles.detailChip, { backgroundColor: isDark ? "#14532d30" : "#f0fdf4", borderColor: "#16a34a40" }]}>
+                      <Text style={[styles.detailChipText, { color: "#16a34a" }]}>❤️ Verified Health</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Info Grid (Location & Assurance) */}
+              <View style={styles.detailInfoGrid}>
+                <View style={styles.detailInfoBox}>
+                  <Text style={styles.detailInfoBoxLabel}>📍 LOCATION & LOGISTICS</Text>
+                  <Text style={styles.detailInfoBoxVal}>{selectedDetailItem?.location}</Text>
+                  <Text style={styles.detailInfoBoxSub}>
+                    {selectedDetailItem?.species ? `Age: ${selectedDetailItem?.age || "Young"}` : "Fast Delivery Available"}
+                  </Text>
+                </View>
+                <View style={styles.detailInfoBox}>
+                  <Text style={styles.detailInfoBoxLabel}>🛡️ VERIFIED ASSURANCE</Text>
+                  <Text style={styles.detailInfoBoxVal}>{selectedDetailItem?.seller || "Verified Caretaker"}</Text>
+                  <Text style={styles.detailInfoBoxSub}>
+                    {selectedDetailItem?.species
+                      ? (selectedDetailItem?.vaccinated ? "✅ Vaccinated" : "Regular Checkups")
+                      : "⭐ 4.9/5 Supplier Rating"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Description Overview */}
+              <View style={styles.detailSectionBox}>
+                <Text style={styles.detailSectionLabel}>LISTING OVERVIEW</Text>
+                <Text style={styles.detailSectionText}>
+                  {selectedDetailItem?.description || "Verified EcoTrack listing. This item has passed our welfare and safety verification protocol."}
+                </Text>
+
+                {/* Technical Specs if available */}
+                {selectedDetailItem?.specs && typeof selectedDetailItem?.specs === "object" && (
+                  <View style={styles.detailSpecsWrap}>
+                    <Text style={styles.detailSpecsLabel}>SPECIFICATIONS</Text>
+                    {Object.entries(selectedDetailItem.specs).map(([k, v]) => (
+                      <View key={k} style={styles.detailSpecItem}>
+                        <Text style={styles.detailSpecKey}>{k}:</Text>
+                        <Text style={styles.detailSpecVal}>{String(v)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* Modal Action CTA */}
+              <View style={styles.detailCtaRow}>
+                <TouchableOpacity
+                  style={styles.detailChatCtaBtn}
+                  onPress={() => {
+                    const item = selectedDetailItem;
+                    setSelectedDetailItem(null);
+                    openChatWithSeller(item);
+                  }}
+                >
+                  <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
+                  <Text style={styles.detailChatCtaBtnText}>
+                    Chat with {selectedDetailItem?.species ? "Seller / Shelter" : "Supplier"}
+                  </Text>
+                </TouchableOpacity>
+
+                {!selectedDetailItem?.species && (
+                  <TouchableOpacity
+                    style={styles.detailCartCtaBtn}
+                    onPress={() => {
+                      addToCart(selectedDetailItem);
+                      setSelectedDetailItem(null);
+                    }}
+                  >
+                    <Ionicons name="cart" size={18} color="#fff" />
+                    <Text style={styles.detailCartCtaBtnText}>Add to Cart</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </ScrollView>
           </View>
-        </TouchableOpacity>
-      )}
-    </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 function getStyles(colors: any, isDark: boolean) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.bgLight },
-    scroll: { flex: 1 },
-    header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 54, paddingBottom: 12 },
-    headerTitle: { fontSize: FontSize.xxl, fontWeight: "800", color: colors.textPrimary },
-    headerSub: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },
-    sectionTitle: { fontSize: FontSize.md, fontWeight: "800", color: colors.textPrimary, marginBottom: 14 },
-    headerActionBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: isDark ? colors.bgCard : "#fff", justifyContent: "center", alignItems: "center", position: "relative", borderWidth: 1, borderColor: colors.border, ...Shadow.sm },
-    badge: { position: "absolute", top: -4, right: -4, backgroundColor: colors.danger, borderRadius: 10, width: 20, height: 20, justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: '#fff' },
-    badgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-
-    tabBar: { flexDirection: "row", marginBottom: 16, maxHeight: 48 },
-    tabBtn: {
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.bgLight,
+    },
+    topHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      backgroundColor: colors.bgCard,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      maxWidth: 1000,
+      width: "100%",
+      alignSelf: "center",
+    },
+    topIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: "#f97316",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    topTitle: {
+      fontSize: 18,
+      fontWeight: "900",
+      color: colors.textPrimary,
+    },
+    topSub: {
+      fontSize: 10.5,
+      fontWeight: "700",
+      color: colors.textSecondary,
+    },
+    headerRightActions: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: isDark ? colors.bgCard : "#f3f4f6",
+      gap: 10,
+    },
+    profileHeaderBtn: {
+      padding: 2,
+    },
+    headerActionBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
+      paddingHorizontal: 12,
+      paddingVertical: 7,
       borderRadius: Radius.full,
-      paddingVertical: 10,
-      paddingHorizontal: 16,
-      gap: 8,
+      gap: 5,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    tabBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    tabBtnText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: "600" },
-    tabBtnTextActive: { color: "#fff", fontWeight: "700" },
+    headerActionBtnText: {
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+      color: colors.primary,
+    },
+    cartIconBadge: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      position: "relative",
+    },
+    badgeCount: {
+      position: "absolute",
+      top: -4,
+      right: -4,
+      backgroundColor: colors.danger,
+      borderRadius: 9,
+      width: 18,
+      height: 18,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    badgeCountText: {
+      color: "#fff",
+      fontSize: 10,
+      fontWeight: "900",
+    },
 
-    searchContainer: { flexDirection: "row", alignItems: "center", backgroundColor: colors.bgCard, borderRadius: Radius.lg, paddingHorizontal: 14, marginHorizontal: 16, marginBottom: 14, borderWidth: 1, borderColor: colors.border, height: 44, ...Shadow.sm },
-    searchInput: { flex: 1, marginLeft: 8, fontSize: FontSize.sm, color: colors.textPrimary },
-    nearbyBtn: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.primary + '10', marginLeft: 8 },
+    scrollContent: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      maxWidth: 1000,
+      width: "100%",
+      alignSelf: "center",
+    },
 
-    listGrid: { paddingHorizontal: 16, gap: 14 },
-    card: { backgroundColor: colors.bgCard, borderRadius: Radius.xl, overflow: "hidden", borderWidth: 1, borderColor: colors.border, ...Shadow.sm },
-    imageBox: { height: 200, position: "relative" },
-    cardImg: { width: "100%", height: "100%" },
-    favBtn: { position: "absolute", top: 12, right: 12, backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 16, width: 32, height: 32, justifyContent: "center", alignItems: "center" },
-    cardBadges: { position: "absolute", bottom: 12, left: 12, flexDirection: 'row', gap: 6 },
-    verifiedTag: { backgroundColor: colors.primary, borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 },
-    typeBadge: { borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4 },
-    tagText: { color: "#fff", fontSize: 9, fontWeight: "800", textTransform: 'uppercase' },
+    searchBarWrap: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.bgCard,
+      borderRadius: Radius.lg,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 14,
+      gap: 10,
+      ...Shadow.sm,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: FontSize.sm,
+      color: colors.textPrimary,
+    },
 
-    cardContent: { padding: 16 },
-    titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-    cardTitle: { fontSize: FontSize.lg, fontWeight: "800", color: colors.textPrimary },
-    priceTag: { fontSize: FontSize.lg, fontWeight: "900", color: colors.primary },
-    metaRow: { flexDirection: 'row', gap: 12, marginTop: 6, marginBottom: 10 },
-    metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    metaText: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
-    recText: { fontSize: FontSize.xs, color: colors.textSecondary, fontStyle: "italic", lineHeight: 18 },
-    contactBtn: { backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 12, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 14 },
-    contactText: { color: "#fff", fontWeight: "800", fontSize: FontSize.sm },
-
-    catChip: {
-      backgroundColor: isDark ? colors.bgCard : "#f3f4f6",
+    primaryTabsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 12,
+    },
+    primaryTab: {
+      backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
+      paddingHorizontal: 14,
+      paddingVertical: 9,
       borderRadius: Radius.full,
-      paddingHorizontal: 18,
-      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    primaryTabActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    primaryTabActiveSaved: {
+      backgroundColor: colors.danger,
+      borderColor: colors.danger,
+    },
+    primaryTabText: {
+      fontSize: FontSize.xs,
+      fontWeight: "700",
+      color: colors.textSecondary,
+    },
+    primaryTabTextActive: {
+      color: "#fff",
+      fontWeight: "800",
+    },
+
+    secondaryScroll: {
+      flexDirection: "row",
+      marginBottom: 16,
+    },
+    secChip: {
+      backgroundColor: isDark ? "#0f172a" : "#ffffff",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: Radius.full,
       marginRight: 8,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    catChipText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: "600" },
-    catChipTextActive: { color: "#fff", fontWeight: "700" },
+    secChipActive: {
+      backgroundColor: isDark ? "#1e293b" : "#e2e8f0",
+      borderColor: colors.primary,
+    },
+    secChipText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: colors.textSecondary,
+    },
+    secChipTextActive: {
+      color: colors.primary,
+      fontWeight: "800",
+    },
 
-    accGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-    accCard: { width: (width - 44) / 2, backgroundColor: colors.bgCard, borderRadius: Radius.lg, overflow: "hidden", borderWidth: 1, borderColor: colors.border, ...Shadow.sm },
-    accImageWrapper: { position: 'relative', height: 130 },
-    accImg: { width: "100%", height: "100%" },
-    accQuickAdd: { position: 'absolute', bottom: 10, right: 10, backgroundColor: colors.primary, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', ...Shadow.md },
-    accInfo: { padding: 12 },
-    accCategory: { fontSize: 9, color: colors.textMuted, fontWeight: "800", textTransform: 'uppercase' },
-    accName: { fontSize: FontSize.xs, fontWeight: "700", color: colors.textPrimary, marginTop: 4 },
-    accPrice: { fontSize: FontSize.md, fontWeight: "800", color: colors.primary, marginTop: 4 },
-    addToCartBtn: { backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 8, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 },
-    addToCartBtnText: { color: '#fff', fontSize: FontSize.xs, fontWeight: '800' },
+    catalogGrid: {
+      gap: 16,
+    },
+    card: {
+      backgroundColor: colors.bgCard,
+      borderRadius: Radius.xl,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...Shadow.sm,
+    },
+    cardImageContainer: {
+      height: 220,
+      position: "relative",
+      backgroundColor: "#000",
+    },
+    cardImage: {
+      width: "100%",
+      height: "100%",
+      resizeMode: "cover",
+    },
+    cardBadge: {
+      position: "absolute",
+      top: 12,
+      left: 12,
+      backgroundColor: "rgba(0,0,0,0.65)",
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: Radius.full,
+    },
+    cardBadgeText: {
+      color: "#fff",
+      fontSize: 10,
+      fontWeight: "800",
+    },
+    cardHeartBtn: {
+      position: "absolute",
+      top: 12,
+      right: 12,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
 
-    floatingCartBtn: { position: 'absolute', bottom: 20, left: 16, right: 16, backgroundColor: colors.primary, borderRadius: Radius.xl, paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', ...Shadow.lg, zIndex: 99 },
-    floatingCartLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    floatingCartCount: { color: '#fff', fontWeight: '800', fontSize: FontSize.md },
-    floatingCartRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    floatingCartTotal: { color: '#fff', fontWeight: '900', fontSize: FontSize.lg },
-    floatingCartViewText: { color: '#fff', fontWeight: '700', fontSize: FontSize.xs },
+    cardBody: {
+      padding: 16,
+    },
+    cardHeaderLine: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6,
+    },
+    cardPrice: {
+      fontSize: FontSize.lg,
+      fontWeight: "900",
+      color: colors.primary,
+    },
+    vaxBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: isDark ? "#064e3b" : "#dcfce7",
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: Radius.full,
+      gap: 4,
+    },
+    vaxText: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: colors.primary,
+    },
+    cardTitle: {
+      fontSize: FontSize.md,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    cardDesc: {
+      fontSize: FontSize.xs,
+      color: colors.textSecondary,
+      lineHeight: 18,
+      marginBottom: 10,
+    },
+    cardMetaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      marginBottom: 14,
+    },
+    cardMetaText: {
+      fontSize: 11,
+      color: colors.textMuted,
+      fontWeight: "600",
+    },
+    metaDot: {
+      color: colors.textMuted,
+      marginHorizontal: 2,
+    },
 
-    postCard: { backgroundColor: colors.bgCard, borderRadius: Radius.xl, padding: 24, borderWidth: 1, borderColor: colors.border, ...Shadow.lg },
-    modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-    postHeader: { fontSize: FontSize.xl, fontWeight: "800", color: colors.textPrimary },
-    postSub: { fontSize: FontSize.sm, color: colors.textSecondary, marginBottom: 16 },
-    typeRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-    typeBtn: { flex: 1, backgroundColor: isDark ? colors.bgLight : "#f3f4f6", borderRadius: Radius.md, paddingVertical: 10, alignItems: "center", borderWidth: 1, borderColor: colors.border },
-    typeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    typeText: { fontSize: 11, color: colors.textSecondary, fontWeight: "700" },
-    typeTextActive: { color: "#fff" },
-    uploadBox: { height: 140, borderRadius: Radius.lg, borderWidth: 2, borderStyle: "dashed", borderColor: colors.primary, justifyContent: "center", alignItems: "center", backgroundColor: isDark ? colors.bgLight : "#f0fdf4", marginBottom: 16 },
-    uploadText: { fontSize: FontSize.sm, fontWeight: "700", color: colors.primary, marginTop: 10 },
-    previewBox: { height: 160, borderRadius: Radius.lg, overflow: "hidden", marginBottom: 16, position: "relative" },
-    previewImg: { width: "100%", height: "100%" },
-    removeImg: { position: "absolute", top: 10, right: 10, backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 12, padding: 6 },
-    label: { fontSize: FontSize.xs, fontWeight: "700", color: colors.textSecondary, marginBottom: 6, marginTop: 10 },
-    input: { backgroundColor: isDark ? colors.bgLight : "#f9fafb", borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: FontSize.md, color: colors.textPrimary },
-    submitBtn: { backgroundColor: colors.primary, borderRadius: Radius.lg, paddingVertical: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, marginTop: 24 },
-    submitText: { color: "#fff", fontWeight: "900", fontSize: FontSize.md },
+    cardActionsRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    adoptBtn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      borderRadius: Radius.md,
+      gap: 6,
+    },
+    adoptBtnText: {
+      color: "#fff",
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+    },
+    addToCartBtn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      borderRadius: Radius.md,
+      gap: 6,
+    },
+    addToCartBtnText: {
+      color: "#fff",
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+    },
+    detailsBtn: {
+      flex: 1,
+      height: 44,
+      borderRadius: Radius.md,
+      backgroundColor: colors.primary,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 5,
+    },
+    detailsBtnText: {
+      color: "#fff",
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+    },
+    detailModalSheet: {
+      backgroundColor: colors.bgCard,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 28,
+      width: "100%",
+      maxHeight: "90%",
+    },
+    detailHeroImgWrap: {
+      height: 220,
+      borderRadius: 18,
+      overflow: "hidden",
+      position: "relative",
+      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
+      marginBottom: 16,
+    },
+    detailHeroImg: {
+      width: "100%",
+      height: "100%",
+      resizeMode: "cover",
+    },
+    detailImgBadges: {
+      position: "absolute",
+      bottom: 12,
+      left: 12,
+      flexDirection: "row",
+      gap: 8,
+    },
+    detailSpeciesBadge: {
+      backgroundColor: "rgba(15,23,42,0.85)",
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: Radius.full,
+    },
+    detailSpeciesBadgeText: {
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: "800",
+      textTransform: "uppercase",
+    },
+    detailVaxBadge: {
+      backgroundColor: "rgba(16,185,129,0.9)",
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: Radius.full,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    detailVaxBadgeText: {
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: "800",
+    },
+    detailTitlePriceRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 12,
+    },
+    detailItemName: {
+      fontSize: FontSize.xl,
+      fontWeight: "900",
+      color: colors.textPrimary,
+      lineHeight: 24,
+    },
+    detailItemSub: {
+      fontSize: FontSize.xs,
+      fontWeight: "600",
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    detailPriceVal: {
+      fontSize: 22,
+      fontWeight: "900",
+      color: colors.primary,
+    },
+    detailPriceSub: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: colors.textMuted,
+      textTransform: "uppercase",
+      marginTop: 2,
+    },
+    detailChipsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+      marginBottom: 14,
+    },
+    detailChip: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: Radius.full,
+      borderWidth: 1,
+    },
+    detailChipText: {
+      fontSize: 11,
+      fontWeight: "700",
+    },
+    detailInfoGrid: {
+      flexDirection: "row",
+      gap: 10,
+      marginBottom: 14,
+    },
+    detailInfoBox: {
+      flex: 1,
+      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      padding: 12,
+    },
+    detailInfoBoxLabel: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: colors.textMuted,
+      marginBottom: 4,
+    },
+    detailInfoBoxVal: {
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+    detailInfoBoxSub: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    detailSectionBox: {
+      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 18,
+    },
+    detailSectionLabel: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: colors.textMuted,
+      letterSpacing: 0.5,
+      marginBottom: 6,
+    },
+    detailSectionText: {
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    detailSpecsWrap: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    detailSpecsLabel: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: colors.primary,
+      marginBottom: 4,
+    },
+    detailSpecItem: {
+      flexDirection: "row",
+      gap: 6,
+      marginTop: 3,
+    },
+    detailSpecKey: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: colors.textMuted,
+    },
+    detailSpecVal: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    detailCtaRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginBottom: 10,
+    },
+    detailChatCtaBtn: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      height: 48,
+      borderRadius: Radius.md,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    detailChatCtaBtnText: {
+      color: "#fff",
+      fontSize: FontSize.sm,
+      fontWeight: "800",
+    },
+    detailCartCtaBtn: {
+      flex: 1,
+      backgroundColor: "#0284c7",
+      height: 48,
+      borderRadius: Radius.md,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    detailCartCtaBtnText: {
+      color: "#fff",
+      fontSize: FontSize.sm,
+      fontWeight: "800",
+    },
+    chatSellerBtn: {
+      flexDirection: "row",
+      height: 44,
+      paddingHorizontal: 12,
+      borderRadius: Radius.md,
+      backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 5,
+    },
+    chatSellerBtnText: {
+      fontSize: FontSize.xs,
+      fontWeight: "700",
+      color: colors.primary,
+    },
 
-    modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-    cartModal: { backgroundColor: colors.bgCard, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: "85%", ...Shadow.lg },
-    orderSummaryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-    orderSummaryTitle: { fontSize: FontSize.lg, fontWeight: '800', color: colors.textPrimary },
-    orderSummaryCount: { fontSize: FontSize.xs, color: colors.textMuted, fontWeight: '600' },
-    modalTitle: { fontSize: FontSize.xl, fontWeight: "800", color: colors.textPrimary },
-    emptyCart: { paddingVertical: 60, alignItems: "center" },
-    emptyText: { fontSize: FontSize.md, color: colors.textMuted, marginTop: 16, fontWeight: '600' },
-    continueBtn: { marginTop: 20, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: Radius.full },
-    continueText: { color: '#fff', fontWeight: '800' },
+    emptyCard: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 48,
+      paddingHorizontal: 24,
+    },
+    emptyTitle: {
+      fontSize: FontSize.lg,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginTop: 12,
+      marginBottom: 6,
+    },
+    emptySub: {
+      fontSize: FontSize.sm,
+      color: colors.textSecondary,
+      textAlign: "center",
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      justifyContent: "flex-end",
+      alignItems: "center",
+    },
+    modalSheet: {
+      backgroundColor: colors.bgCard,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+      width: "100%",
+      maxHeight: "85%",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 16,
+    },
+    modalTitle: {
+      fontSize: FontSize.lg,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+    emptyCartBox: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 36,
+    },
+    cartItemRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    cartItemImg: {
+      width: 50,
+      height: 50,
+      borderRadius: 8,
+    },
+    cartItemName: {
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    cartItemPrice: {
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+      color: colors.primary,
+    },
+    qtyControl: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
+      borderRadius: Radius.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    qtyBtn: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    qtyBtnText: {
+      fontSize: FontSize.sm,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+    qtyVal: {
+      fontSize: FontSize.xs,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      paddingHorizontal: 6,
+    },
+    cartFooter: {
+      marginTop: 16,
+      paddingTop: 14,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    totalRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 14,
+    },
+    totalLabel: {
+      fontSize: FontSize.md,
+      fontWeight: "800",
+      color: colors.textSecondary,
+    },
+    totalVal: {
+      fontSize: FontSize.xl,
+      fontWeight: "900",
+      color: colors.primary,
+    },
+    checkoutBtn: {
+      backgroundColor: colors.primary,
+      paddingVertical: 14,
+      borderRadius: Radius.md,
+      alignItems: "center",
+    },
+    checkoutBtnText: {
+      color: "#fff",
+      fontSize: FontSize.sm,
+      fontWeight: "800",
+    },
 
-    cartItemRow: { flexDirection: "row", alignItems: "center", marginBottom: 16, backgroundColor: isDark ? colors.bgLight : "#f9fafb", padding: 14, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border },
-    cartThumb: { width: 60, height: 60, borderRadius: 12 },
-    cartItemName: { fontSize: FontSize.sm, fontWeight: "700", color: colors.textPrimary },
-    cartItemPrice: { fontSize: FontSize.sm, fontWeight: "800", color: colors.primary, marginTop: 4 },
-    cartActions: { alignItems: 'flex-end', gap: 10 },
-    qtyRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.primary, borderRadius: Radius.full, paddingHorizontal: 4, paddingVertical: 4 },
-    qtyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: "center", alignItems: "center" },
-    qtyText: { fontSize: FontSize.sm, fontWeight: "900", color: "#fff", minWidth: 20, textAlign: 'center' },
-    trashBtn: { padding: 4 },
-
-    checkoutFooter: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 20, marginTop: 10 },
-    billRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-    billLabel: { fontSize: FontSize.xs, color: colors.textSecondary, fontWeight: '600' },
-    billVal: { fontSize: FontSize.xs, color: colors.textPrimary, fontWeight: '700' },
-    totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10, marginBottom: 20 },
-    totalLabel: { fontSize: FontSize.lg, fontWeight: "800", color: colors.textPrimary },
-    totalVal: { fontSize: FontSize.xl, fontWeight: "900", color: colors.primary },
-    checkoutBtn: { backgroundColor: colors.success, borderRadius: Radius.lg, paddingVertical: 16, alignItems: "center", ...Shadow.md },
-    checkoutText: { color: "#fff", fontWeight: "900", fontSize: FontSize.md },
-    successBanner: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.bgCard, justifyContent: "center", alignItems: "center", borderRadius: Radius.xl, zIndex: 100 },
-    successText: { fontSize: FontSize.lg, fontWeight: "800", color: colors.success, marginTop: 14, textAlign: 'center', paddingHorizontal: 40 },
+    listingTypeRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginBottom: 14,
+    },
+    typeBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: Radius.md,
+      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    typeBtnActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    typeBtnText: {
+      fontSize: FontSize.xs,
+      fontWeight: "700",
+      color: colors.textSecondary,
+    },
+    typeBtnTextActive: {
+      color: "#fff",
+      fontWeight: "800",
+    },
+    inputLabel: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginBottom: 6,
+    },
+    modalInput: {
+      backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: Radius.md,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: FontSize.sm,
+      color: colors.textPrimary,
+      marginBottom: 12,
+    },
+    imagePickerContainer: {
+      marginBottom: 14,
+    },
+    imagePreviewBox: {
+      width: "100%",
+      height: 160,
+      borderRadius: Radius.md,
+      overflow: "hidden",
+      marginBottom: 8,
+      position: "relative",
+    },
+    imagePreview: {
+      width: "100%",
+      height: "100%",
+      resizeMode: "cover",
+    },
+    removeImageBtn: {
+      position: "absolute",
+      top: 8,
+      right: 8,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      borderRadius: Radius.full,
+      padding: 4,
+    },
+    mediaButtonsRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    mediaBtn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: isDark ? "#0f172a" : "#f1f5f9",
+      paddingVertical: 10,
+      borderRadius: Radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 6,
+    },
+    mediaBtnText: {
+      fontSize: FontSize.xs,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+    submitListingBtn: {
+      backgroundColor: colors.primary,
+      paddingVertical: 14,
+      borderRadius: Radius.md,
+      alignItems: "center",
+      marginTop: 6,
+      marginBottom: 10,
+    },
+    submitListingBtnText: {
+      color: "#fff",
+      fontSize: FontSize.sm,
+      fontWeight: "800",
+    },
   });
 }

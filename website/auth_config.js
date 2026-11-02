@@ -7,7 +7,7 @@ const AUTH_CONFIG = {
   sessionKey: "@ecotrack_web_session",
   themeKey: "@ecotrack_theme",
   // Use 127.0.0.1 for CI stability
-  apiBase: (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
+  apiBase: (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' || window.location.hostname === '' || window.location.port === '3000' || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.'))
            ? "http://127.0.0.1:5000/api"
            : "https://SasiKumarS254.github.io/EcoTrackApp/api"
 };
@@ -91,23 +91,34 @@ function performLogout() {
 (function() {
   const originalFetch = window.fetch;
   window.fetch = async function(resource, options = {}) {
-    const urlStr = typeof resource === 'string' ? resource : resource.url;
-    // Only intercept EcoTrack API calls
-    if (urlStr.includes('localhost:5000') || urlStr.startsWith('/api') || urlStr.includes('/api/')) {
+    const urlStr = typeof resource === 'string' ? resource : (resource ? resource.url : '');
+    // Intercept EcoTrack API calls
+    const isEcoTrackApi = urlStr && (
+      urlStr.includes('localhost:5000') ||
+      urlStr.includes('127.0.0.1:5000') ||
+      urlStr.includes(':5000/api') ||
+      urlStr.startsWith('/api') ||
+      urlStr.includes('/api/') ||
+      (typeof AUTH_CONFIG !== 'undefined' && AUTH_CONFIG.apiBase && urlStr.includes(AUTH_CONFIG.apiBase))
+    );
+
+    if (isEcoTrackApi) {
       const sessionObj = getSession();
       if (sessionObj && sessionObj.token) {
         options.headers = options.headers || {};
         if (options.headers instanceof Headers) {
-          options.headers.set('Authorization', `Bearer ${sessionObj.token}`);
+          if (!options.headers.has('Authorization')) {
+            options.headers.set('Authorization', `Bearer ${sessionObj.token}`);
+          }
         } else if (Array.isArray(options.headers)) {
           const existingIndex = options.headers.findIndex(h => h[0].toLowerCase() === 'authorization');
-          if (existingIndex !== -1) {
-            options.headers[existingIndex] = ['Authorization', `Bearer ${sessionObj.token}`];
-          } else {
+          if (existingIndex === -1) {
             options.headers.push(['Authorization', `Bearer ${sessionObj.token}`]);
           }
         } else {
-          options.headers['Authorization'] = `Bearer ${sessionObj.token}`;
+          if (!options.headers['Authorization'] && !options.headers['authorization']) {
+            options.headers['Authorization'] = `Bearer ${sessionObj.token}`;
+          }
         }
       }
     }

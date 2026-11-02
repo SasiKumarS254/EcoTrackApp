@@ -5,7 +5,7 @@
       "email": "user@ecotrack.org",
       "password_hash": "demo",
       "name": "Eco Explorer",
-      "bio": "Nature enthusiast • Wildlife Photographer • Conservationist",
+      "bio": "Nature enthusiast \u2022 Wildlife Photographer \u2022 Conservationist",
       "location": "Chennai, India",
       "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
       "role": "admin",
@@ -29,7 +29,9 @@
       "diet": "Herbivore",
       "lifespan": "60-70 yrs",
       "status": "Vulnerable",
-      "description": "The largest land mammal on Earth. Highly social herbivores led by a matriarch."
+      "description": "The largest land mammal on Earth. Highly social herbivores led by a matriarch.",
+      "image": "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?w=600",
+      "imageUrl": "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?w=600"
     },
     {
       "tsn": 183803,
@@ -41,7 +43,9 @@
       "diet": "Carnivore",
       "lifespan": "10-15 yrs",
       "status": "Endangered",
-      "description": "Powerful apex predator of Asian forests, known for exceptional swimming ability and solitary hunting."
+      "description": "Powerful apex predator of Asian forests, known for exceptional swimming ability and solitary hunting.",
+      "image": "https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=600",
+      "imageUrl": "https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=600"
     },
     {
       "tsn": 180596,
@@ -53,7 +57,9 @@
       "diet": "Omnivore",
       "lifespan": "9-13 yrs",
       "status": "Least Concern",
-      "description": "Highly intelligent working dog breed known for agility, obedience, police work, and companionship."
+      "description": "Highly intelligent working dog breed known for agility, obedience, police work, and companionship.",
+      "image": "https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?w=600",
+      "imageUrl": "https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?w=600"
     },
     {
       "tsn": 180587,
@@ -65,7 +71,9 @@
       "diet": "Carnivore",
       "lifespan": "6-8 yrs",
       "status": "Least Concern",
-      "description": "Ancestor of the domestic dog, social predator hunting in structured packs."
+      "description": "Ancestor of the domestic dog, social predator hunting in structured packs.",
+      "image": "https://images.unsplash.com/photo-1564349683136-77e08dba1ef7?w=600",
+      "imageUrl": "https://images.unsplash.com/photo-1564349683136-77e08dba1ef7?w=600"
     },
     {
       "tsn": 180543,
@@ -77,7 +85,9 @@
       "diet": "Carnivore",
       "lifespan": "12-17 yrs",
       "status": "Domesticated",
-      "description": "Long-haired breed of cat characterized by its round face and short muzzle."
+      "description": "Long-haired breed of cat characterized by its round face and short muzzle.",
+      "image": "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600",
+      "imageUrl": "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600"
     },
     {
       "tsn": 175404,
@@ -89,7 +99,9 @@
       "diet": "Carnivore",
       "lifespan": "15-20 yrs",
       "status": "Least Concern",
-      "description": "Fastest living creature on Earth, capable of reaching diving speeds over 300 km/h."
+      "description": "Fastest living creature on Earth, capable of reaching diving speeds over 300 km/h.",
+      "image": "https://images.unsplash.com/photo-1611689342806-0863700ce1e4?w=600",
+      "imageUrl": "https://images.unsplash.com/photo-1611689342806-0863700ce1e4?w=600"
     },
     {
       "tsn": 175005,
@@ -101,7 +113,9 @@
       "diet": "Piscivore",
       "lifespan": "20-30 yrs",
       "status": "Least Concern",
-      "description": "North American sea eagle recognized for its white head, yellow beak, and massive wingspan."
+      "description": "North American sea eagle recognized for its white head, yellow beak, and massive wingspan.",
+      "image": "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=600",
+      "imageUrl": "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=600"
     },
     {
       "tsn": 173802,
@@ -113,7 +127,9 @@
       "diet": "Herbivore",
       "lifespan": "70-80 yrs",
       "status": "Endangered",
-      "description": "Large sea turtle migrating across vast oceanic distances between feeding grounds and nesting beaches."
+      "description": "Large sea turtle migrating across vast oceanic distances between feeding grounds and nesting beaches.",
+      "image": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600",
+      "imageUrl": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600"
     },
     {
       "tsn": 173812,
@@ -125,7 +141,9 @@
       "diet": "Carnivore",
       "lifespan": "30-50 yrs",
       "status": "Endangered",
-      "description": "Largest living species of lizard, endemic to the Indonesian islands of Komodo and Rinca."
+      "description": "Largest living species of lizard, endemic to the Indonesian islands of Komodo and Rinca.",
+      "image": "https://images.unsplash.com/photo-1578326457399-3b34dbbf23b8?w=600",
+      "imageUrl": "https://images.unsplash.com/photo-1578326457399-3b34dbbf23b8?w=600"
     },
     {
       "tsn": 173825,
@@ -137,7 +155,9 @@
       "diet": "Carnivore",
       "lifespan": "10-15 yrs",
       "status": "Critically Endangered",
-      "description": "Neotenic salamander famous for retaining juvenile features and miraculous organ regeneration capacity."
+      "description": "Neotenic salamander famous for retaining juvenile features and miraculous organ regeneration capacity.",
+      "image": "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600",
+      "imageUrl": "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600"
     }
   ],
   "scans": [],
@@ -169,12 +189,12 @@
       "type": "sale"
     },
     {
-      "id": 102,
+      "id": 207,
       "title": "Orthopedic Memory Foam Pet Bed",
       "category": "Accessories",
       "price": 1499,
       "location": "Bangalore",
-      "image_url": "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=400",
+      "image_url": "/assets/pet_bed.jpg",
       "type": "accessory"
     }
   ],
@@ -197,30 +217,118 @@
   "events": [
     {
       "id": 1,
-      "title": "Annual Wildlife Conservation Summit 2026",
-      "category": "Exhibition",
-      "date_str": "Aug 15, 2026",
-      "location": "Eco Park Convention Center",
-      "description": "Global summit on species tracking and habitat restoration.",
-      "attendees": 142
+      "title": "Wildlife Rescue Camp",
+      "category": "Rescue",
+      "date_str": "22 November 2026",
+      "date_iso": "2026-11-22",
+      "location": "Chennai Wildlife Reserve",
+      "description": "Join wildlife experts and rescue injured animals in a hands-on camp.",
+      "long_description": "This intensive weekend camp is designed for animal lovers who want to learn real-world rescue techniques. You will shadow senior veterinarians, participate in rehabilitation sessions for raptors, and learn how to safely transport injured mammals. All equipment and basic meals provided.",
+      "attendees": 142,
+      "max_attendees": 500,
+      "image": "https://images.unsplash.com/photo-1546182990-dffeafbe841d?q=85&w=1200",
+      "organizer": "EcoTrack Foundation",
+      "creator_id": "usr_user2",
+      "is_free": true,
+      "price": 0,
+      "refund_policy": "Full refund available up to 48 hours before the event.",
+      "coordinates": {
+        "lat": 12.9229,
+        "lng": 80.1275
+      },
+      "date": "22 November 2026"
     },
     {
       "id": 2,
-      "title": "City Rabies & Vaccination Drive",
-      "category": "Health",
-      "date_str": "Aug 3, 2026",
-      "location": "Central Park Community Hub",
-      "description": "Free vaccination for pets and stray animals.",
-      "attendees": 88
+      "title": "International Dog Exhibition",
+      "category": "Exhibition",
+      "date_str": "29 November 2026",
+      "date_iso": "2026-11-29",
+      "location": "Bangalore Expo Center",
+      "description": "Showcase dog breeds, participate in competitions, meet breeders.",
+      "long_description": "The biggest canine event of the year! Over 500 breeds on display, agility competitions, grooming workshops, and stalls from the top pet care brands in Asia. Special sessions on advanced obedience using AI tracking tools. Tickets include a goodie bag for your pet.",
+      "attendees": 894,
+      "max_attendees": 1000,
+      "image": "https://images.unsplash.com/photo-1517849845537-4d257902454a?q=85&w=1200",
+      "organizer": "Kennel Club India",
+      "creator_id": "usr_user3",
+      "is_free": false,
+      "price": 499,
+      "refund_policy": "80% refundable until 24h before. No refunds on the day of event.",
+      "coordinates": {
+        "lat": 12.9716,
+        "lng": 77.5946
+      },
+      "date": "29 November 2026"
     },
     {
       "id": 3,
-      "title": "Canine Agility Workshop",
+      "title": "National Adoption Drive",
+      "category": "Adoption",
+      "date_str": "06 December 2026",
+      "date_iso": "2026-12-06",
+      "location": "Chennai SPCA",
+      "description": "Adopt a rescued dog or cat and give them a loving forever home.",
+      "long_description": "Find your new best friend at our monthly adoption drive. Over 50 dogs and cats from various shelters will be present. All animals are vaccinated, dewormed, and microchipped. Adoption counselors will be on site to help you find the perfect match for your lifestyle.",
+      "attendees": 320,
+      "max_attendees": 500,
+      "image": "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=85&w=1200",
+      "organizer": "Blue Cross India",
+      "creator_id": "usr_user1",
+      "is_free": true,
+      "price": 0,
+      "refund_policy": "Not applicable.",
+      "coordinates": {
+        "lat": 13.0827,
+        "lng": 80.2707
+      },
+      "date": "06 December 2026"
+    },
+    {
+      "id": 4,
+      "title": "Bird Conservation Seminar",
+      "category": "Conservation",
+      "date_str": "15 December 2026",
+      "date_iso": "2026-12-15",
+      "location": "TNAU Auditorium, Coimbatore",
+      "description": "Expert talks on endangered bird species conservation and habitat protection.",
+      "long_description": "A gathering of ornithologists and conservationists to discuss the state of migratory birds in South India. Topics include wetland protection, pesticide impacts, and how citizen scientists can contribute to bird counts using the EcoTrack app.",
+      "attendees": 68,
+      "max_attendees": 200,
+      "image": "https://images.unsplash.com/photo-1444464666168-49d633b86797?q=85&w=1200",
+      "organizer": "Bird Watch India",
+      "creator_id": "usr_user2",
+      "is_free": true,
+      "price": 0,
+      "refund_policy": "Not applicable.",
+      "coordinates": {
+        "lat": 11.0168,
+        "lng": 76.9558
+      },
+      "date": "15 December 2026"
+    },
+    {
+      "id": 5,
+      "title": "AI Animal Training Workshop",
       "category": "Training",
-      "date_str": "Aug 10, 2026",
-      "location": "EcoTrack Welfare Grounds",
-      "description": "Professional agility and obedience training workshop.",
-      "attendees": 65
+      "date_str": "27 December 2026",
+      "date_iso": "2026-12-27",
+      "location": "Virtual + Chennai Hub",
+      "description": "Learn AI-powered training techniques for pets and wild animals.",
+      "long_description": "Discover how advanced techniques are revolutionizing animal training. This workshop covers the basics of behavioral correction, focus training, and monitoring rehabilitation progress in injured animals.",
+      "attendees": 210,
+      "max_attendees": 400,
+      "image": "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?q=85&w=1200",
+      "organizer": "EcoTrack AI Labs",
+      "creator_id": "usr_user3",
+      "is_free": false,
+      "price": 999,
+      "refund_policy": "50% Refundable. No-show will not be refunded.",
+      "coordinates": {
+        "lat": 13.0475,
+        "lng": 80.2089
+      },
+      "date": "27 December 2026"
     }
   ],
   "pets": {}

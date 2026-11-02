@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
-  Alert, StatusBar, Dimensions, ActivityIndicator,
+  StatusBar, Dimensions, ActivityIndicator,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,9 +17,8 @@ type Pet = { id: number; name: string; species: string; breed: string; age: stri
 
 export default function OtherProfileScreen() {
   const { id } = useLocalSearchParams();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   
-  const [session, setSession] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [pets, setPets] = useState<Pet[]>([]);
@@ -30,27 +29,25 @@ export default function OtherProfileScreen() {
   const [followingCount, setFollowingCount] = useState(0);
   const [followStatus, setFollowStatus] = useState<"None" | "Pending" | "Approved">("None");
   const [isPrivateRestricted, setIsPrivateRestricted] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadOtherProfile();
-  }, [id]);
-
-  const loadOtherProfile = async () => {
+  const loadOtherProfile = useCallback(async () => {
     try {
       setIsLoading(true);
+      setErrorMsg(null);
 
       const sessionRaw = await AsyncStorage.getItem("@ecotrack_user_session");
       if (!sessionRaw) { router.replace("/auth/login"); return; }
       const sess = JSON.parse(sessionRaw);
 
       // Check if viewing self
-      if (sess.user_id === id) {
+      if (sess && (sess.user_id === id || sess.id === id || sess.ecotrack_id === id)) {
         router.replace("/(tabs)/profile");
         return;
       }
 
       const data = await fetchSocialProfile(id as string);
-      if (data) {
+      if (data && data.profile) {
         const p = data.profile || {};
         setProfile(p);
         setFollowStatus(data.followStatus || "None");
@@ -66,17 +63,25 @@ export default function OtherProfileScreen() {
           if (data.impactStats) setImpactStats(data.impactStats);
         }
       } else {
-        Alert.alert("Error", "Could not load user profile.");
-        router.back();
+        setErrorMsg("Could not load user profile.");
       }
-    } catch (e) {
-      console.warn("Failed to load other profile", e);
-      Alert.alert("Offline", "Could not load user profile. Please verify your connection.");
-      router.back();
+    } catch {
+      setErrorMsg("Could not load user profile. Please verify your connection.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(() => {
+      if (active) loadOtherProfile();
+    }, 0);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [loadOtherProfile]);
 
   const handleFollowToggle = async () => {
     if (!id) return;
@@ -112,6 +117,22 @@ export default function OtherProfileScreen() {
     return (
       <View style={[styles.loadingCenter, { backgroundColor: colors.bgLight }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (errorMsg && !profile) {
+    return (
+      <View style={[styles.loadingCenter, { backgroundColor: colors.bgLight, padding: 24 }]}>
+        <Ionicons name="alert-circle-outline" size={52} color={colors.textMuted} />
+        <Text style={[styles.lockedTitle, { color: colors.textPrimary, marginTop: 14 }]}>Profile Unavailable</Text>
+        <Text style={[styles.lockedText, { color: colors.textMuted, marginTop: 6, marginBottom: 20 }]}>{errorMsg}</Text>
+        <TouchableOpacity style={styles.followBtn} onPress={loadOtherProfile}>
+          <Text style={styles.followBtnText}>Retry</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={{ marginTop: 14 }} onPress={() => router.back()}>
+          <Text style={{ color: colors.primary, fontWeight: '700' }}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -246,8 +267,8 @@ export default function OtherProfileScreen() {
               </View>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-                {pets.map((pet) => (
-                  <View key={pet.id} style={[styles.petCard, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
+                {pets.map((pet, pIdx) => (
+                  <View key={`pet-${pet.id}-${pIdx}`} style={[styles.petCard, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
                     <Image source={{ uri: pet.images || "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=200" }} style={styles.petImg} />
                     <Text style={[styles.petName, { color: colors.textPrimary }]}>{pet.name}</Text>
                     <Text style={{ color: colors.textMuted, fontSize: 10 }}>{pet.species} • {pet.breed}</Text>
@@ -313,7 +334,7 @@ const styles = StyleSheet.create({
   loadingCenter: { flex: 1, justifyContent: "center", alignItems: "center" },
   headerArea: { height: 160, position: "relative" },
   coverImg: { width: "100%", height: "100%" },
-  coverGradient: { ...StyleSheet.absoluteFillObject },
+  coverGradient: { ...(StyleSheet.absoluteFill as any) },
   backBtn: { position: "absolute", top: 50, left: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" },
   
   profileSummary: { alignItems: "center", marginTop: -50, paddingHorizontal: 24 },

@@ -1,79 +1,49 @@
-/**
- * scanner/live.tsx — Live AI Scanner (In-App CV)
- *
- * Real-time camera inference for posture and exercise tracking.
- */
-
-import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
-  StatusBar, ActivityIndicator, Alert, Dimensions, Platform, ScrollView
-} from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator, Alert, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import Svg, { Circle, Rect } from 'react-native-svg';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Svg, Rect } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
-import { useTheme } from '../../context/ThemeContext';
-
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useLocalSearchParams, router } from 'expo-router';
 import * as Scanner from '../../lib/scannerCore';
 import { analyzeAllJoints } from '../../lib/jointAnalysis';
 import { getExerciseById } from '../../lib/exerciseTemplates';
-import { getSkeletonForSpecies } from '../../lib/skeletonTemplates';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
-export default function LiveScannerScreen() {
-  const { colors, isDark } = useTheme();
-  const params = useLocalSearchParams();
+type PipelineStage = 'INITIALIZING' | 'VERIFYING' | 'VISIBILITY_CHECK' | 'DETECTING' | 'POSING' | 'ANALYZING';
 
-  const species = (params.species as string) || 'Human';
-  const exerciseId = (params.exerciseId as string) || 'squat';
-  const exerciseTemplate = useMemo(() => getExerciseById(exerciseId), [exerciseId]);
+export default function LiveScannerScreen() {
+  const params = useLocalSearchParams();
+  const species = (params.species as string) || 'Canine (Dog)';
+  const exercise = (params.exercise as string) || 'Gait Analysis';
 
   const [permission, requestPermission] = useCameraPermissions();
-  const [stage, setStage] = useState<Scanner.ScannerStage>('INITIALIZING');
-  const [loadingMsg, setLoadingMsg] = useState('Booting CV Engine...');
+  const [stage, setStage] = useState<PipelineStage>('INITIALIZING');
+  const [loadingMsg, setLoadingMsg] = useState('Loading Core AI Engine...');
   const [haltReason, setHaltReason] = useState<string | null>(null);
 
+  // Telemetry
   const [fps, setFps] = useState(0);
   const [latency, setLatency] = useState(0);
   const [confidence, setConfidence] = useState(0);
-  const [repCount, setRepCount] = useState(0);
-  const [coachingTip, setCoachingTip] = useState('Position yourself in full view.');
+  const [coachingTip, setCoachingTip] = useState('Align subject within the tracking viewport.');
 
+  const exerciseTemplate = getExerciseById(exercise);
+
+  // Visual Overlays
   const [bbox, setBbox] = useState<Scanner.BoundingBox | null>(null);
   const [keypoints, setKeypoints] = useState<Scanner.Keypoint[]>([]);
 
   const cameraRef = useRef<any>(null);
   const isScanning = useRef(false);
   const frameId = useRef<number | null>(null);
+  const pipelineRef = useRef<(() => Promise<void> | void) | null>(null);
 
-  const startScanner = async () => {
-    if (!permission?.granted) {
-      const res = await requestPermission();
-      if (!res.granted) {
-        Alert.alert("Permission Required", "Camera access is mandatory for AI scanning.");
-        return;
-      }
-    }
-
-    setStage('INITIALIZING');
-    const ok = await Scanner.initializeScanner(setLoadingMsg);
-    if (!ok) {
-      setHaltReason("Failed to initialize hardware acceleration.");
-      setStage('VERIFYING');
-      return;
-    }
-
-    setStage('DETECTING');
-    isScanning.current = true;
-    runPipelineLoop();
-  };
-
-  const runPipelineLoop = async () => {
+  const runPipelineLoop = useCallback(async () => {
     if (!isScanning.current) return;
-    const startTime = performance.now();
+    const startTime = Date.now();
 
     try {
       if (cameraRef.current) {
@@ -106,33 +76,66 @@ export default function LiveScannerScreen() {
         const measuredAngles: Record<string, number> = {};
         const analysis = analyzeAllJoints(
           measuredAngles,
-          (exerciseTemplate?.joint_rules || {}) as any, // Updated to use joint_rules
+          (exerciseTemplate?.joint_rules || {}) as any,
           exerciseTemplate?.critical_joints || [],
           species
         );
         if (analysis.primaryIssue) setCoachingTip(analysis.primaryIssue);
         else setCoachingTip("Form looks excellent. Continue.");
 
-        const endTime = performance.now();
+        const endTime = Date.now();
         setLatency(Math.round(endTime - startTime));
-        setFps(Math.round(1000 / (endTime - startTime)));
+        setFps(Math.round(1000 / Math.max(1, endTime - startTime)));
       }
     } catch (e) {
       console.error(e);
     }
 
     if (isScanning.current) {
-      frameId.current = requestAnimationFrame(runPipelineLoop);
+      frameId.current = requestAnimationFrame(() => {
+        pipelineRef.current?.();
+      });
     }
-  };
+  }, [exerciseTemplate, species]);
 
   useEffect(() => {
-    startScanner();
+    pipelineRef.current = runPipelineLoop;
+  }, [runPipelineLoop]);
+
+  const startScanner = useCallback(async () => {
+    if (!permission?.granted) {
+      const res = await requestPermission();
+      if (!res.granted) {
+        Alert.alert("Permission Required", "Camera access is mandatory for AI scanning.");
+        return;
+      }
+    }
+
+    setStage('INITIALIZING');
+    const ok = await Scanner.initializeScanner(setLoadingMsg);
+    if (!ok) {
+      setHaltReason("Failed to initialize hardware acceleration.");
+      setStage('VERIFYING');
+      return;
+    }
+
+    setStage('DETECTING');
+    isScanning.current = true;
+    runPipelineLoop();
+  }, [permission?.granted, requestPermission, runPipelineLoop]);
+
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(() => {
+      if (active) startScanner();
+    }, 100);
     return () => {
+      active = false;
+      clearTimeout(timer);
       isScanning.current = false;
       if (frameId.current) cancelAnimationFrame(frameId.current);
     };
-  }, []);
+  }, [startScanner]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -145,6 +148,8 @@ export default function LiveScannerScreen() {
         <View style={styles.metricsContainer}>
           <Text style={styles.metric}>FPS: <Text style={{color: '#fff'}}>{fps}</Text></Text>
           <Text style={styles.metric}>Latency: <Text style={{color: '#fff'}}>{latency}ms</Text></Text>
+          <Text style={styles.metric}>Conf: <Text style={{color: '#fff'}}>{Math.round(confidence * 100)}%</Text></Text>
+          <Text style={styles.metric}>Joints: <Text style={{color: '#fff'}}>{keypoints.length}</Text></Text>
         </View>
       </View>
 
@@ -158,6 +163,13 @@ export default function LiveScannerScreen() {
             />
           )}
         </Svg>
+
+        {haltReason && (
+          <View style={styles.haltOverlay}>
+            <Ionicons name="alert-circle" size={16} color="#f59e0b" />
+            <Text style={styles.haltText}>{haltReason}</Text>
+          </View>
+        )}
 
         {stage === 'INITIALIZING' && (
           <BlurView intensity={40} style={styles.overlayFull}>
@@ -194,7 +206,22 @@ const styles = StyleSheet.create({
   metricsContainer: { flexDirection: 'row', gap: 12 },
   metric: { color: '#64748b', fontSize: 11, fontWeight: '700' },
   viewport: { flex: 1, backgroundColor: '#000', position: 'relative' },
-  overlayFull: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  haltOverlay: {
+    position: 'absolute',
+    top: 20,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(15,23,42,0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+  },
+  haltText: { color: '#f59e0b', fontSize: 12, fontWeight: '700' },
+  overlayFull: { ...(StyleSheet.absoluteFill as any), justifyContent: 'center', alignItems: 'center', padding: 32 },
   overlayTitle: { color: '#fff', fontSize: 22, fontWeight: '900', marginTop: 24, textAlign: 'center' },
   overlayDesc: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginTop: 12, lineHeight: 22 },
   hudBottom: { position: 'absolute', bottom: 100, left: 20, right: 20 },

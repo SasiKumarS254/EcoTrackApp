@@ -15,9 +15,135 @@ let hasMorePosts = true;
 let loadedPosts = []; // Local cache of currently loaded posts
 let allRecommendedUsers = []; // Cached recommendations for View All modal
 
+// Periodic message check and notifications sync
+let messageNotificationCheckInterval = null;
+
+function startMessageNotificationCheck() {
+  if (messageNotificationCheckInterval) clearInterval(messageNotificationCheckInterval);
+  
+  // Check notifications immediately, then every 3 seconds
+  checkNotificationsAndMessages();
+  messageNotificationCheckInterval = setInterval(checkNotificationsAndMessages, 3000);
+}
+
+async function checkNotificationsAndMessages() {
+  if (!window.currentUser) return;
+  try {
+    // 1. Fetch notifications for dropdown
+    const notifs = await window.EcoSocialDB.fetchNotifications();
+    renderCommunityNotifications(notifs);
+
+    // 2. Fetch conversations to check for unread counts
+    const res = await fetch(`${window.EcoSocialDB.apiBase}/messages/conversations`, { headers: window.EcoSocialDB.getAuthHeader() });
+    if (res.ok) {
+      const data = await res.json();
+      const conversations = data.conversations || [];
+      
+      // Calculate total unread messages count
+      let totalUnread = 0;
+      conversations.forEach(c => {
+        totalUnread += Number(c.unread_count || 0);
+      });
+
+      // Update sidebar active chats badge
+      const activeChatsContainer = document.getElementById('chatConversationsList');
+      if (activeChatsContainer && document.getElementById('messagingDrawerModal') && !document.getElementById('messagingDrawerModal').classList.contains('hidden')) {
+        renderConversations(conversations, activeChatsContainer);
+      }
+
+      // Update the main header message badge
+      const topBadge = document.getElementById('unreadMessagesCountBadge');
+      if (topBadge) {
+        if (totalUnread > 0) {
+          topBadge.textContent = totalUnread;
+          topBadge.style.display = 'flex';
+        } else {
+          topBadge.style.display = 'none';
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Error in periodic notification sync:', e);
+  }
+}
+
+function toggleCommunityNotificationsDropdown() {
+  // Notifications dropdown replaced by messages drawer
+}
+
+function renderCommunityNotifications(notifs) {
+  const listContainer = document.getElementById('communityNotificationsList');
+  const badge = document.getElementById('unreadMessagesCountBadge');
+  if (!listContainer) return;
+
+  const unreadNotifs = notifs.filter(n => n.is_read === 0);
+  if (badge) {
+    if (unreadNotifs.length > 0) {
+      badge.textContent = unreadNotifs.length;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if (!notifs.length) {
+    listContainer.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:12px;">No new notifications</div>`;
+    return;
+  }
+
+  listContainer.innerHTML = notifs.map(n => {
+    const avatar = n.actor_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.actor_name || 'User')}&background=10b981&color=fff`;
+    const readStyle = n.is_read ? 'opacity: 0.75;' : 'font-weight: 700; background: var(--primary-ultra-light);';
+    let clickAction = '';
+    if (n.type === 'message' || n.type === 'chat') {
+      clickAction = `onclick="markNotificationAsRead(${n.id}); if(window.openMessagingDrawer) window.openMessagingDrawer('${n.actor_id}')"`;
+    } else {
+      clickAction = `onclick="markNotificationAsRead(${n.id}); viewUserProfile('${n.actor_id}')"`;
+    }
+    
+    return `
+      <div class="notification-item" ${clickAction} style="display:flex; align-items:center; gap:10px; padding:10px; border-radius:10px; cursor:pointer; transition:background 0.2s; ${readStyle}">
+        <img src="${avatar}" class="avatar-sm" style="width:30px; height:30px; border-radius:50%;" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=User'">
+        <div style="flex:1; font-size:12.5px; text-align:left; color:var(--text-primary);">
+          <span style="font-weight:800;">${escapeHtml(n.actor_name)}</span> ${escapeHtml(n.message)}
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">${formatTimeAgo(n.created_at)}</div>
+        </div>
+        ${!n.is_read ? `<div style="width:8px; height:8px; border-radius:50%; background:var(--primary);"></div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+async function markNotificationAsRead(notifId) {
+  try {
+    await fetch(`${window.EcoSocialDB.apiBase}/notifications/${notifId}/read`, {
+      method: 'POST',
+      headers: window.EcoSocialDB.getAuthHeader()
+    });
+    checkNotificationsAndMessages();
+  } catch (e) {
+    console.warn('Failed to mark notification as read:', e);
+  }
+}
+
+async function markAllNotificationsAsRead() {
+  try {
+    await fetch(`${window.EcoSocialDB.apiBase}/notifications/read-all`, {
+      method: 'POST',
+      headers: window.EcoSocialDB.getAuthHeader()
+    });
+    checkNotificationsAndMessages();
+  } catch (e) {
+    console.warn('Failed to clear notifications:', e);
+  }
+}
+
 async function initCommunityFeed(isNextPage = false) {
   if (isFetching) return;
   if (isNextPage && !hasMorePosts) return;
+
+  // Start notification sync loop when page is loaded
+  startMessageNotificationCheck();
 
   isFetching = true;
   const container = document.getElementById('communityPostsContainer');
@@ -327,7 +453,7 @@ function formatPostText(text) {
 
 function renderPostCardHtml(post) {
   const isVet = post.vet_status || post.post_type === 'veterinary';
-  const vetBadge = isVet ? `<span class="vet-badge" title="Verified Veterinarian"><i class="fas fa-stethoscope"></i> Vet Specialist</span>` : '';
+  const vetBadge = isVet ? `<span class="vet-badge" title="Verified Veterinarian" style="display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:800; background:rgba(16,185,129,0.12); color:var(--primary); padding:2px 8px; border-radius:12px;"><i class="fas fa-stethoscope"></i> Vet Specialist</span>` : '';
   const timeAgo = formatTimeAgo(post.created_at);
   const privacyIcon = post.privacy_visibility === 'Private' ? '🔒' : post.privacy_visibility === 'Followers Only' ? '👥' : '🌍';
 
@@ -338,42 +464,47 @@ function renderPostCardHtml(post) {
   let categoryBadgeHtml = '';
   if (post.post_type) {
     const cat = post.post_type.toLowerCase();
-    let label = '✨ General Update';
+    let label = '✨ General';
     let css = 'cat-general';
-    if (cat === 'veterinary') { label = '🩺 Veterinary Advice'; css = 'cat-veterinary'; }
-    else if (cat === 'training') { label = '🏋️ Pet Training'; css = 'cat-training'; }
-    else if (cat === 'rescue') { label = '🛡️ Rescue & Welfare'; css = 'cat-rescue'; }
-    else if (cat === 'marketplace') { label = '🛒 Marketplace Item'; css = 'cat-marketplace'; }
+    if (cat === 'veterinary') { label = '🩺 Vet Care'; css = 'cat-veterinary'; }
+    else if (cat === 'training') { label = '🏋️ Training'; css = 'cat-training'; }
+    else if (cat === 'rescue') { label = '🛡️ Rescue'; css = 'cat-rescue'; }
+    else if (cat === 'marketplace') { label = '🛒 Market'; css = 'cat-marketplace'; }
 
-    categoryBadgeHtml = `<span class="category-badge ${css}">${label}</span>`;
+    categoryBadgeHtml = `<span class="category-badge ${css}" style="font-size:11px; font-weight:800; padding:4px 10px; border-radius:20px;">${label}</span>`;
   }
 
-  // Media gallery - improved multi-image layout
+  // Media gallery - sleek, high clarity, balanced aspect ratio
   let mediaHtml = '';
-  if (post.media_urls && post.media_urls.length) {
-    const count = post.media_urls.length;
+  const validMediaUrls = (post.media_urls || []).filter(url => url && url.trim().startsWith('http'));
+  if (validMediaUrls && validMediaUrls.length) {
+    const count = validMediaUrls.length;
     const gridStyle = count === 1
       ? 'display:block;'
       : count === 2
-        ? 'display:grid; grid-template-columns:1fr 1fr; gap:2px;'
+        ? 'display:grid; grid-template-columns:1fr 1fr; gap:6px;'
         : count === 3
-          ? 'display:grid; grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; gap:2px;'
-          : 'display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:2px;';
+          ? 'display:grid; grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; gap:6px;'
+          : 'display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:6px;';
 
-    const mediaItems = post.media_urls.slice(0, 4).map((url, i) => {
+    const mediaItems = validMediaUrls.slice(0, 4).map((url, i) => {
       const isVideo = post.media_types && post.media_types[i] === 'video';
-      const isFirst = i === 0;
       const spanStyle = count === 3 && i === 0 ? 'grid-row: span 2;' : '';
       if (isVideo) {
-        return `<div style="${spanStyle} overflow:hidden; max-height:${count === 1 ? '400px' : '220px'};"><video src="${url}" controls style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'"></video></div>`;
+        return `<div style="${spanStyle} overflow:hidden; max-height:${count === 1 ? '360px' : '220px'}; max-width:${count === 1 ? '480px' : '100%'}; margin:${count === 1 ? '0 auto' : '0'}; border-radius:12px; background:#000; display:flex; align-items:center; justify-content:center; width:100%;"><video src="${url}" controls style="width:100%; max-height:${count === 1 ? '360px' : '220px'}; object-fit:contain;" onerror="this.style.display='none'"></video></div>`;
       }
-      return `<div style="${spanStyle} overflow:hidden; max-height:${count === 1 ? '400px' : '220px'}; position:relative;">
-        <img src="${url}" alt="Post media" style="width:100%; height:100%; object-fit:cover; display:block;" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=600'">
-        ${i === 3 && post.media_urls.length > 4 ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;">+${post.media_urls.length - 4}</div>` : ''}
+      if (count === 1) {
+        return `<div style="overflow:hidden; max-height:360px; min-height:160px; position:relative; background:var(--bg-main); display:flex; align-items:center; justify-content:center; border-radius:12px; width:100%; max-width:480px; margin:0 auto;">
+          <img src="${url}" alt="Post media" class="post-media-img" style="max-width:100%; width:auto; height:auto; max-height:360px; object-fit:contain; display:block; margin:0 auto; transition:transform 0.3s ease;" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=600'">
+        </div>`;
+      }
+      return `<div style="${spanStyle} overflow:hidden; height:200px; position:relative; background:var(--bg-main); display:flex; align-items:center; justify-content:center; border-radius:12px; border:1px solid var(--border-color);">
+        <img src="${url}" alt="Post media" style="width:100%; height:100%; object-fit:cover; display:block; transition:transform 0.3s ease;" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=600'">
+        ${i === 3 && validMediaUrls.length > 4 ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:900;border-radius:12px;backdrop-filter:blur(2px);">+${validMediaUrls.length - 4}</div>` : ''}
       </div>`;
     }).join('');
 
-    mediaHtml = `<div style="margin-top:12px; border-radius:14px; overflow:hidden; border:1px solid var(--border-color); background:var(--bg-main); ${gridStyle}">${mediaItems}</div>`;
+    mediaHtml = `<div class="post-media-container" style="${gridStyle}">${mediaItems}</div>`;
   }
 
   // Attachments (Training Certificate, Rescue Record)
@@ -381,39 +512,39 @@ function renderPostCardHtml(post) {
   if (post.training_achievement) {
     const t = post.training_achievement;
     attachmentHtml += `
-      <div class="post-attachment-card training-attachment" style="border-radius:12px; padding:12px; border:1px solid var(--border-color); margin-top:12px; background:var(--bg-main);">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <div style="font-size:11px; font-weight:800; color:#f59e0b; text-transform:uppercase;"><i class="fas fa-trophy"></i> Training Achievement</div>
-            <div style="font-weight:900; font-size:13.5px; color:var(--text-primary); margin-top:2px;">${t.planTitle || 'Agility Milestone'}</div>
-          </div>
-          <div style="font-size:14px; font-weight:900; color:#f59e0b;">+${t.xpEarned || 250} XP</div>
+      <div class="post-attachment-card training-attachment" style="border-radius:14px; padding:12px 14px; border:1px solid var(--border-color); margin-top:10px; background:var(--bg-main); display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:10.5px; font-weight:800; color:#f59e0b; text-transform:uppercase; display:flex; align-items:center; gap:5px;"><i class="fas fa-trophy"></i> Training Milestone</div>
+          <div style="font-weight:800; font-size:13.5px; color:var(--text-primary); margin-top:2px;">${escapeHtml(t.planTitle || 'Agility Milestone')}</div>
         </div>
+        <div style="font-size:13.5px; font-weight:900; color:#f59e0b; background:rgba(245,158,11,0.12); padding:4px 10px; border-radius:10px;">+${t.xpEarned || 250} XP</div>
       </div>
     `;
   }
 
-  // Check if this post is from another user (not current user)
-  const isOwnPost = window.currentUser && post.user_id === window.currentUser.id;
+  // Direct message button next to three dots menu (only shown for other users)
+  const currentUid = window.currentUser ? String(window.currentUser.id) : null;
+  const isOwnPost = currentUid && (String(post.user_id) === currentUid || (window.currentUser.ecotrack_id && post.author_ecotrack_id === window.currentUser.ecotrack_id));
+  const safeAuthorName = (post.author_name || 'Member').replace(/'/g, "\\'");
   const messageBtnHtml = !isOwnPost ? `
-    <button class="post-action-btn scale-hover" onclick="event.stopPropagation(); if(window.openDirectMessageModal) window.openDirectMessageModal('${post.user_id}', '${escapeHtml(post.author_name).replace(/'/g,"\\'")}');" style="display:flex; align-items:center; gap:4px; cursor:pointer; color:var(--text-muted); font-size:12px; padding:0; border:none; background:none;">
-      <i class="far fa-comment-dots" style="font-size:13px; color:var(--primary);"></i>
+    <button class="btn-icon scale-hover" title="Send Direct Message to ${escapeHtml(post.author_name || 'Member')}" onclick="event.stopPropagation(); if(window.openDirectMessageModal) window.openDirectMessageModal('${post.user_id}', '${safeAuthorName}');" style="width:32px; height:32px; border-radius:50%; border:1px solid var(--border-color); background:var(--bg-main); color:var(--primary); cursor:pointer; display:flex; align-items:center; justify-content:center;">
+      <i class="far fa-comment-dots" style="font-size:13px;"></i>
     </button>
   ` : '';
 
   return `
-    <div class="card post-card" id="post-card-${post.id}" style="border-radius:20px; border:1px solid var(--border-color); background:var(--bg-card); padding:20px; display:flex; flex-direction:column; justify-content:space-between; transition:transform 0.2s ease, box-shadow 0.2s ease;">
+    <div class="card post-card" id="post-card-${post.id}" style="border-radius:18px; border:1px solid var(--border-color); background:var(--bg-card); padding:16px; display:flex; flex-direction:column; gap:10px; transition:box-shadow 0.2s ease, border-color 0.2s ease;">
       <div>
         <!-- Post Header -->
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
-          <div style="display:flex; align-items:center; gap:12px; cursor:pointer;" onclick="viewUserProfile('${post.user_id}')">
-            <img src="${authorAvatar}" class="avatar-md" alt="${escapeHtml(post.author_name)}" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=User&background=10b981&color=fff'" style="border:2px solid var(--border-color);">
-            <div>
-              <div style="font-weight:800; font-size:14.5px; display:flex; align-items:center; gap:6px; color:var(--text-primary);">
-                ${escapeHtml(post.author_name)}
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div style="display:flex; align-items:center; gap:10px; cursor:pointer; flex:1; overflow:hidden;" onclick="viewUserProfile('${post.user_id}')">
+            <img src="${authorAvatar}" class="avatar-md" alt="${escapeHtml(post.author_name)}" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=User&background=10b981&color=fff'" style="width:40px; height:40px; border-radius:50%; border:1.5px solid var(--border-color); flex-shrink:0;">
+            <div style="overflow:hidden;">
+              <div style="font-weight:800; font-size:14px; display:flex; align-items:center; gap:6px; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                <span>${escapeHtml(post.author_name)}</span>
                 ${vetBadge}
               </div>
-              <div style="font-size:11.5px; color:var(--text-muted); display:flex; align-items:center; gap:6px; margin-top:2px;">
+              <div style="font-size:11.5px; color:var(--text-muted); display:flex; align-items:center; gap:5px; margin-top:2px;">
                 <span>${post.author_ecotrack_id || '@ecotrack'}</span>
                 <span>•</span>
                 <span>${timeAgo}</span>
@@ -423,16 +554,17 @@ function renderPostCardHtml(post) {
             </div>
           </div>
           
-          <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
             ${categoryBadgeHtml}
+            ${messageBtnHtml}
             <div style="position:relative;">
-              <button class="btn-icon scale-hover" onclick="togglePostMenu(${post.id}, event)" style="width:32px; height:32px; border-radius:50%; border:none; background:var(--bg-main); color:var(--text-muted); cursor:pointer;"><i class="fas fa-ellipsis-h"></i></button>
+              <button class="btn-icon scale-hover" onclick="togglePostMenu(${post.id}, event)" style="width:32px; height:32px; border-radius:50%; border:1px solid var(--border-color); background:var(--bg-main); color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fas fa-ellipsis-h" style="font-size:12px;"></i></button>
             </div>
           </div>
         </div>
 
         <!-- Post Content -->
-        <div style="font-size:14px; line-height:1.6; color:var(--text-primary); margin-bottom:12px; text-align:left;">
+        <div style="font-size:13.5px; line-height:1.55; color:var(--text-primary); margin-bottom:8px; text-align:left; word-break:break-word;">
           ${formattedContent}
         </div>
 
@@ -440,46 +572,44 @@ function renderPostCardHtml(post) {
         ${attachmentHtml}
 
         <!-- Interactive Species & Location Tags -->
-        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-          ${post.location_tag ? `<span class="interactive-pill" onclick="filterByLocation('${escapeHtml(post.location_tag)}')"><i class="fas fa-location-dot" style="color:var(--primary);"></i> ${escapeHtml(post.location_tag)}</span>` : ''}
-          ${post.animal_tag ? `<span class="interactive-pill" onclick="filterBySpecies('${escapeHtml(post.animal_tag)}')"><i class="fas fa-paw" style="color:var(--primary);"></i> ${escapeHtml(post.animal_tag)}</span>` : ''}
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+          ${post.location_tag ? `<span class="interactive-pill" onclick="filterByLocation('${escapeHtml(post.location_tag)}')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:700; color:var(--text-secondary); background:var(--bg-main); border:1px solid var(--border-color); padding:3px 10px; border-radius:12px;"><i class="fas fa-location-dot" style="color:var(--primary); font-size:10px;"></i> ${escapeHtml(post.location_tag)}</span>` : ''}
+          ${post.animal_tag ? `<span class="interactive-pill" onclick="filterBySpecies('${escapeHtml(post.animal_tag)}')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:700; color:var(--text-secondary); background:var(--bg-main); border:1px solid var(--border-color); padding:3px 10px; border-radius:12px;"><i class="fas fa-paw" style="color:var(--primary); font-size:10px;"></i> ${escapeHtml(post.animal_tag)}</span>` : ''}
         </div>
       </div>
 
       <div>
         <!-- Post Action Counter Bar -->
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; padding-top:12px; border-top:1px solid var(--border-color);">
-          <button class="post-action-btn heart-btn-animate ${post.liked_by_me ? 'liked' : ''}" onclick="togglePostLike(${post.id}, this)" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <i class="${post.liked_by_me ? 'fas' : 'far'} fa-heart"></i>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:10px; border-top:1px solid var(--border-color);">
+          <button class="post-action-btn heart-btn-animate ${post.liked_by_me ? 'liked' : ''}" onclick="togglePostLike(${post.id}, this)" style="display:flex; align-items:center; gap:6px; cursor:pointer; background:none; border:none; color:${post.liked_by_me ? 'var(--danger, #ef4444)' : 'var(--text-secondary)'}; font-size:13px; font-weight:700; padding:4px 8px; border-radius:8px; transition:background 0.2s;">
+            <i class="${post.liked_by_me ? 'fas' : 'far'} fa-heart" style="${post.liked_by_me ? 'color:#ef4444;' : ''}"></i>
             <span class="like-count" style="font-weight:800;">${post.likes_count || 0}</span>
           </button>
 
-          <button class="post-action-btn scale-hover" onclick="toggleCommentsSection(${post.id})" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <button class="post-action-btn scale-hover" onclick="toggleCommentsSection(${post.id})" style="display:flex; align-items:center; gap:6px; cursor:pointer; background:none; border:none; color:var(--text-secondary); font-size:13px; font-weight:700; padding:4px 8px; border-radius:8px; transition:background 0.2s;">
             <i class="far fa-comment"></i>
-            <span style="font-weight:800;">${post.comments_count || 0}</span>
+            <span class="comment-count" style="font-weight:800;">${post.comments_count || 0}</span>
           </button>
 
-          <button class="post-action-btn scale-hover ${post.saved_by_me ? 'saved' : ''}" onclick="togglePostBookmark(${post.id}, this)" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <i class="${post.saved_by_me ? 'fas' : 'far'} fa-bookmark"></i>
-            <span style="font-weight:800;">Save</span>
+          <button class="post-action-btn scale-hover ${post.saved_by_me ? 'saved' : ''}" onclick="togglePostBookmark(${post.id}, this)" style="display:flex; align-items:center; gap:6px; cursor:pointer; background:none; border:none; color:${post.saved_by_me ? 'var(--primary)' : 'var(--text-secondary)'}; font-size:13px; font-weight:700; padding:4px 8px; border-radius:8px; transition:background 0.2s;">
+            <i class="${post.saved_by_me ? 'fas' : 'far'} fa-bookmark" style="${post.saved_by_me ? 'color:var(--primary);' : ''}"></i>
+            <span style="font-weight:800;">${post.saved_by_me ? 'Saved' : 'Save'}</span>
           </button>
 
-          ${messageBtnHtml}
-
-          <button class="post-action-btn scale-hover" onclick="openShareModal(${post.id})" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <button class="post-action-btn scale-hover" onclick="openShareModal(${post.id})" style="display:flex; align-items:center; gap:6px; cursor:pointer; background:none; border:none; color:var(--text-secondary); font-size:13px; font-weight:700; padding:4px 8px; border-radius:8px; transition:background 0.2s;">
             <i class="far fa-paper-plane"></i>
             <span style="font-weight:800;">Share</span>
           </button>
         </div>
 
-        <!-- Comments Section (Lazy-Loaded) -->
-        <div id="comments-section-${post.id}" class="comments-section" style="display:none; margin-top:16px; padding-top:16px; border-top:1px dashed var(--border-color);">
-          <!-- Add Comment Input Form -->
-          <div style="display:flex; gap:10px; margin-bottom:12px;">
-            <img src="${window.currentUser && window.currentUser.avatar ? window.currentUser.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(window.currentUser ? window.currentUser.name : 'Me')}&background=10b981&color=fff`}" class="avatar-sm" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=Me'" style="border:1px solid var(--border-color);">
-            <div style="flex:1; display:flex; gap:8px;">
-              <input type="text" id="comment-input-${post.id}" class="form-input" placeholder="Add a public comment..." style="border-radius:24px; font-size:12.5px; padding:8px 16px; border:1px solid var(--border-color); background:var(--bg-main); width:100%; outline:none;" onkeydown="if(event.key==='Enter') submitComment(${post.id})">
-              <button class="btn btn-primary scale-hover" style="border-radius:24px; padding:6px 16px; font-size:12px; font-weight:800;" onclick="submitComment(${post.id})">Post</button>
+        <!-- Comments Section (Lazy-Loaded / Expandable) -->
+        <div id="comments-section-${post.id}" class="comments-section" style="display:none; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border-color);">
+          <!-- Add Comment Input Form (shown only when signed in) -->
+          <div id="comment-input-row-${post.id}" style="display:flex; gap:8px; margin-bottom:12px; align-items:center;">
+            <img id="comment-avatar-${post.id}" src="https://ui-avatars.com/api/?name=Me&background=10b981&color=fff" class="avatar-sm" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=Me'" style="width:30px; height:30px; border-radius:50%; border:1px solid var(--border-color); flex-shrink:0;">
+            <div style="flex:1; display:flex; gap:6px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:24px; padding:3px 4px 3px 12px; align-items:center;">
+              <input type="text" id="comment-input-${post.id}" class="form-input" placeholder="Write a comment..." style="border:none; background:transparent; font-size:12.5px; color:var(--text-primary); width:100%; outline:none; padding:4px 0;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){ event.preventDefault(); submitComment(${post.id}); }">
+              <button id="comment-btn-${post.id}" class="btn btn-primary scale-hover" style="border-radius:20px; padding:5px 14px; font-size:11.5px; font-weight:800; white-space:nowrap;" onclick="submitComment(${post.id})">Post</button>
             </div>
           </div>
 
@@ -529,6 +659,7 @@ async function togglePostBookmark(postId, btnEl) {
   } else {
     btnEl.classList.remove('saved');
     icon.className = 'far fa-bookmark';
+    showToast('Removed from bookmarks.', 'info');
   }
 
   const post = loadedPosts.find(p => p.id === postId);
@@ -546,6 +677,29 @@ async function toggleCommentsSection(postId) {
   const isHidden = section.style.display === 'none';
   if (isHidden) {
     section.style.display = 'block';
+
+    // Update avatar now that we know who is signed in
+    const avatarImg = document.getElementById(`comment-avatar-${postId}`);
+    if (avatarImg && window.currentUser) {
+      const u = window.currentUser;
+      avatarImg.src = u.avatar_url || u.avatar ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(u.display_name || u.name || 'Me')}&background=10b981&color=fff`;
+    }
+
+    // If not logged in, hide input row and show sign-in notice instead
+    const inputRow = document.getElementById(`comment-input-row-${postId}`);
+    const btn = document.getElementById(`comment-btn-${postId}`);
+    if (!window.currentUser) {
+      if (inputRow) {
+        inputRow.innerHTML = `
+          <div style="width:100%; text-align:center; padding:10px; background:rgba(16,185,129,0.06); border:1px dashed var(--primary); border-radius:12px; font-size:12.5px; color:var(--text-muted);">
+            <i class="fas fa-lock" style="color:var(--primary); margin-right:6px;"></i>
+            <span>Please <strong style="color:var(--primary); cursor:pointer;" onclick="document.getElementById('loginPage')?.classList.remove('hidden'); document.getElementById('mainApp').style.display='none';">sign in</strong> to post a comment.</span>
+          </div>
+        `;
+      }
+    }
+
     list.innerHTML = `
       <div style="text-align:center; padding:16px; color:var(--text-muted);">
         <i class="fas fa-spinner fa-spin" style="color:var(--primary); margin-right:6px;"></i> Loading comments...
@@ -559,6 +713,7 @@ async function toggleCommentsSection(postId) {
         </div>
       `;
     } catch (err) {
+      console.error('toggleCommentsSection fetchComments error:', err);
       list.innerHTML = `
         <div style="text-align:center; padding:16px; color:var(--danger); font-size:12.5px;">
           Failed to load comments. Please try again.
@@ -574,48 +729,110 @@ async function toggleCommentsSection(postId) {
   }
 }
 
+const activeCommentSubmissions = new Set();
+
 async function submitComment(postId) {
-  if (!window.currentUser) { showToast('Please sign in to comment.', 'error'); return; }
+  if (!postId) return;
+  const session = window.currentUser || (function() {
+    try {
+      // Use AUTH_CONFIG.sessionKey which is '@ecotrack_web_session'
+      const key = (typeof AUTH_CONFIG !== 'undefined' && AUTH_CONFIG.sessionKey) ? AUTH_CONFIG.sessionKey : '@ecotrack_web_session';
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch(e) { return null; }
+  })();
+
+  if (!session || !session.id) {
+    showToast('Please sign in to comment.', 'error');
+    return;
+  }
+  if (activeCommentSubmissions.has(postId)) {
+    return;
+  }
+
   const input = document.getElementById(`comment-input-${postId}`);
-  if (!input || !input.value.trim()) return;
-
+  const btn = document.getElementById(`comment-btn-${postId}`);
+  if (!input) return;
   const text = input.value.trim();
-  const res = await window.EcoSocialDB.addComment(postId, text);
-  if (res && res.comment_id) {
-    const commentEl = {
-      id: res.comment_id,
-      user_id: window.currentUser.id,
-      author_name: window.currentUser.name || '',
-      author_avatar: window.currentUser.avatar || '',
-      text: text,
-      created_at: new Date().toISOString(),
-      replies: []
-    };
+  if (!text) {
+    input.focus();
+    return;
+  }
 
-    const list = document.getElementById(`comments-list-${postId}`);
-    if (list) {
-      if (list.innerHTML.includes("No comments yet")) {
-        list.innerHTML = "";
+  activeCommentSubmissions.add(postId);
+  
+  // Visual loading state
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin" style="margin-right:4px;"></i> Posting`;
+    btn.style.opacity = '0.7';
+  }
+  if (input) input.disabled = true;
+
+  try {
+    const res = await window.EcoSocialDB.addComment(postId, text);
+    if (res && (res.comment_id || res.message === 'Comment added')) {
+      const authorName = session.display_name || session.name || 'Community Member';
+      const authorAvatar = session.avatar_url || session.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=10b981&color=fff`;
+      
+      const commentEl = {
+        id: res.comment_id || Date.now(),
+        user_id: session.id,
+        author_name: authorName,
+        author_avatar: authorAvatar,
+        text: text,
+        created_at: new Date().toISOString(),
+        replies: []
+      };
+
+      const list = document.getElementById(`comments-list-${postId}`);
+      if (list) {
+        if (list.innerHTML.includes("No comments yet") || list.innerHTML.includes("No comments yet. Share your thoughts!")) {
+          list.innerHTML = "";
+        }
+        const commentHtml = renderCommentItemHtml(commentEl, postId);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = commentHtml;
+        list.prepend(tempDiv.firstElementChild);
       }
-      const commentHtml = renderCommentItemHtml(commentEl, postId);
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = commentHtml;
-      list.prepend(tempDiv.firstElementChild);
-    }
 
-    const postCard = document.getElementById(`post-card-${postId}`);
-    if (postCard) {
-      const commentBtn = postCard.querySelector('button[onclick*="toggleCommentsSection"]');
-      if (commentBtn) {
-        const countSpan = commentBtn.querySelector('span');
-        if (countSpan) countSpan.textContent = parseInt(countSpan.textContent || '0') + 1;
+      // Update all matching comment count badges for this post across the UI
+      const countSpans = document.querySelectorAll(`#post-card-${postId} .comment-count`);
+      countSpans.forEach(countSpan => {
+        const currentCount = parseInt(countSpan.textContent || '0', 10) || 0;
+        countSpan.textContent = res.comments_count !== undefined ? res.comments_count : (currentCount + 1);
+      });
+
+      // Update loadedPosts in-memory cache
+      const postObj = loadedPosts.find(p => p.id === postId || String(p.id) === String(postId));
+      if (postObj) {
+        postObj.comments_count = res.comments_count !== undefined ? res.comments_count : ((postObj.comments_count || 0) + 1);
       }
-    }
 
-    input.value = '';
-    showToast('Comment posted!', 'success');
+      input.value = '';
+      showToast('Comment posted!', 'success');
+    } else {
+      showToast('Failed to post comment. Please try again.', 'error');
+    }
+  } catch (err) {
+    console.error('submitComment error:', err);
+    showToast('Failed to post comment. Please try again.', 'error');
+  } finally {
+    activeCommentSubmissions.delete(postId);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `Post`;
+      btn.style.opacity = '1';
+    }
+    if (input) {
+      input.disabled = false;
+      input.focus();
+    }
   }
 }
+window.submitComment = submitComment;
+window.toggleCommentsSection = toggleCommentsSection;
+
 
 function renderCommentItemHtml(c, postId) {
   const authorAvatar = c.author_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.author_name || 'User')}&background=10b981&color=fff`;
@@ -720,7 +937,10 @@ async function submitReply(commentId, postId) {
 }
 
 async function handleDeletePost(postId) {
-  if (!confirm("Are you sure you want to delete this post?")) return;
+  const confirmed = window.showConfirmModal
+    ? await window.showConfirmModal({ title: 'Delete Post', message: 'Are you sure you want to delete this post? This cannot be undone.', icon: 'fa-trash-alt', confirmText: 'Delete', cancelText: 'Cancel', isDanger: true })
+    : window.confirm('Are you sure you want to delete this post?');
+  if (!confirmed) return;
   const res = await window.EcoSocialDB.deletePost(postId);
   if (res && res.success) {
     showToast("Post deleted successfully!", "success");
@@ -728,9 +948,10 @@ async function handleDeletePost(postId) {
     if (card) {
       card.style.opacity = '0';
       card.style.transform = 'scale(0.9)';
+      card.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
       setTimeout(() => card.remove(), 250);
     }
-    loadedPosts = loadedPosts.filter(p => p.id !== postId);
+    loadedPosts = loadedPosts.filter(p => String(p.id) !== String(postId));
   } else {
     showToast("Failed to delete post.", "error");
   }
@@ -764,11 +985,14 @@ function togglePostMenu(postId, event) {
     animation: fadeInScale 0.2s ease-out;
   `;
 
-  const post = loadedPosts.find(p => p.id === postId);
-  const isOwner = window.currentUser && post && (post.user_id === window.currentUser.id);
+  const post = loadedPosts.find(p => String(p.id) === String(postId));
+  const isOwner = window.currentUser && post && (String(post.user_id) === String(window.currentUser.id) || (window.currentUser.ecotrack_id && post.author_ecotrack_id === window.currentUser.ecotrack_id));
 
   menu.innerHTML = `
-    <div class="menu-item" onclick="copyPostLink(${postId})" style="display:flex; align-items:center; gap:10px; padding:10px; cursor:pointer; font-size:13px; font-weight:600; border-radius:8px; color:var(--text-primary);">
+    <div class="menu-item" onclick="openShareModal(${postId}); togglePostMenu(${postId})" style="display:flex; align-items:center; gap:10px; padding:10px; cursor:pointer; font-size:13px; font-weight:600; border-radius:8px; color:var(--text-primary);">
+      <i class="fas fa-share-nodes" style="color:#3b82f6; width:16px;"></i> Forward
+    </div>
+    <div class="menu-item" onclick="copyPostLink(${postId}); togglePostMenu(${postId})" style="display:flex; align-items:center; gap:10px; padding:10px; cursor:pointer; font-size:13px; font-weight:600; border-radius:8px; color:var(--text-primary);">
       <i class="fas fa-link" style="color:var(--primary); width:16px;"></i> Copy Link
     </div>
     <div class="menu-item" onclick="showToast('Post reported to community moderators','info'); togglePostMenu(${postId})" style="display:flex; align-items:center; gap:10px; padding:10px; cursor:pointer; font-size:13px; font-weight:600; border-radius:8px; color:var(--text-primary);">
@@ -798,49 +1022,73 @@ function togglePostMenu(postId, event) {
 
 function openCreatePostModal() {
   const modal = document.getElementById('createPostModal');
-  if (modal) modal.classList.remove('hidden');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+  }
 }
 
 function closeCreatePostModal() {
   const modal = document.getElementById('createPostModal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  }
 }
 
 async function handleCreatePostSubmit(e) {
   e.preventDefault();
-  const content = document.getElementById('createPostText').value.trim();
-  const postType = document.getElementById('createPostType').value;
-  const visibility = document.getElementById('createPostVisibility').value;
+  const content     = document.getElementById('createPostText').value.trim();
+  const postType    = document.getElementById('createPostType').value;
+  const visibility  = document.getElementById('createPostVisibility').value;
   const locationTag = document.getElementById('createPostLocation').value.trim();
-  const animalTag = document.getElementById('createPostAnimal').value.trim();
-  const hashtags = document.getElementById('createPostHashtags').value.trim();
-  const mediaUrl = document.getElementById('createPostMediaUrl').value.trim();
+  const animalTag   = document.getElementById('createPostAnimal').value.trim();
+  const hashtags    = document.getElementById('createPostHashtags').value.trim();
+
+  // Determine media: file upload takes priority over URL tab
+  const isUrlTabActive = document.getElementById('postImgUrlDiv')?.style.display !== 'none';
+  const postFile       = document.getElementById('createPostMediaFile')?.files[0];
+  const mediaUrlVal    = document.getElementById('createPostMediaUrl')?.value.trim();
 
   if (!window.currentUser) { showToast('Please sign in to publish posts.', 'error'); return; }
   const userId = window.currentUser.id;
 
-  const res = await window.EcoSocialDB.createPost({
-    user_id: userId,
-    author_name: window.currentUser.name,
-    content,
-    post_type: postType,
-    privacy_visibility: visibility,
-    location_tag: locationTag,
-    animal_tag: animalTag,
-    hashtags,
-    media_urls: mediaUrl ? [mediaUrl] : []
-  });
+  const publishPost = async (mediaUrl) => {
+    const res = await window.EcoSocialDB.createPost({
+      user_id: userId,
+      author_name: window.currentUser.name,
+      content,
+      post_type: postType,
+      privacy_visibility: visibility,
+      location_tag: locationTag,
+      animal_tag: animalTag,
+      hashtags,
+      media_urls: mediaUrl ? [mediaUrl] : []
+    });
 
-  if (res) {
-    document.getElementById('createPostText').value = '';
-    document.getElementById('createPostLocation').value = '';
-    document.getElementById('createPostAnimal').value = '';
-    document.getElementById('createPostHashtags').value = '';
-    document.getElementById('createPostMediaUrl').value = '';
-    
-    closeCreatePostModal();
-    showToast('Post published successfully!', 'success');
-    initCommunityFeed();
+    if (res) {
+      document.getElementById('createPostText').value = '';
+      document.getElementById('createPostLocation').value = '';
+      document.getElementById('createPostAnimal').value = '';
+      document.getElementById('createPostHashtags').value = '';
+      const urlEl = document.getElementById('createPostMediaUrl');
+      if (urlEl) urlEl.value = '';
+      const fileEl = document.getElementById('createPostMediaFile');
+      if (fileEl) fileEl.value = '';
+      closeCreatePostModal();
+      showToast('Post published successfully!', 'success');
+      initCommunityFeed();
+    }
+  };
+
+  if (!isUrlTabActive && postFile) {
+    const reader = new FileReader();
+    reader.onload = (ev) => publishPost(ev.target.result);
+    reader.readAsDataURL(postFile);
+  } else {
+    publishPost(mediaUrlVal || '');
   }
 }
 
@@ -858,13 +1106,40 @@ function viewUserProfile(userIdOrEcoId) {
   }
 }
 
-function formatTimeAgo(dateStr) {
-  if (!dateStr) return 'Just now';
-  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-  if (diff < 60) return 'Just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+function formatTimeAgo(dateVal) {
+  if (typeof window.formatTimeAgo === 'function' && window.formatTimeAgo !== formatTimeAgo) {
+    return window.formatTimeAgo(dateVal);
+  }
+  if (!dateVal) return '';
+  let d;
+  if (dateVal instanceof Date) {
+    d = dateVal;
+  } else if (typeof dateVal === 'number' || (!isNaN(Number(dateVal)) && /^\d+$/.test(String(dateVal).trim()))) {
+    d = new Date(Number(dateVal));
+  } else {
+    let str = String(dateVal).trim().replace(/(\.\d{3})\d+/, '$1');
+    if (str.includes(' ') && !str.includes('T')) str = str.replace(' ', 'T');
+    if (!str.endsWith('Z') && !str.includes('+') && !/[-+]\d{2}:\d{2}$/.test(str)) {
+      str += 'Z';
+    }
+    d = new Date(str);
+    if (isNaN(d.getTime())) {
+      d = new Date(String(dateVal).trim());
+    }
+  }
+
+  if (isNaN(d.getTime())) return '';
+
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) {
+    return timeStr;
+  } else {
+    const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return `${dateStr}, ${timeStr}`;
+  }
 }
 
 function escapeHtml(str) {
@@ -884,32 +1159,29 @@ function openShareModal(postId) {
   modal.className = 'bottom-sheet-modal';
   modal.onclick = (e) => { if (e.target === modal) closeShareModal(); };
   modal.innerHTML = `
-    <div class="bottom-sheet-card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h3 style="margin:0; font-weight:800; font-size:16px; display:flex; align-items:center; gap:8px;">
+    <div class="bottom-sheet-card" style="background:var(--bg-card); border-radius:20px 20px 0 0; padding:20px; max-width:480px; margin:0 auto; border:1px solid var(--border-color); box-shadow:var(--shadow-xl);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0; font-weight:800; font-size:15px; display:flex; align-items:center; gap:8px; color:var(--text-primary);">
           <i class="fas fa-share-nodes" style="color:var(--primary);"></i> Share welfare update
         </h3>
-        <button onclick="closeShareModal()" style="border:none; background:none; font-size:18px; cursor:pointer; color:var(--text-muted);">✕</button>
+        <button onclick="closeShareModal()" style="border:none; background:var(--bg-main); width:28px; height:28px; border-radius:50%; font-size:14px; cursor:pointer; color:var(--text-muted); display:flex; align-items:center; justify-content:center;">✕</button>
       </div>
       
       <!-- Post Preview snippet -->
-      <div style="background:var(--bg-main); border:1px solid var(--border-color); border-radius:12px; padding:12px; margin-bottom:16px; text-align:left;">
-        <div style="font-weight:800; font-size:11px; color:var(--primary); text-transform:uppercase; margin-bottom:4px;">Post by ${escapeHtml(authorName)}</div>
-        <div style="font-size:12.5px; color:var(--text-secondary); line-height:1.4;">"${escapeHtml(contentSnippet)}"</div>
+      <div style="background:var(--bg-main); border:1px solid var(--border-color); border-radius:12px; padding:10px 12px; margin-bottom:14px; text-align:left;">
+        <div style="font-weight:800; font-size:11px; color:var(--primary); text-transform:uppercase; margin-bottom:3px;">Post by ${escapeHtml(authorName)}</div>
+        <div style="font-size:12px; color:var(--text-secondary); line-height:1.4;">"${escapeHtml(contentSnippet)}"</div>
       </div>
       
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <button class="btn btn-secondary scale-hover" onclick="copyPostLink(${postId})" style="justify-content:flex-start; gap:12px; border-radius:12px; padding:10px 16px; text-align:left; font-weight:800; border:1px solid var(--border-color);">
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button class="btn btn-secondary scale-hover" onclick="copyPostLink(${postId})" style="justify-content:flex-start; gap:12px; border-radius:12px; padding:10px 14px; text-align:left; font-weight:800; font-size:12.5px; border:1px solid var(--border-color); background:var(--bg-main); color:var(--text-primary); cursor:pointer;">
           <i class="fas fa-link" style="color:var(--primary); width:16px;"></i> Copy Direct Post Link
         </button>
-        <button class="btn btn-secondary scale-hover" onclick="sharePostToDirectMessage(${postId})" style="justify-content:flex-start; gap:12px; border-radius:12px; padding:10px 16px; text-align:left; font-weight:800; border:1px solid var(--border-color);">
+        <button class="btn btn-secondary scale-hover" onclick="sharePostToDirectMessage(${postId})" style="justify-content:flex-start; gap:12px; border-radius:12px; padding:10px 14px; text-align:left; font-weight:800; font-size:12.5px; border:1px solid var(--border-color); background:var(--bg-main); color:var(--text-primary); cursor:pointer;">
           <i class="fas fa-paper-plane" style="color:#3b82f6; width:16px;"></i> Send in Direct Message
         </button>
-        <button class="btn btn-secondary scale-hover" onclick="shareToExternalSocial('whatsapp', ${postId})" style="justify-content:flex-start; gap:12px; border-radius:12px; padding:10px 16px; text-align:left; font-weight:800; border:1px solid var(--border-color);">
-          <i class="fab fa-whatsapp" style="color:#22c55e; width:16px;"></i> Share to WhatsApp
-        </button>
-        <button class="btn btn-secondary scale-hover" onclick="shareToExternalSocial('twitter', ${postId})" style="justify-content:flex-start; gap:12px; border-radius:12px; padding:10px 16px; text-align:left; font-weight:800; border:1px solid var(--border-color);">
-          <i class="fab fa-twitter" style="color:#38bdf8; width:16px;"></i> Share to X (Twitter)
+        <button class="btn btn-secondary scale-hover" onclick="shareToExternalSocial('twitter', ${postId})" style="justify-content:flex-start; gap:12px; border-radius:12px; padding:10px 14px; text-align:left; font-weight:800; font-size:12.5px; border:1px solid var(--border-color); background:var(--bg-main); color:var(--text-primary); cursor:pointer;">
+          <i class="fab fa-x-twitter" style="color:#38bdf8; width:16px;"></i> Share to X (Twitter)
         </button>
       </div>
     </div>
@@ -928,8 +1200,26 @@ function closeShareModal() {
 }
 
 function copyPostLink(postId) {
-  const url = `${window.location.origin}${window.location.pathname}#community?post=${postId}`;
-  navigator.clipboard.writeText(url);
+  const dummyUrl = `${window.location.origin}${window.location.pathname}#post-${postId}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(dummyUrl).then(() => {
+      showToast('Post link copied to clipboard!', 'success');
+      closeShareModal();
+    }).catch(() => {
+      fallbackCopy(dummyUrl);
+    });
+  } else {
+    fallbackCopy(dummyUrl);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
   showToast('Post link copied to clipboard!', 'success');
   closeShareModal();
 }
@@ -954,7 +1244,6 @@ function sharePostToDirectMessage(postId) {
 function shareToExternalSocial(platform, postId) {
   const url = encodeURIComponent(`${window.location.origin}${window.location.pathname}#community?post=${postId}`);
   const text = encodeURIComponent('Check out this animal welfare post on EcoTrack!');
-  if (platform === 'whatsapp') window.open(`https://api.whatsapp.com/send?text=${text}%20${url}`, '_blank');
   if (platform === 'twitter') window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank');
   closeShareModal();
 }
@@ -1005,5 +1294,22 @@ window.sharePostToDirectMessage = sharePostToDirectMessage;
 window.shareToExternalSocial = shareToExternalSocial;
 window.renderPostCardHtml = renderPostCardHtml;
 window.openAllRecommendationsModal = openAllRecommendationsModal;
-window.closeAllRecommendationsModal = closeAllRecommendationsModal;
+window.toggleCommunityNotificationsDropdown = toggleCommunityNotificationsDropdown;
+window.renderCommunityNotifications = renderCommunityNotifications;
+window.markNotificationAsRead = markNotificationAsRead;
+window.markAllNotificationsAsRead = markAllNotificationsAsRead;
 window.handleDeletePost = handleDeletePost;
+
+// Re-enforce community function exports after all scripts finish loading
+// This ensures app.js (loaded after community.js) cannot accidentally override these
+document.addEventListener('DOMContentLoaded', function() {
+  window.submitComment = submitComment;
+  window.toggleCommentsSection = toggleCommentsSection;
+  window.togglePostLike = togglePostLike;
+  window.togglePostBookmark = togglePostBookmark;
+  window.submitReply = submitReply;
+  window.toggleReplyBox = toggleReplyBox;
+  window.handleCreatePostSubmit = handleCreatePostSubmit;
+  window.initCommunityFeed = initCommunityFeed;
+  console.log('[community.js] All community functions re-exported to window after DOMContentLoaded');
+});

@@ -7,8 +7,9 @@
 
 import { getSkeletonForSpecies, type SkeletonTemplate } from './skeletonTemplates';
 import { getExerciseById, type ExerciseTemplate } from './exerciseTemplates';
+import { API_BASE_URL } from '../services/api';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = API_BASE_URL;
 
 export type ScannerStage =
   | 'INITIALIZING'     // 1. Model & Hardware load

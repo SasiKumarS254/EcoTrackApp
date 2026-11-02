@@ -1,40 +1,40 @@
 // EcoTrack Design System — Centralized Theme
 export const LightColors = {
-  primary: "#16a34a",
-  primaryDark: "#15803d",
-  primaryLight: "#86efac",
+  primary: "#10b981",
+  primaryDark: "#059669",
+  primaryLight: "#ecfdf5",
   secondary: "#0ea5e9",
-  accent: "#f59e0b",
+  accent: "#3b82f6",
   danger: "#ef4444",
-  success: "#22c55e",
-  warning: "#f97316",
+  success: "#10b981",
+  warning: "#f59e0b",
   purple: "#8b5cf6",
-  
-  bgLight: "#f0fdf4",
+
+  bgLight: "#f8fafc",
   bgCard: "#ffffff",
-  textPrimary: "#111827",
-  textSecondary: "#6b7280",
-  textMuted: "#9ca3af",
-  border: "#e5e7eb",
+  textPrimary: "#0f172a",
+  textSecondary: "#475569",
+  textMuted: "#94a3b8",
+  border: "#e2e8f0",
 };
 
 export const DarkColors = {
-  primary: "#16a34a",
-  primaryDark: "#14532d",
-  primaryLight: "#4ade80",
-  secondary: "#38bdf8",
-  accent: "#fbbf24",
-  danger: "#f87171",
-  success: "#4ade80",
-  warning: "#fb923c",
-  purple: "#a78bfa",
-  
-  bgLight: "#0f172a", // Dark bg
-  bgCard: "#1e293b", // Dark card
+  primary: "#10b981",
+  primaryDark: "#059669",
+  primaryLight: "#064e3b",
+  secondary: "#0ea5e9",
+  accent: "#3b82f6",
+  danger: "#ef4444",
+  success: "#10b981",
+  warning: "#f59e0b",
+  purple: "#8b5cf6",
+
+  bgLight: "#0b0f19",
+  bgCard: "#111827",
   textPrimary: "#f8fafc",
-  textSecondary: "#cbd5e1",
-  textMuted: "#94a3b8",
-  border: "#334155",
+  textSecondary: "#94a3b8",
+  textMuted: "#64748b",
+  border: "#1f2937",
 };
 
 // Fallback for components not yet converted to useTheme
@@ -60,7 +60,7 @@ export const Shadow = {
 
 // Conservation Status colors (for the animal dataset)
 export const ConservationColors: Record<string, string> = {
-  LC: "#22c55e",
+  LC: "#10b981",
   NT: "#84cc16",
   VU: "#f59e0b",
   EN: "#f97316",

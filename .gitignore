@@ -61,8 +61,16 @@ coverage.xml
 **/*.db
 **/*.db-shm
 **/*.db-wal
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
 **/*.pdf
 **/*.tmp
+**/*.mp4
+scratch/
+EcoTrack AppVideo/
+backend/uploads/
+backend/*.txt
 
 # Image safety (except app icons)
 **/*.jpg

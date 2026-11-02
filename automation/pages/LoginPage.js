@@ -28,7 +28,7 @@ class LoginPage extends BasePage {
         const title = await d.findElements(By.id('topPageTitle'));
         if (title.length > 0 && await title[0].isDisplayed()) return { success: true };
 
-        const error = await d.findElements(By.className('toast-msg'));
+        const error = await d.findElements(By.css('.toast.error .toast-msg'));
         if (error.length > 0) {
             const text = await error[0].getText();
             if (text && text.trim().length > 0) {

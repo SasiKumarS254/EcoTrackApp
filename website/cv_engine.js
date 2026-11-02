@@ -156,6 +156,17 @@ const EXERCISE_RULES = {
       R_Shoulder: { min: 80, max: 120, ideal: 100, label: 'R Forelimb Flex' }
     }
   },
+  dog_stand: {
+    name: 'Stand',
+    rep_tracking_joint: 'Neck',
+    rep_threshold: 0.05,
+    rules: {
+      L_Elbow: { min: 140, max: 180, ideal: 165, label: 'L Fore Leg Extension' },
+      R_Elbow: { min: 140, max: 180, ideal: 165, label: 'R Fore Leg Extension' },
+      L_Knee: { min: 140, max: 180, ideal: 165, label: 'L Hind Leg Extension' },
+      R_Knee: { min: 140, max: 180, ideal: 165, label: 'R Hind Leg Extension' }
+    }
+  },
   horse_halt: {
     name: 'Square Halt',
     rep_tracking_joint: 'Neck',
@@ -166,6 +177,109 @@ const EXERCISE_RULES = {
       L_Knee: { min: 145, max: 180, ideal: 165, label: 'L Hindlimb Extension' },
       R_Knee: { min: 145, max: 180, ideal: 165, label: 'R Hindlimb Extension' }
     }
+  },
+  horse_trot: {
+    name: 'Trot Stride',
+    rep_tracking_joint: 'L_F_Paw',
+    rep_threshold: 0.10,
+    rules: {
+      L_Elbow: { min: 100, max: 140, ideal: 120, label: 'L Fore Elbow Flexion' },
+      R_Elbow: { min: 100, max: 140, ideal: 120, label: 'R Fore Elbow Flexion' },
+      L_Knee: { min: 90, max: 130, ideal: 110, label: 'L Hind Stifle' },
+      R_Knee: { min: 90, max: 130, ideal: 110, label: 'R Hind Stifle' }
+    }
+  },
+  cat_stretch: {
+    name: 'Cat Stretch',
+    rep_tracking_joint: 'Neck',
+    rep_threshold: 0.06,
+    rules: {
+      Neck: { min: 100, max: 150, ideal: 130, label: 'Neck Extension' },
+      L_Hip: { min: 140, max: 180, ideal: 165, label: 'L Hip Extension' },
+      R_Hip: { min: 140, max: 180, ideal: 165, label: 'R Hip Extension' },
+      L_Elbow: { min: 145, max: 180, ideal: 168, label: 'L Forelimb Reach' },
+      R_Elbow: { min: 145, max: 180, ideal: 168, label: 'R Forelimb Reach' }
+    }
+  },
+  human_lunge: {
+    name: 'Lunge',
+    rep_tracking_joint: 'left_knee',
+    rep_threshold: 0.07,
+    rules: {
+      left_knee: { min: 80, max: 100, ideal: 90, label: 'Front Knee Flexion' },
+      right_knee: { min: 80, max: 100, ideal: 90, label: 'Back Knee Flexion' },
+      left_hip: { min: 150, max: 180, ideal: 165, label: 'Back Hip Extension' }
+    }
+  },
+  human_shoulder_press: {
+    name: 'Shoulder Press',
+    rep_tracking_joint: 'left_wrist',
+    rep_threshold: 0.10,
+    rules: {
+      left_elbow: { min: 85, max: 180, ideal: 170, label: 'L Elbow Extension' },
+      right_elbow: { min: 85, max: 180, ideal: 170, label: 'R Elbow Extension' },
+      left_shoulder: { min: 60, max: 120, ideal: 90, label: 'L Shoulder Abduction' },
+      right_shoulder: { min: 60, max: 120, ideal: 90, label: 'R Shoulder Abduction' }
+    }
+  },
+  human_plank: {
+    name: 'Plank',
+    rep_tracking_joint: 'left_hip',
+    rep_threshold: 0.02,
+    rules: {
+      left_hip: { min: 160, max: 200, ideal: 180, label: 'L Hip Alignment' },
+      right_hip: { min: 160, max: 200, ideal: 180, label: 'R Hip Alignment' },
+      left_knee: { min: 160, max: 200, ideal: 180, label: 'L Knee Extension' },
+      right_knee: { min: 160, max: 200, ideal: 180, label: 'R Knee Extension' }
+    }
+  },
+  human_pullup: {
+    name: 'Pull-Up',
+    rep_tracking_joint: 'left_wrist',
+    rep_threshold: 0.12,
+    rules: {
+      left_elbow: { min: 50, max: 90, ideal: 70, label: 'L Elbow Flexion (top)' },
+      right_elbow: { min: 50, max: 90, ideal: 70, label: 'R Elbow Flexion (top)' }
+    }
+  },
+  generic_walk: {
+    name: 'Gait Walk / Stride',
+    rep_tracking_joint: 'L_F_Paw',
+    rep_threshold: 0.08,
+    rules: {
+      L_Elbow: { min: 110, max: 165, ideal: 138, label: 'L Forelimb Flexion' },
+      R_Elbow: { min: 110, max: 165, ideal: 138, label: 'R Forelimb Flexion' },
+      L_Knee: { min: 105, max: 160, ideal: 132, label: 'L Hind Stifle Flexion' },
+      R_Knee: { min: 105, max: 160, ideal: 132, label: 'R Hind Stifle Flexion' }
+    }
+  },
+  generic_run: {
+    name: 'Sprint / Run Agility',
+    rep_tracking_joint: 'L_F_Paw',
+    rep_threshold: 0.12,
+    rules: {
+      L_Elbow: { min: 85, max: 168, ideal: 125, label: 'L Fore Drive Angle' },
+      R_Elbow: { min: 85, max: 168, ideal: 125, label: 'R Fore Drive Angle' },
+      L_Knee: { min: 80, max: 172, ideal: 122, label: 'L Hind Stifle Impulsion' },
+      R_Knee: { min: 80, max: 172, ideal: 122, label: 'R Hind Stifle Impulsion' }
+    }
+  },
+  generic_jump: {
+    name: 'Jump / Kinetic Clearance',
+    rep_tracking_joint: 'Neck',
+    rep_threshold: 0.14,
+    rules: {
+      L_Knee: { min: 65, max: 175, ideal: 115, label: 'Takeoff Stifle Launch' },
+      R_Knee: { min: 65, max: 175, ideal: 115, label: 'Takeoff Stifle Launch' },
+      L_Elbow: { min: 75, max: 170, ideal: 118, label: 'Forelimb Clearance' },
+      R_Elbow: { min: 75, max: 170, ideal: 118, label: 'Forelimb Clearance' }
+    }
+  },
+  free_pose: {
+    name: 'Free Pose Scan',
+    rep_tracking_joint: 'Neck',
+    rep_threshold: 0.20,
+    rules: {}
   }
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Image, Alert, StatusBar, Dimensions, ActivityIndicator,
@@ -6,8 +6,8 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize, Spacing } from "@/constants/theme";
-import { router, useFocusEffect } from "expo-router";
+import { Radius, Shadow } from "@/constants/theme";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { fetchTaxonomySpecies } from "../../services/api";
 import { fetchWikipediaSpeciesData } from "../../services/wikipedia";
 
@@ -17,9 +17,10 @@ const CLASSES = ["All", "Mammalia", "Aves", "Reptilia", "Amphibia", "Actinoptery
 
 export default function EncyclopediaScreen() {
   const { colors, isDark } = useTheme();
+  const params = useLocalSearchParams<{ q?: string }>();
 
   const [species, setSpecies] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(params.q || "");
   const [activeClass, setActiveClass] = useState("All");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -27,13 +28,7 @@ export default function EncyclopediaScreen() {
   const [wikiData, setWikiData] = useState<any>(null);
   const [loadingWiki, setLoadingWiki] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadSpecies();
-    }, [activeClass])
-  );
-
-  const loadSpecies = async (query = "") => {
+  const loadSpecies = useCallback(async (query = "") => {
     try {
       setIsLoading(true);
       const res = await fetchTaxonomySpecies(query, activeClass);
@@ -45,7 +40,16 @@ export default function EncyclopediaScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeClass]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // If a search query was passed via URL param, use it
+      const initialQuery = params.q?.trim() || "";
+      if (initialQuery) setSearch(initialQuery);
+      loadSpecies(initialQuery);
+    }, [params.q, loadSpecies])
+  );
 
   const handleSearch = () => {
     loadSpecies(search);
@@ -70,15 +74,15 @@ export default function EncyclopediaScreen() {
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* HEADER */}
-      <View style={styles.header}>
+      <View style={[styles.header, { maxWidth: 1100, width: "100%", alignSelf: "center" }]}>
         <View>
-          <Text style={styles.headerTitle}>🧬 Encyclopedia</Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>🧬 Encyclopedia</Text>
           <Text style={styles.headerSub}>Curated biological taxonomy database</Text>
         </View>
       </View>
 
       {/* SEARCH & FILTERS */}
-      <View style={{ paddingHorizontal: 16 }}>
+      <View style={{ paddingHorizontal: 16, maxWidth: 1100, width: "100%", alignSelf: "center" }}>
         <View style={[styles.searchRow, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
           <Ionicons name="search" size={18} color={colors.textMuted} />
           <TextInput
@@ -120,14 +124,21 @@ export default function EncyclopediaScreen() {
           contentContainerStyle={styles.grid}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.bgCard }]}
+              style={[styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border }]}
               onPress={() => openDetails(item)}
+              activeOpacity={0.88}
             >
-              <Image source={{ uri: item.image || item.imageUrl || "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=300" }} style={styles.cardImg} />
+              <Image
+                source={{
+                  uri: item.image || item.imageUrl || (item.image_gallery && item.image_gallery[0]) || "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?w=600"
+                }}
+                style={styles.cardImg}
+                resizeMode="cover"
+              />
               <View style={styles.cardInfo}>
                 <Text style={[styles.commonName, { color: colors.textPrimary }]} numberOfLines={1}>{item.common_name || item.scientific_name}</Text>
                 <Text style={styles.latinName} numberOfLines={1}>{item.scientific_name}</Text>
-                <View style={[styles.classBadge, { backgroundColor: colors.primary + "15" }]}>
+                <View style={[styles.classBadge, { backgroundColor: colors.primary + "18" }]}>
                   <Text style={[styles.classText, { color: colors.primary }]}>{item.class_name}</Text>
                 </View>
               </View>
@@ -222,14 +233,14 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full, borderWidth: 1, borderColor: "#e2e8f0", marginRight: 8 },
   chipText: { fontSize: 12, fontWeight: "800" },
 
-  grid: { padding: 12 },
-  card: { width: (width - 36) / 2, borderRadius: 20, marginBottom: 12, marginRight: 12, overflow: "hidden", ...Shadow.sm },
-  cardImg: { width: "100%", height: 120 },
-  cardInfo: { padding: 12 },
-  commonName: { fontWeight: "900", fontSize: 14 },
-  latinName: { color: "#64748b", fontSize: 11, fontStyle: "italic", marginTop: 2 },
-  classBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 8 },
-  classText: { fontSize: 9, fontWeight: "900", textTransform: "uppercase" },
+  grid: { padding: 12, maxWidth: 1100, width: "100%", alignSelf: "center" },
+  card: { flex: 1, minWidth: 160, maxWidth: 360, borderRadius: 20, marginBottom: 16, marginHorizontal: 6, overflow: "hidden", borderWidth: 1, ...Shadow.sm },
+  cardImg: { width: "100%", height: 170 },
+  cardInfo: { padding: 14 },
+  commonName: { fontWeight: "900", fontSize: 15 },
+  latinName: { color: "#64748b", fontSize: 12, fontStyle: "italic", marginTop: 2 },
+  classBadge: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginTop: 8 },
+  classText: { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
 
   empty: { height: 300, justifyContent: "center", alignItems: "center", width: width - 24 },
 

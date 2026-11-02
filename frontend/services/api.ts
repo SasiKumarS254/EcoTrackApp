@@ -5,9 +5,38 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 
-// Use 10.0.2.2 for Android emulators to reach the host machine's localhost
-export const API_BASE_URL = Platform.OS === 'android' ? "http://10.0.2.2:5000/api" : "http://localhost:5000/api";
+// Dynamically resolve backend URL across Physical Mobile devices (Expo Go), Android Emulator, and Web
+const resolveBackendUrl = () => {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.location?.hostname) {
+      return `http://${window.location.hostname}:5000/api`;
+    }
+    return "http://127.0.0.1:5000/api";
+  }
+
+  // Detect Expo host URI across all Expo SDK versions & platforms (Expo Go, custom client, dev builds)
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    (Constants as any).__expoHostUri ||
+    (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
+    (Constants as any).manifest?.debuggerHost ||
+    (Constants as any).experienceUrl;
+
+  if (hostUri && typeof hostUri === 'string') {
+    const cleanHost = hostUri.replace(/^[a-zA-Z]+:\/\//, '');
+    const ip = cleanHost.split(':')[0];
+    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+      return `http://${ip}:5000/api`;
+    }
+  }
+
+  // Fallback to Development Machine LAN IP (accessible by physical Android/iOS devices on Wi-Fi)
+  return "http://172.25.25.176:5000/api";
+};
+
+export const API_BASE_URL = resolveBackendUrl();
 export const STORAGE_KEYS = {
   ANALYTICS: "@ecotrack_training_analytics",
   SCANS: "@ecotrack_scans_history",
@@ -23,15 +52,17 @@ export const STORAGE_KEYS = {
 const customFetch = async (url: string | Request | URL, options: any = {}) => {
   try {
     const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH);
-    if (token) {
-      options.headers = options.headers || {};
-      if (options.headers instanceof Headers) {
-        options.headers.set('Authorization', `Bearer ${token}`);
-      } else if (Array.isArray(options.headers)) {
-        options.headers.push(['Authorization', `Bearer ${token}`]);
-      } else {
-        options.headers['Authorization'] = `Bearer ${token}`;
-      }
+    const userId = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
+    options.headers = options.headers || {};
+    if (options.headers instanceof Headers) {
+      if (token) options.headers.set('Authorization', `Bearer ${token}`);
+      if (userId) options.headers.set('x-user-id', userId);
+    } else if (Array.isArray(options.headers)) {
+      if (token) options.headers.push(['Authorization', `Bearer ${token}`]);
+      if (userId) options.headers.push(['x-user-id', userId]);
+    } else {
+      if (token) options.headers['Authorization'] = `Bearer ${token}`;
+      if (userId) options.headers['x-user-id'] = userId;
     }
   } catch (e) {
     console.warn("Error injecting mobile authorization token:", e);
@@ -49,7 +80,12 @@ export async function login(credentials: any) {
   if (res.ok) {
     await AsyncStorage.setItem(STORAGE_KEYS.AUTH, data.token);
     await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, data.user.id);
-    await AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({ ...data.user, token: data.token }));
+    await AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
+      ...data.user,
+      id: data.user.id,
+      user_id: data.user.id,  // ensure user_id is always set
+      token: data.token
+    }));
   }
   return { ok: res.ok, data };
 }
@@ -64,7 +100,12 @@ export async function signup(userData: any) {
   if (res.ok) {
     await AsyncStorage.setItem(STORAGE_KEYS.AUTH, data.token);
     await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, data.user.id);
-    await AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({ ...data.user, token: data.token }));
+    await AsyncStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
+      ...data.user,
+      id: data.user.id,
+      user_id: data.user.id,  // ensure user_id is always set
+      token: data.token
+    }));
   }
   return { ok: res.ok, data };
 }
@@ -311,15 +352,19 @@ export async function createListing(listingData: any) {
   return null;
 }
 
-export async function fetchUserProfile(userId: string) {
+export async function deleteMarketplaceListing(id: number | string) {
   try {
-    const res = await customFetch(`${API_BASE_URL}/users/${userId}`);
+    const res = await customFetch(`${API_BASE_URL}/marketplace/listing/${id}`, {
+      method: "DELETE"
+    });
     if (res.ok) return await res.json();
   } catch (e) {
-    console.warn("Fetch user profile offline", e);
+    console.warn("Delete marketplace listing offline", e);
   }
   return null;
 }
+
+
 
 export async function fetchSocialProfile(userId: string) {
   try {
@@ -424,11 +469,62 @@ export async function toggleBookmark(postId: number) {
   return null;
 }
 
-// ── CHAT & MESSAGING SYNC ──
-export async function fetchThread(user1Id: string, user2Id: string) {
+// ── USER PROFILE ──
+export async function fetchUserProfile(userId: string) {
   try {
-    const res = await customFetch(`${API_BASE_URL}/messages/thread/${user1Id}/${user2Id}`);
+    const res = await customFetch(`${API_BASE_URL}/users/${userId}`);
+    if (res.ok) {
+      const data = await res.json();
+      return data.profile || data;
+    }
+  } catch (e) {
+    console.warn("Fetch user profile offline, trying social profile endpoint", e);
+  }
+  try {
+    const res2 = await customFetch(`${API_BASE_URL}/social/profile/${userId}`);
+    if (res2.ok) {
+      const data = await res2.json();
+      return data.profile || data;
+    }
+  } catch (err) {}
+  return null;
+}
+
+export async function fetchFullUserProfile(userId: string) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/profile/${userId}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {}
+  return null;
+}
+
+export async function addPet(petData: any) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/pets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(petData),
+    });
     if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Add pet failed:", e);
+  }
+  return null;
+}
+
+// ── CHAT & MESSAGING SYNC ──
+export async function fetchThread(user1Id: string, user2Id: string, listingId?: string | null) {
+  try {
+    const url = listingId
+      ? `${API_BASE_URL}/messages/thread/${user1Id}/${user2Id}?listing_id=${listingId}`
+      : `${API_BASE_URL}/messages/thread/${user1Id}/${user2Id}`;
+    const res = await customFetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.messages || []);
+    }
   } catch (e) {
     console.warn("Fetch message thread offline");
   }
@@ -438,25 +534,78 @@ export async function fetchThread(user1Id: string, user2Id: string) {
 export async function fetchMessages(userId: string) {
   try {
     const res = await customFetch(`${API_BASE_URL}/messages/conversations/${userId}`);
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      const rawList = Array.isArray(data) ? data : (data.conversations || []);
+      const normalized = rawList.map((c: any) => ({
+        id: c.id || c.partner_id || c.other_user_id,
+        other_user_id: c.other_user_id || c.partner_id,
+        other_user_name: c.other_user_name || c.partner_name || "Eco Member",
+        other_user_avatar: c.other_user_avatar || c.partner_avatar || "",
+        last_message: c.last_message || "",
+        last_message_time: c.last_message_time || c.last_time || new Date().toISOString(),
+        listing_id: c.listing_id || null,
+        listing_title: c.listing_title || null,
+        listing_image: c.listing_image || null,
+        unread_count: c.unread_count || 0
+      }));
+      return { conversations: normalized };
+    }
   } catch (e) {
-    console.warn("Fetch messages offline");
+    console.warn("Fetch messages offline", e);
   }
-  return null;
+  return { conversations: [] };
 }
 
-export async function sendMessage(fromUserId: string, toUserId: string, text: string, mediaUrl?: string, mediaType?: string) {
+export async function sendMessage(fromUserId: string, toUserId: string, text: string, mediaUrl?: string, mediaType?: string, listingId?: string | null) {
   try {
     const res = await customFetch(`${API_BASE_URL}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from_user_id: fromUserId, to_user_id: toUserId, text, media_url: mediaUrl, media_type: mediaType }),
+      body: JSON.stringify({
+        to_user_id: toUserId,
+        receiver_id: toUserId,
+        text,
+        media_url: mediaUrl || null,
+        media_type: mediaType || null,
+        listing_id: listingId || null
+      }),
     });
     if (res.ok) return await res.json();
-  } catch (e) {
-    console.warn("Send message offline");
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `Send failed: ${res.status}`);
+  } catch (e: any) {
+    console.warn("Send message error:", e.message || e);
+    throw e;
   }
-  return null;
+}
+
+export async function deleteMessage(messageId: string | number, deleteType: 'me' | 'all' = 'me') {
+  try {
+    const userId = (await AsyncStorage.getItem(STORAGE_KEYS.USER_ID)) || 'usr1';
+    const res = await customFetch(`${API_BASE_URL}/messages/${messageId}?delete_type=${deleteType}&user_id=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    });
+    if (res.ok) return await res.json();
+    return null;
+  } catch (e: any) {
+    console.warn("Delete message error:", e.message || e);
+    return null;
+  }
+}
+
+export async function deleteConversation(partnerId: string) {
+  try {
+    const userId = (await AsyncStorage.getItem(STORAGE_KEYS.USER_ID)) || 'usr1';
+    const res = await customFetch(`${API_BASE_URL}/messages/conversations/${partnerId}?user_id=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    });
+    if (res.ok) return await res.json();
+    return null;
+  } catch (e: any) {
+    console.warn("Delete conversation error:", e.message || e);
+    return null;
+  }
 }
 
 // ── TRAINING PROGRAMS SYNC ──
@@ -480,6 +629,32 @@ export async function saveTrainingProgram(userId: string, programData: any) {
     if (res.ok) return await res.json();
   } catch (e) {
     console.warn("Save training program offline");
+  }
+  return null;
+}
+
+export async function updateTrainingProgramProgress(userId: string, programId: string, progressData: any) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/training/programs/${userId}/${programId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(progressData),
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Update training program progress offline");
+  }
+  return null;
+}
+
+export async function deleteTrainingProgram(userId: string, programId: string) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/training/programs/${userId}/${programId}`, {
+      method: "DELETE"
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Delete training program offline", e);
   }
   return null;
 }
@@ -511,13 +686,21 @@ export async function createCommunityPost(postData: any) {
 
 export async function likeCommunityPost(postId: number, userId: string) {
   try {
-    const res = await customFetch(`${API_BASE_URL}/community/${postId}/like`, {
+    const res = await customFetch(`${API_BASE_URL}/social/posts/${postId}/like`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: userId }),
     });
     if (res.ok) return await res.json();
   } catch (e) {
+    try {
+      const res2 = await customFetch(`${API_BASE_URL}/community/${postId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      if (res2.ok) return await res2.json();
+    } catch(err) {}
     console.warn("Like community post offline");
   }
   return null;
@@ -525,13 +708,21 @@ export async function likeCommunityPost(postId: number, userId: string) {
 
 export async function commentCommunityPost(postId: number, commentData: any) {
   try {
-    const res = await customFetch(`${API_BASE_URL}/community/${postId}/comment`, {
+    const res = await customFetch(`${API_BASE_URL}/social/posts/${postId}/comments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(commentData),
     });
     if (res.ok) return await res.json();
   } catch (e) {
+    try {
+      const res2 = await customFetch(`${API_BASE_URL}/community/${postId}/comment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(commentData),
+      });
+      if (res2.ok) return await res2.json();
+    } catch(err) {}
     console.warn("Comment community post offline");
   }
   return null;
@@ -551,6 +742,36 @@ export async function fetchCareServices(type?: string, search?: string) {
   return null;
 }
 
+// ── MARKETPLACE SYNC ──
+export async function fetchMarketplaceAnimals() {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/marketplace?category=Pets`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (e) {
+    console.warn("Fetch marketplace animals offline");
+  }
+  return null;
+}
+
+export async function fetchMarketplaceProducts() {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/marketplace`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const products = data.filter((item: any) => item.category !== 'Pets');
+        if (products.length > 0) return products;
+      }
+    }
+  } catch (e) {
+    console.warn("Fetch marketplace products offline");
+  }
+  return null;
+}
+
 // ── EVENTS SYNC ──
 export async function fetchEvents(category?: string) {
   try {
@@ -559,6 +780,32 @@ export async function fetchEvents(category?: string) {
     if (res.ok) return await res.json();
   } catch (e) {
     console.warn("Fetch events offline");
+  }
+  return null;
+}
+
+export async function createEvent(eventData: any) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(eventData),
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Create event offline", e);
+  }
+  return null;
+}
+
+export async function deleteEvent(eventId: number | string) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/events/${eventId}`, {
+      method: "DELETE"
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Delete event offline", e);
   }
   return null;
 }
@@ -636,4 +883,14 @@ export async function fetchSavedPosts() {
     console.warn("Fetch saved posts offline", e);
   }
   return [];
+}
+
+export async function fetchScanReport(scanId: string) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/ai/scan-report/${scanId}`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Fetch scan report offline", e);
+  }
+  return null;
 }

@@ -31,10 +31,23 @@ class SpeciesTrainerPage extends BasePage {
     console.log('Waiting for plan results...');
     await this.waitForElement(this.resultContainer);
     // Wait for title to actually have text
-    await this.driver.wait(async (d) => {
-        const text = await d.findElement(this.planTitle).getText();
-        return text.length > 0;
-    }, this.timeout);
+    try {
+      await this.driver.wait(async (d) => {
+          const elements = await d.findElements(this.planTitle);
+          if (elements.length > 0) {
+              const text = await elements[0].getText();
+              return text.length > 0;
+          }
+          return false;
+      }, 30000);
+    } catch (err) {
+      const containerEl = await this.driver.findElement(this.resultContainer);
+      const innerHtml = await containerEl.getAttribute('innerHTML');
+      console.log('--- trainingResultContainer INNER HTML ON FAILURE ---');
+      console.log(innerHtml);
+      console.log('----------------------------------------------------');
+      throw err;
+    }
     console.log('Plan generated and rendered.');
   }
 

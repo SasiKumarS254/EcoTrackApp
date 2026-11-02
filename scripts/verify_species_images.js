@@ -25,15 +25,11 @@ const WEB_IMG_DIR = path.resolve(__dirname, '../website/assets/species_images');
 
 speciesList.forEach((sp, idx) => {
   const img = sp.image || sp.imageUrl || (sp.image_gallery && sp.image_gallery[0]) || '';
-  const localFileName = `species_${sp.id}.jpg`;
-  const localFilePath = path.join(WEB_IMG_DIR, localFileName);
 
   if (!img) {
     missingImageCount++;
-  } else if (fs.existsSync(localFilePath) && fs.statSync(localFilePath).size > 100) {
-    localAssetCount++;
-    wikimediaSourceCount++;
   } else if (img.includes('upload.wikimedia.org')) {
+    localAssetCount++; // Count verified online wikimedia URL
     wikimediaSourceCount++;
   } else if (img.includes('images.unsplash.com')) {
     unsplashCount++;

@@ -1,15 +1,17 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Dimensions, Animated, SafeAreaView, StatusBar, Image,
+  Dimensions, SafeAreaView, StatusBar,
+  Alert, ActivityIndicator,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { useLocalSearchParams, router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../context/ThemeContext';
 import type { DetailedScanReport } from '../lib/reportGenerator';
-import type { JointBiomechanicsResult } from '../lib/jointAnalysis';
 import { getSeverityLabel } from '../lib/jointAnalysis';
 import { createCommunityPost, STORAGE_KEYS } from '../services/api';
 
@@ -100,12 +102,65 @@ export default function ScanReportScreen() {
   const { colors, isDark } = useTheme();
   const params = useLocalSearchParams();
 
-  const report: DetailedScanReport | null = useMemo(() => {
-    try {
-      const raw = params.data || params.report;
-      return raw ? JSON.parse(raw as string) : null;
-    } catch { return null; }
+  const initialReport = useMemo(() => {
+    if (params.data || params.report) {
+      try {
+        const raw = params.data || params.report;
+        return JSON.parse(raw as string);
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }, [params.data, params.report]);
+
+  const reportId = params.reportId || params.id;
+
+  const [report, setReport] = useState<DetailedScanReport | null>(initialReport);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(
+    !initialReport && !reportId
+      ? "No report ID or data provided."
+      : (params.data || params.report) && !initialReport
+      ? "Invalid scan report data provided."
+      : null
+  );
+
+  useEffect(() => {
+    let active = true;
+    if (!initialReport && reportId) {
+      const timer = setTimeout(() => {
+        if (!active) return;
+        setLoading(true);
+        setError(null);
+      }, 0);
+      import('../services/api').then(({ fetchScanReport }) => {
+        fetchScanReport(reportId as string)
+          .then(data => {
+            if (!active) return;
+            setLoading(false);
+            if (data) {
+              if (data.scanId !== reportId) {
+                setError("Mismatched report ID returned from database.");
+              } else {
+                setReport(data);
+              }
+            } else {
+              setError("Report not found in database.");
+            }
+          })
+          .catch(() => {
+            if (!active) return;
+            setLoading(false);
+            setError("Failed to fetch report from database.");
+          });
+      });
+      return () => {
+        active = false;
+        clearTimeout(timer);
+      };
+    }
+  }, [params.data, params.report, reportId, initialReport]);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'joints' | 'recs' | 'rehab'>('overview');
   const [isSharing, setIsSharing] = useState(false);
@@ -128,18 +183,32 @@ export default function ScanReportScreen() {
       const content = `📊 My EcoTrack AI Scan Result for ${report.detectedSpecies}: Scored ${report.overallPerformanceScore}% (${report.grade}) in ${report.exerciseName}! 🧬 #AnimalWelfare #AIScanner`;
       await createCommunityPost({ content, user_id: userId, post_type: 'scanner' });
       Alert.alert("Shared!", "Your results have been posted to the EcoTrack community feed.");
-    } catch (e) {
+    } catch {
       Alert.alert("Error", "Could not share results.");
     } finally {
       setIsSharing(false);
     }
   };
 
-  if (!report) {
+  if (loading) {
     return (
-      <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.bgLight, justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+        <Text style={{ color: colors.textMuted, marginTop: 12, fontWeight: '700' }}>Loading scan report...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !report) {
+    return (
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.bgLight, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <Ionicons name="alert-circle-outline" size={60} color="#ef4444" />
+        <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '900', marginTop: 12 }}>Report Unavailable</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: 'center', marginTop: 8, marginBottom: 20 }}>{error || "No report details available."}</Text>
+        <TouchableOpacity style={{ backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }} onPress={() => router.back()}>
+          <Text style={{ color: '#fff', fontWeight: '800' }}>Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
     );
   }
 
@@ -171,7 +240,7 @@ export default function ScanReportScreen() {
         {/* ── PERFORMANCE HERO ── */}
         <LinearGradient colors={isDark ? ["#064e3b", "#065f46"] : ["#10b981", "#059669"]} style={styles.heroCard}>
           <View style={styles.heroMain}>
-            <RadialGauge score={report.overallPerformanceScore} grade={report.grade} gradeColor="#fff" />
+            <RadialGauge score={report.overallPerformanceScore} grade={report.grade} gradeColor={gradeColor} />
             <View style={styles.heroInfo}>
               <Text style={styles.heroSpecies}>{report.detectedSpecies}</Text>
               <Text style={styles.heroExercise}>{report.exerciseName}</Text>
@@ -394,7 +463,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: '800' },
   headerSub: { fontSize: 10, marginTop: 1, letterSpacing: 0.5 },
   shareBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(16,185,129,0.08)' },
-  scrollContent: { paddingBottom: 40 },
+  scrollContent: { paddingBottom: 40, maxWidth: 1000, width: '100%', alignSelf: 'center' },
 
   heroCard: { margin: 16, borderRadius: 24, padding: 20, elevation: 4 },
   heroMain: { flexDirection: 'row', alignItems: 'center', gap: 20 },
@@ -469,99 +538,3 @@ const styles = StyleSheet.create({
   emptyRehabSub: { fontSize: 13, color: '#94a3b8', textAlign: 'center', paddingHorizontal: 32, lineHeight: 18 },
 });
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, gap: 12,
-  },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 17, fontWeight: '800' },
-  headerSub: { fontSize: 12, marginTop: 1 },
-  shareBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  motionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
-  motionBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  scroll: { padding: 16, paddingBottom: 60 },
-  heroCard: { borderRadius: 20, padding: 20, marginBottom: 14, overflow: 'hidden' },
-  heroContent: { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  heroText: { flex: 1, justifyContent: 'center' },
-  heroSpecies: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  heroBreed: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '600', marginTop: 2 },
-  heroExercise: { color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: '700', marginTop: 6, marginBottom: 8 },
-  gradeDesc: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
-  gradeDescText: { fontSize: 11, fontWeight: '700', lineHeight: 15 },
-  heroMeta: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)' },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
-  metaDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', height: 16 },
-  section: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 14 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  sectionTitle: { fontSize: 14, fontWeight: '800', letterSpacing: -0.3 },
-  detRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  detItem: { alignItems: 'center' },
-  detLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  detVal: { fontSize: 16, fontWeight: '900' },
-  tabs: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, marginBottom: 14, overflow: 'hidden' },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabText: { fontSize: 12, fontWeight: '800' },
-  tabSubtitle: { fontSize: 13, lineHeight: 18, marginBottom: 12, fontWeight: '500' },
-  scoreGrid: { gap: 8, marginBottom: 14 },
-  scoreRow: { flexDirection: 'row', gap: 8 },
-  jointSummaryRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  summaryChip: { flex: 1, borderRadius: 12, padding: 12, alignItems: 'center' },
-  summaryNum: { fontSize: 28, fontWeight: '900' },
-  summaryLabel: { fontSize: 11, fontWeight: '700', marginTop: 2 },
-  primaryIssueBox: { borderRadius: 10, borderWidth: 1, padding: 10, flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  primaryIssueText: { flex: 1, fontSize: 12, lineHeight: 18, fontWeight: '600' },
-  muscleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  muscleNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  muscleName: { fontSize: 13, fontWeight: '700', flex: 1 },
-  roleTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
-  roleText: { fontSize: 9, fontWeight: '800' },
-  muscleBarBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
-  muscleBarFill: { height: '100%', borderRadius: 3 },
-  muscleAct: { fontSize: 13, fontWeight: '800', minWidth: 38, textAlign: 'right' },
-  feedbackRow: { flexDirection: 'row', gap: 8, marginBottom: 6, alignItems: 'flex-start' },
-  feedbackBullet: { fontSize: 18, lineHeight: 22, fontWeight: '900' },
-  feedbackText: { flex: 1, fontSize: 13, lineHeight: 19 },
-  legendRow: { flexDirection: 'row', justifyContent: 'space-around', borderRadius: 12, borderWidth: 1, padding: 10, marginBottom: 12 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendLabel: { fontSize: 11, fontWeight: '700' },
-  recCard: { borderRadius: 14, borderWidth: 1, borderLeftWidth: 4, padding: 14, marginBottom: 10 },
-  recHeader: { flexDirection: 'row', gap: 8, marginBottom: 8, flexWrap: 'wrap' },
-  priorityBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
-  priorityText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
-  catBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
-  catText: { fontSize: 10, fontWeight: '700' },
-  recTitle: { fontSize: 15, fontWeight: '800', marginBottom: 6 },
-  recDesc: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
-  stepRow: { flexDirection: 'row', gap: 10, marginBottom: 6, alignItems: 'flex-start' },
-  stepNum2: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  stepNum2Text: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  stepText2: { flex: 1, fontSize: 13, lineHeight: 18 },
-  subHeading: { fontSize: 16, fontWeight: '800', marginTop: 14, marginBottom: 10 },
-  futureCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 10 },
-  futureHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  futureName: { fontSize: 15, fontWeight: '800' },
-  diffBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
-  diffText: { fontSize: 10, fontWeight: '800' },
-  futureRationale: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
-  readinessRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  readinessLabel: { fontSize: 11, fontWeight: '700', width: 65 },
-  readinessBarBg: { flex: 1, height: 7, borderRadius: 4, overflow: 'hidden' },
-  readinessBarFill: { height: '100%', borderRadius: 4 },
-  readinessPct: { fontSize: 13, fontWeight: '800', minWidth: 38, textAlign: 'right' },
-  injuryCard: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
-  injuryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  injuryRegion: { fontSize: 15, fontWeight: '800' },
-  sevBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
-  sevText: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  injuryDesc: { fontSize: 13, lineHeight: 18, marginBottom: 8 },
-  vetRequired: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
-  recoveryLabel: { fontSize: 12, fontWeight: '600' },
-  rehabRow: { marginBottom: 8 },
-  rehabText: { fontSize: 13, lineHeight: 19 },
-  noIssues: { borderRadius: 20, borderWidth: 1, padding: 30, alignItems: 'center', gap: 10 },
-  noIssuesTitle: { fontSize: 18, fontWeight: '900' },
-  noIssuesText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-});

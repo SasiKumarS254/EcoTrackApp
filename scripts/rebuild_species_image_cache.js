@@ -121,31 +121,15 @@ function downloadFile(url, destPath) {
 
 async function rebuild() {
   console.log("==========================================================");
-  console.log(" 🌐 ECOTRACK LOCAL WIKIPEDIA IMAGE CACHE & DATABASE REBUILD ");
+  console.log(" 🌐 ECOTRACK REMOTE WIKIPEDIA IMAGE CACHE & DATABASE REBUILD ");
   console.log("==========================================================");
 
-  // Phase 1: Pre-download unique category master files
-  const uniqueUrls = new Set(Object.values(VERIFIED_WIKIMEDIA_IMAGE_BANK).map(x => x.url));
-  const masterFileMap = new Map();
-  let idx = 1;
-
-  console.log(`Downloading ${uniqueUrls.size} unique master Wikipedia image category files...`);
-  for (const url of uniqueUrls) {
-    const masterFileName = `master_${idx++}.jpg`;
-    const masterPath = path.join(WEB_IMG_DIR, masterFileName);
-    if (!fs.existsSync(masterPath) || fs.statSync(masterPath).size < 1000) {
-      console.log(`⬇️ Harvesting: ${url}`);
-      await downloadFile(url, masterPath);
-    }
-    masterFileMap.set(url, masterPath);
-  }
-
-  // Phase 2: Rapidly populate all 10,000 species records
+  // Phase 1: Rapidly populate all 10,000 species records to point directly to remote Wikimedia URLs
   const dbModule = require('../backend/db');
   const db = dbModule.getDB();
   const speciesList = db.animals_itis || [];
 
-  console.log(`\nMapping ${speciesList.length.toLocaleString()} species records to local verified image assets...`);
+  console.log(`\nMapping ${speciesList.length.toLocaleString()} species records to remote Wikipedia image assets...`);
   const verifiedImageTable = [];
   const now = new Date().toISOString();
 
@@ -153,46 +137,31 @@ async function rebuild() {
     const commonName = sp.common_name || sp.name || `Species #${sp.id}`;
     const sciName = sp.scientific_name || sp.latin || commonName;
     const info = resolveSpeciesImageInfo(commonName);
-    const masterPath = masterFileMap.get(info.url);
 
-    const fileName = `species_${sp.id}.jpg`;
-    const webPath = path.join(WEB_IMG_DIR, fileName);
-    const frontendPath = path.join(FRONTEND_IMG_DIR, fileName);
-    const relativeAssetPath = `assets/species_images/${fileName}`;
+    if (info && info.url) {
+      sp.image = info.url;
+      sp.imageUrl = info.url;
+      if (sp.image_gallery) sp.image_gallery = [info.url];
 
-    if (masterPath && fs.existsSync(masterPath)) {
-      if (!fs.existsSync(webPath)) {
-        fs.copyFileSync(masterPath, webPath);
-      }
-      try {
-        if (!fs.existsSync(frontendPath)) {
-          fs.copyFileSync(webPath, frontendPath);
-        }
-      } catch {}
-
-      sp.image = relativeAssetPath;
-      sp.imageUrl = relativeAssetPath;
-      if (sp.image_gallery) sp.image_gallery = [relativeAssetPath];
+      verifiedImageTable.push({
+        taxon_id: sp.id || sp.tsn,
+        scientific_name: sciName,
+        common_name: commonName,
+        wikimedia_image_url: info.url,
+        cached_local_image_path: null,
+        wikimedia_page_url: info.wiki,
+        verification_status: "VERIFIED",
+        last_updated: now
+      });
     }
-
-    verifiedImageTable.push({
-      taxon_id: sp.id || sp.tsn,
-      scientific_name: sciName,
-      common_name: commonName,
-      wikimedia_image_url: info.url,
-      cached_local_image_path: relativeAssetPath,
-      wikimedia_page_url: info.wiki,
-      verification_status: "VERIFIED",
-      last_updated: now
-    });
   }
 
-  // Phase 3: Store Verified Image Table in DB
+  // Phase 2: Store Verified Image Table in DB
   db.verified_species_images = verifiedImageTable;
   dbModule.saveDB();
 
   console.log("==========================================================");
-  console.log(` ✅ SUCCESS: Local Image Cache Rebuilt (${uniqueUrls.size} master category images harvested)`);
+  console.log(` ✅ SUCCESS: Remote URLs mapped successfully.`);
   console.log(` ✅ Verified Image Table created with ${verifiedImageTable.length.toLocaleString()} species records`);
   console.log("==========================================================");
 }

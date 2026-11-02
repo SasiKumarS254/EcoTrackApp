@@ -17,6 +17,15 @@ describe('Species AI Trainer Deep Validation', function() {
         await trainerPage.click(trainerPage.speciesTrainerNav);
     });
 
+    afterEach(async function() {
+        if (this.currentTest.state === 'failed' && driver) {
+            const logs = await driver.manage().logs().get('browser');
+            console.log('--- BROWSER CONSOLE LOGS ---');
+            logs.forEach(log => console.log(`[${log.level.name}] ${log.message}`));
+            console.log('----------------------------');
+        }
+    });
+
     after(async function() {
         if (driver) await driver.quit();
     });

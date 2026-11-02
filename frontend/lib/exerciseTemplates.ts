@@ -394,23 +394,96 @@ const ALL_EXERCISES: ExerciseTemplate[] = [
 ];
 
 /**
+ * Normalize common species/breed names to supported canonical groups
+ */
+export function normalizeSpecies(species: string): string {
+  const s = (species || "").toLowerCase().trim();
+  if (!s) return "human";
+  if (
+    s.includes("dog") || s.includes("canine") || s.includes("shepherd") ||
+    s.includes("retriever") || s.includes("hound") || s.includes("poodle") ||
+    s.includes("bulldog") || s.includes("husky") || s.includes("terrier") ||
+    s.includes("rottweiler") || s.includes("beagle") || s.includes("boxer") ||
+    s.includes("dachshund") || s.includes("pug") || s.includes("corgi") ||
+    s.includes("mastiff") || s.includes("wolf") || s.includes("dingo") ||
+    s.includes("puppy")
+  ) {
+    return "dog";
+  }
+  if (
+    s.includes("cat") || s.includes("feline") || s.includes("tiger") ||
+    s.includes("lion") || s.includes("leopard") || s.includes("cheetah") ||
+    s.includes("jaguar") || s.includes("cougar") || s.includes("panther") ||
+    s.includes("lynx") || s.includes("kitten")
+  ) {
+    return "cat";
+  }
+  if (
+    s.includes("horse") || s.includes("equine") || s.includes("stallion") ||
+    s.includes("mare") || s.includes("pony") || s.includes("foal") ||
+    s.includes("zebra") || s.includes("donkey") || s.includes("mule")
+  ) {
+    return "horse";
+  }
+  if (
+    s.includes("cow") || s.includes("bovine") || s.includes("cattle") ||
+    s.includes("bull") || s.includes("calf") || s.includes("ox") ||
+    s.includes("buffalo") || s.includes("bison")
+  ) {
+    return "cow";
+  }
+  if (
+    s.includes("sheep") || s.includes("ovine") || s.includes("lamb") ||
+    s.includes("ram") || s.includes("ewe") || s.includes("goat") ||
+    s.includes("caprine")
+  ) {
+    return "sheep";
+  }
+  if (
+    s.includes("bird") || s.includes("avian") || s.includes("eagle") ||
+    s.includes("parrot") || s.includes("falcon") || s.includes("hawk") ||
+    s.includes("owl") || s.includes("pigeon") || s.includes("crow")
+  ) {
+    return "bird";
+  }
+  if (
+    s.includes("human") || s.includes("person") || s.includes("user") ||
+    s.includes("man") || s.includes("woman") || s.includes("athlete")
+  ) {
+    return "human";
+  }
+  return s;
+}
+
+/**
  * Get all exercises applicable to a species.
  */
 export function getExercisesForSpecies(species: string): ExerciseTemplate[] {
-  const key = species.toLowerCase().trim();
+  const norm = normalizeSpecies(species);
+  const rawKey = (species || "").toLowerCase().trim();
   const applicable = ALL_EXERCISES.filter(ex => {
     if (ex.id === 'free_pose') return true;
-    return ex.species.some(s => s === key || s === 'any');
+    return ex.species.some(s => s === norm || s === rawKey || s === 'any');
   });
-  // Always add Free Pose Scan at start
   return applicable;
 }
 
 /**
- * Get a specific exercise by ID.
+ * Get a specific exercise by ID or Name (with exact and fuzzy match).
  */
-export function getExerciseById(id: string): ExerciseTemplate | null {
-  return ALL_EXERCISES.find(ex => ex.id === id) ?? null;
+export function getExerciseById(idOrName: string): ExerciseTemplate | null {
+  if (!idOrName) return null;
+  const target = idOrName.toLowerCase().trim();
+  const exactId = ALL_EXERCISES.find(ex => ex.id.toLowerCase() === target);
+  if (exactId) return exactId;
+  const exactName = ALL_EXERCISES.find(ex => ex.name.toLowerCase() === target);
+  if (exactName) return exactName;
+  const partial = ALL_EXERCISES.find(ex =>
+    target.includes(ex.id.toLowerCase()) || ex.id.toLowerCase().includes(target) ||
+    target.includes(ex.name.toLowerCase()) || ex.name.toLowerCase().includes(target)
+  );
+  if (partial) return partial;
+  return null;
 }
 
 export default ALL_EXERCISES;

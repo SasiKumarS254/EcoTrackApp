@@ -19,7 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { Radius, Shadow, FontSize } from "@/constants/theme";
 import { useTheme } from "../../context/ThemeContext";
-import { fetchThread, sendMessage, fetchUserProfile } from "../../services/api";
+import { fetchThread, sendMessage, fetchUserProfile, deleteMessage, deleteConversation } from "../../services/api";
 
 interface MessageItem {
   id: string;
@@ -38,16 +38,19 @@ const QUICK_PROMPTS = [
 ];
 
 export default function ChatScreen() {
-  const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
+  const { id, name, listingId } = useLocalSearchParams<{ id: string; name?: string; listingId?: string }>();
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
 
-  const targetUserId = id ? (id.startsWith("user_") || id.startsWith("seller_") || id.startsWith("usr_") || id.startsWith("usr") ? id : `user_${id}`) : "user_101";
-  const sellerName = name || `Eco Member (${targetUserId})`;
-  const storageKey = `@ecotrack_chat_${targetUserId}`;
+  const targetUserId = id ? String(id).trim() : "user_101";
+  const sellerName = name || (targetUserId ? `Eco Member` : "Member");
+  const activeListingId = listingId ? String(listingId) : null;
+  const storageKey = activeListingId
+    ? `@ecotrack_chat_${targetUserId}_${activeListingId}`
+    : `@ecotrack_chat_${targetUserId}`;
 
   const [input, setInput] = useState("");
-  const [userId, setUserId] = useState<string>("user_guest");
+  const [userId, setUserId] = useState<string>("usr1");
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [attachedMedia, setAttachedMedia] = useState<{ uri: string; isVideo: boolean } | null>(null);
   const [partnerProfile, setPartnerProfile] = useState<any>(null);
@@ -62,10 +65,34 @@ export default function ChatScreen() {
     }
   }, [targetUserId]);
 
+  const flatListRef = useRef<FlatList>(null);
+
+  const reloadThread = async () => {
+    if (!targetUserId || !userId || userId === "user_guest") return;
+    try {
+      const thread = await fetchThread(userId, targetUserId, activeListingId);
+      if (thread !== null && Array.isArray(thread)) {
+        const mapped: MessageItem[] = thread.map((m: any) => ({
+          id: String(m.id || Date.now().toString()),
+          text: m.text,
+          sender: (m.from_user_id === userId || m.sender_id === userId) ? ("me" as const) : ("seller" as const),
+          time: (m.timestamp || m.created_at) ? new Date(m.timestamp || m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
+          media_url: m.media_url,
+          media_type: m.media_type
+        }));
+        setMessages(mapped);
+        AsyncStorage.setItem(`${storageKey}_${userId}`, JSON.stringify(mapped)).catch(() => {});
+      }
+    } catch (err) {
+      console.warn("Failed to reload thread", err);
+    }
+  };
+
   // Load user & chat thread
   useEffect(() => {
+    let isMounted = true;
     (async () => {
-      let currentUid = "user_guest";
+      let currentUid = "usr1";
       try {
         const raw = await AsyncStorage.getItem("@ecotrack_user_session");
         if (raw) {
@@ -73,77 +100,168 @@ export default function ChatScreen() {
           currentUid = sess.user_id || sess.id || "user_guest";
         }
       } catch (e) {}
-      setUserId(currentUid);
+      if (isMounted) setUserId(currentUid);
 
-      const thread = await fetchThread(currentUid, targetUserId);
-      if (thread && Array.isArray(thread) && thread.length > 0) {
-        const mapped = thread.map((m: any) => ({
-          id: m.id || Date.now().toString(),
-          text: m.text,
-          sender: m.from_user_id === currentUid ? ("me" as const) : ("seller" as const),
-          time: new Date(m.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          media_url: m.media_url,
-          media_type: m.media_type
-        }));
-        setMessages(mapped);
-      } else {
-        const stored = await AsyncStorage.getItem(`${storageKey}_${currentUid}`);
-        if (stored) setMessages(JSON.parse(stored));
+      const thread = await fetchThread(currentUid, targetUserId, activeListingId);
+      if (isMounted) {
+        if (thread !== null && Array.isArray(thread)) {
+          const mapped: MessageItem[] = thread.map((m: any) => ({
+            id: String(m.id || Date.now().toString()),
+            text: m.text,
+            sender: (m.from_user_id === currentUid || m.sender_id === currentUid) ? ("me" as const) : ("seller" as const),
+            time: (m.timestamp || m.created_at) ? new Date(m.timestamp || m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
+            media_url: m.media_url,
+            media_type: m.media_type
+          }));
+          setMessages(mapped);
+          AsyncStorage.setItem(`${storageKey}_${currentUid}`, JSON.stringify(mapped)).catch(() => {});
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }, 100);
+        } else {
+          const stored = await AsyncStorage.getItem(`${storageKey}_${currentUid}`);
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              // Cleanse any old simulated bot messages
+              const cleaned = Array.isArray(parsed)
+                ? parsed.filter((m: any) => m && m.id !== "msg_init" && !String(m.id).startsWith("reply_") && !String(m.text || "").includes("Thanks for inquiring about"))
+                : [];
+              setMessages(cleaned);
+            } catch {}
+          }
+        }
       }
     })();
+
+    // Poll for new messages every 4 seconds
+    const interval = setInterval(() => {
+      if (isMounted) reloadThread();
+    }, 4000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [targetUserId, storageKey]);
 
-  // Save local copy
+  // Save local copy whenever messages change
   useEffect(() => {
-    if (messages.length > 0) {
-      AsyncStorage.setItem(`${storageKey}_${userId}`, JSON.stringify(messages)).catch(() => {});
-    }
+    AsyncStorage.setItem(`${storageKey}_${userId}`, JSON.stringify(messages)).catch(() => {});
   }, [messages, storageKey, userId]);
 
-  const flatListRef = useRef<FlatList>(null);
-
   const pickMedia = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert("Permission Required", "Gallery permission is required to attach photos or videos.");
-      return;
-    }
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert("Permission Required", "Gallery permission is required to attach photos or videos.");
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      allowsEditing: true,
-      quality: 0.7,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        allowsEditing: false,
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
-      setAttachedMedia({ uri: asset.uri, isVideo: asset.type === 'video' });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setAttachedMedia({ uri: asset.uri, isVideo: asset.type === 'video' });
+      }
+    } catch (e) {
+      Alert.alert("Media Picker Error", "Could not select media file.");
     }
   };
 
   const sendMessageText = async (textToSend: string) => {
     if (!textToSend.trim() && !attachedMedia) return;
 
-    const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const userMsg: MessageItem = {
-      id: Date.now().toString(),
-      text: textToSend,
-      sender: "me",
-      time: currentTime,
-      media_url: attachedMedia?.uri || null,
-      media_type: attachedMedia ? (attachedMedia.isVideo ? "video" : "image") : null,
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
     const mediaToSend = attachedMedia;
+    setInput("");
     setAttachedMedia(null);
 
     try {
-      await sendMessage(userId, targetUserId, textToSend, mediaToSend?.uri, mediaToSend ? (mediaToSend.isVideo ? "video" : "image") : undefined);
-    } catch (e) {
-      console.warn("Failed to send message to backend", e);
+      await sendMessage(
+        userId,
+        targetUserId,
+        textToSend,
+        mediaToSend?.uri,
+        mediaToSend ? (mediaToSend.isVideo ? "video" : "image") : undefined,
+        activeListingId
+      );
+      // Reload from backend AFTER confirmed persistence
+      await reloadThread();
+    } catch (e: any) {
+      console.warn("Failed to send message to backend:", e);
+      Alert.alert("Send Failed", e?.message || "Message could not be sent. Check your connection.");
     }
+  };
+
+  const handlePromptDelete = (msg: MessageItem) => {
+    const isMe = msg.sender === "me";
+    const actions: any[] = [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete for Me",
+        style: "destructive",
+        onPress: async () => {
+          const updated = messages.filter((m) => m.id !== msg.id);
+          setMessages(updated);
+          await AsyncStorage.setItem(`${storageKey}_${userId}`, JSON.stringify(updated)).catch(() => {});
+          await deleteMessage(msg.id, "me");
+          await reloadThread();
+        },
+      },
+    ];
+
+    if (isMe) {
+      actions.push({
+        text: "Delete for Everyone",
+        style: "destructive",
+        onPress: async () => {
+          Alert.alert(
+            "Delete for Everyone?",
+            "Are you sure you want to delete this message for everyone? This cannot be undone.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Delete for All",
+                style: "destructive",
+                onPress: async () => {
+                  const updated = messages.filter((m) => m.id !== msg.id);
+                  setMessages(updated);
+                  await AsyncStorage.setItem(`${storageKey}_${userId}`, JSON.stringify(updated)).catch(() => {});
+                  await deleteMessage(msg.id, "all");
+                  await reloadThread();
+                }
+              }
+            ]
+          );
+        },
+      });
+    }
+
+    Alert.alert("Message Actions", "Select an option for this message:", actions);
+  };
+
+  const handleClearChatHistory = () => {
+    Alert.alert(
+      "Delete Chat History",
+      "Are you sure you want to permanently delete this entire chat history? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Chat",
+          style: "destructive",
+          onPress: async () => {
+            setMessages([]);
+            await AsyncStorage.removeItem(`${storageKey}_${userId}`).catch(() => {});
+            await deleteConversation(targetUserId);
+            await reloadThread();
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -174,7 +292,25 @@ export default function ChatScreen() {
             <Text style={styles.statusText}>Direct Member Message</Text>
           </View>
         </View>
+
+        <TouchableOpacity
+          onPress={handleClearChatHistory}
+          style={{ padding: 8 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel="Clear chat history"
+        >
+          <Ionicons name="trash-outline" size={20} color={colors.textMuted} />
+        </TouchableOpacity>
       </View>
+
+      {activeListingId && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.primary + "15", paddingHorizontal: 16, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <Ionicons name="pricetag-outline" size={14} color={colors.primary} />
+          <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>
+            Listing Inquiry #{activeListingId}
+          </Text>
+        </View>
+      )}
 
       {/* MESSAGES LIST */}
       <FlatList
@@ -195,7 +331,12 @@ export default function ChatScreen() {
           const isMe = item.sender === "me";
           return (
             <View style={[styles.bubbleWrapper, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
-              <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleSeller]}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onLongPress={() => handlePromptDelete(item)}
+                delayLongPress={300}
+                style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleSeller]}
+              >
                 {!!item.text && (
                   <Text style={[styles.bubbleText, isMe ? styles.textMe : styles.textSeller]}>
                     {item.text}
@@ -204,10 +345,19 @@ export default function ChatScreen() {
                 {!!item.media_url && (
                   <Image source={{ uri: item.media_url }} style={{ width: 180, height: 140, borderRadius: 8, marginTop: 6 }} />
                 )}
-                <Text style={[styles.timeText, isMe ? styles.timeMe : styles.timeSeller]}>
-                  {item.time}
-                </Text>
-              </View>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4, marginTop: 4 }}>
+                  <Text style={[styles.timeText, isMe ? styles.timeMe : styles.timeSeller]}>
+                    {item.time}
+                  </Text>
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() => handlePromptDelete(item)}
+                    style={{ padding: 2 }}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={12} color={isMe ? "rgba(255,255,255,0.85)" : colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
             </View>
           );
         }}

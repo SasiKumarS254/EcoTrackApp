@@ -1,14 +1,14 @@
 /**
- * trainingAnalyticsStore.ts
- * Persistent training analytics with real CV data.
- * All metrics derived from actual scan results — no random boost values.
- *
- * Analytics update rules:
- * - formScore, postureScore, balanceScore come from real joint angle analysis
- * - Level advances when cumulative avg form score passes tier thresholds
- * - Next exercise unlocks when formScore >= 80 AND reps >= exercise.completion_reps
- * - Analytics are NEVER manually editable by users
- */
+* trainingAnalyticsStore.ts
+* Persistent training analytics with real CV data.
+* All metrics derived from actual scan results — no random boost values.
+*
+* Analytics update rules:
+* - formScore, postureScore, balanceScore come from real joint angle analysis
+* - Level advances when cumulative avg form score passes tier thresholds
+* - Next exercise unlocks when formScore >= 80 AND reps >= exercise.completion_reps
+* - Analytics are NEVER manually editable by users
+*/
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
