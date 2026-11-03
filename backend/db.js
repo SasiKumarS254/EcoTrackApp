@@ -1407,7 +1407,10 @@ module.exports = {
   // ── TRAINING PLANS / PROGRAMS ──
   getTrainingPrograms: async (userId) => {
     const sdb = getSocialDB();
-    const rows = await sdb.prepare(`SELECT * FROM AITrainerPrograms WHERE user_id = ? ORDER BY started_at DESC`).all(userId);
+    const raw = String(userId || '');
+    const clean = raw.replace(/^(usr_|user_)/, '');
+    const prefixed = 'usr_' + clean;
+    const rows = await sdb.prepare(`SELECT * FROM AITrainerPrograms WHERE user_id = ? OR user_id = ? OR user_id = ? ORDER BY started_at DESC`).all(raw, clean, prefixed);
     return rows.map(r => ({
       ...r,
       is_active: r.is_active === 1,
@@ -2376,7 +2379,10 @@ module.exports = {
     const sdb = getSocialDB();
     let rows;
     if (userId) {
-      rows = await sdb.prepare(`SELECT * FROM FullScans WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`).all(userId);
+      const raw = String(userId);
+      const clean = raw.replace(/^(usr_|user_)/, '');
+      const prefixed = 'usr_' + clean;
+      rows = await sdb.prepare(`SELECT * FROM FullScans WHERE user_id = ? OR user_id = ? OR user_id = ? ORDER BY created_at DESC LIMIT 50`).all(raw, clean, prefixed);
     } else {
       rows = await sdb.prepare(`SELECT * FROM FullScans ORDER BY created_at DESC LIMIT 50`).all();
     }

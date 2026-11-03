@@ -107,9 +107,8 @@ async function initializeDatabase() {
     ];
     for (const m of migrations) {
       try {
-        if (offline) {
-          // SQLite does not support IF NOT EXISTS in ADD COLUMN; strip it and ignore duplicate column errors
-          const sqliteSql = m.replace('IF NOT EXISTS ', '');
+        if (database.isUsingLocalSQLite()) {
+          const sqliteSql = m.replace(/IF NOT EXISTS\s*/gi, '');
           await dbQuery(sqliteSql, []);
         } else {
           await dbQuery(m, []);
@@ -139,7 +138,7 @@ async function initializeDatabase() {
     await seedInitialData();
 
     // â”€â”€ Step 5: Reset PG sequences (Postgres only) â”€â”€
-    if (!offline) {
+    if (!database.isUsingLocalSQLite()) {
       try {
         await dbQuery(`SELECT setval(pg_get_serial_sequence('posts','id'), COALESCE(max(id),1)) FROM posts`, []);
         await dbQuery(`SELECT setval(pg_get_serial_sequence('marketplacelistings','id'), COALESCE(max(id),1)) FROM marketplacelistings`, []);

@@ -76,7 +76,8 @@ function sqliteQuery(text, params = []) {
     .replace(/REFERENCES \w+\(\w+\)/gi, '')
     .replace(/md5\(random\(\)::text\)/gi, "lower(hex(randomblob(8)))")
     .replace(/::text/gi, '')
-    .replace(/::integer/gi, '');
+    .replace(/::integer/gi, '')
+    .replace(/ADD COLUMN IF NOT EXISTS/gi, 'ADD COLUMN');
 
   // Detect multi-statement blocks (DDL uses ; to separate CREATE TABLE statements)
   const statements = sql
@@ -126,7 +127,7 @@ function sqliteQuery(text, params = []) {
     if (
       err.message.includes('UNIQUE constraint failed') ||
       err.message.includes('no such table')             ||
-      err.message.includes('already exists')
+      err.message.includes('already exists') || err.message.includes('duplicate column')
     ) {
       return { rows: [], rowCount: 0 };
     }
