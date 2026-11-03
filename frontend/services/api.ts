@@ -490,6 +490,20 @@ export async function fetchUserProfile(userId: string) {
   return null;
 }
 
+export async function updateUserProfile(profileData: any) {
+  try {
+    const res = await customFetch(`${API_BASE_URL}/social/profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(profileData),
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Update profile error:", e);
+  }
+  return null;
+}
+
 export async function fetchFullUserProfile(userId: string) {
   try {
     const res = await customFetch(`${API_BASE_URL}/social/profile/${userId}`);

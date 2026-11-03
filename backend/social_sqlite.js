@@ -978,6 +978,169 @@ async function syncOfflineDatabase() {
     const sb = database.getSupabaseClient();
     if (sb) {
       try {
+        // Sync Users from Supabase
+        const { data: sbUsers } = await sb.from('users').select('*');
+        if (Array.isArray(sbUsers) && sbUsers.length > 0) {
+          for (const u of sbUsers) {
+            try {
+              const cleanEmail = (u.email || '').toLowerCase().trim();
+              const existingUser = await dbQuery(`SELECT id FROM Users WHERE email = $1`, [cleanEmail]);
+              if (existingUser.rows && existingUser.rows.length > 0) {
+                const oldId = existingUser.rows[0].id;
+                if (oldId !== u.id) {
+                  const childTables = [
+                    ['Profiles', 'user_id'], ['Pets', 'owner_id'], ['Posts', 'user_id'],
+                    ['Likes', 'user_id'], ['Comments', 'user_id'], ['Messages', 'sender_id'],
+                    ['Messages', 'receiver_id'], ['Followers', 'follower_id'], ['Followers', 'following_id'],
+                    ['AITrainerPrograms', 'user_id'], ['AIScannerReports', 'user_id'], ['FullScans', 'user_id'],
+                    ['EnvironmentalImpact', 'user_id'], ['SavedPosts', 'user_id'], ['Achievements', 'user_id'],
+                    ['UserSettings', 'user_id'], ['CartItems', 'user_id'], ['EventRegistrations', 'user_id']
+                  ];
+                  for (const [tbl, col] of childTables) {
+                    try { await dbQuery(`UPDATE ${tbl} SET ${col} = $1 WHERE ${col} = $2`, [u.id, oldId]); } catch (e) {}
+                  }
+                  await dbQuery(`UPDATE Users SET id = $1, ecotrack_id = $2, name = $3 WHERE email = $4`, [u.id, u.ecotrack_id, u.name, cleanEmail]);
+                }
+              } else {
+                await dbQuery(`
+                  INSERT INTO Users (id, ecotrack_id, email, name, password_hash, role, created_at)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7)
+                  ON CONFLICT (id) DO UPDATE SET
+                    ecotrack_id = excluded.ecotrack_id,
+                    name = excluded.name,
+                    password_hash = excluded.password_hash,
+                    role = excluded.role
+                `, [
+                  u.id, u.ecotrack_id, cleanEmail, u.name || 'Universal Member',
+                  u.password_hash || '123456', u.role || 'user', u.created_at || new Date().toISOString()
+                ]);
+              }
+              usersCount++;
+            } catch (e) {}
+          }
+        }
+
+        // Sync Profiles from Supabase
+        const { data: sbProfiles } = await sb.from('profiles').select('*');
+        if (Array.isArray(sbProfiles) && sbProfiles.length > 0) {
+          for (const p of sbProfiles) {
+            try {
+              await dbQuery(`
+                INSERT INTO Profiles (
+                  user_id, display_name, ecotrack_id, avatar_url, cover_url, bio,
+                  country, city, languages, interests, favorite_species, vet_status,
+                  vet_verification, trainer_certs, rescue_org_membership, social_links,
+                  website, education, experience, volunteer_work, skills, personal_info,
+                  privacy_setting, reputation_score, profile_completion_pct, pinned_post_id,
+                  profession, organization, dm_privacy_setting, emergency_helper, emergency_phone
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
+                ON CONFLICT (user_id) DO UPDATE SET
+                  display_name = excluded.display_name,
+                  ecotrack_id = excluded.ecotrack_id,
+                  avatar_url = excluded.avatar_url,
+                  cover_url = excluded.cover_url,
+                  bio = excluded.bio,
+                  country = excluded.country,
+                  city = excluded.city,
+                  languages = excluded.languages,
+                  interests = excluded.interests,
+                  favorite_species = excluded.favorite_species,
+                  vet_status = excluded.vet_status,
+                  vet_verification = excluded.vet_verification,
+                  trainer_certs = excluded.trainer_certs,
+                  rescue_org_membership = excluded.rescue_org_membership,
+                  social_links = excluded.social_links,
+                  website = excluded.website,
+                  education = excluded.education,
+                  experience = excluded.experience,
+                  volunteer_work = excluded.volunteer_work,
+                  skills = excluded.skills,
+                  personal_info = excluded.personal_info,
+                  privacy_setting = excluded.privacy_setting,
+                  reputation_score = excluded.reputation_score,
+                  profile_completion_pct = excluded.profile_completion_pct,
+                  pinned_post_id = excluded.pinned_post_id,
+                  profession = excluded.profession,
+                  organization = excluded.organization,
+                  dm_privacy_setting = excluded.dm_privacy_setting,
+                  emergency_helper = excluded.emergency_helper,
+                  emergency_phone = excluded.emergency_phone
+              `, [
+                p.user_id, p.display_name, p.ecotrack_id, p.avatar_url, p.cover_url, p.bio,
+                p.country, p.city, p.languages, p.interests, p.favorite_species, p.vet_status || 0,
+                p.vet_verification, p.trainer_certs, p.rescue_org_membership, p.social_links,
+                p.website, p.education, p.experience, p.volunteer_work, p.skills, p.personal_info,
+                p.privacy_setting || 'Public', p.reputation_score || 120, p.profile_completion_pct || 85,
+                p.pinned_post_id, p.profession, p.organization, p.dm_privacy_setting || 'Everyone',
+                p.emergency_helper || 0, p.emergency_phone
+              ]);
+            } catch (e) {}
+          }
+        }
+
+        // Sync Pets from Supabase
+        const { data: sbPets } = await sb.from('pets').select('*');
+        if (Array.isArray(sbPets) && sbPets.length > 0) {
+          for (const pt of sbPets) {
+            try {
+              await dbQuery(`
+                INSERT INTO Pets (
+                  id, owner_id, name, species, breed, age, weight, diet, images,
+                  medical_history, vaccination_records, scanner_reports, training_progress,
+                  achievements, milestones, created_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                ON CONFLICT (id) DO UPDATE SET
+                  owner_id = excluded.owner_id,
+                  name = excluded.name,
+                  species = excluded.species,
+                  breed = excluded.breed,
+                  age = excluded.age,
+                  weight = excluded.weight,
+                  diet = excluded.diet,
+                  images = excluded.images,
+                  medical_history = excluded.medical_history,
+                  vaccination_records = excluded.vaccination_records,
+                  scanner_reports = excluded.scanner_reports,
+                  training_progress = excluded.training_progress,
+                  achievements = excluded.achievements,
+                  milestones = excluded.milestones
+              `, [
+                pt.id, pt.owner_id, pt.name, pt.species, pt.breed, pt.age, pt.weight, pt.diet,
+                typeof pt.images === 'string' ? pt.images : JSON.stringify(pt.images || []),
+                typeof pt.medical_history === 'string' ? pt.medical_history : JSON.stringify(pt.medical_history || []),
+                typeof pt.vaccination_records === 'string' ? pt.vaccination_records : JSON.stringify(pt.vaccination_records || []),
+                typeof pt.scanner_reports === 'string' ? pt.scanner_reports : JSON.stringify(pt.scanner_reports || []),
+                typeof pt.training_progress === 'string' ? pt.training_progress : JSON.stringify(pt.training_progress || {}),
+                typeof pt.achievements === 'string' ? pt.achievements : JSON.stringify(pt.achievements || []),
+                typeof pt.milestones === 'string' ? pt.milestones : JSON.stringify(pt.milestones || []),
+                pt.created_at || new Date().toISOString()
+              ]);
+              petsCount++;
+            } catch (e) {}
+          }
+        }
+
+        // Sync Achievements from Supabase
+        const { data: sbAch } = await sb.from('achievements').select('*');
+        if (Array.isArray(sbAch) && sbAch.length > 0) {
+          for (const a of sbAch) {
+            try {
+              await dbQuery(`
+                INSERT INTO Achievements (id, user_id, badge_code, badge_name, icon, category, description, unlocked_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                ON CONFLICT (id) DO UPDATE SET
+                  user_id = excluded.user_id,
+                  badge_code = excluded.badge_code,
+                  badge_name = excluded.badge_name,
+                  icon = excluded.icon,
+                  category = excluded.category,
+                  description = excluded.description,
+                  unlocked_at = excluded.unlocked_at
+              `, [a.id, a.user_id, a.badge_code, a.badge_name, a.icon, a.category, a.description, a.unlocked_at]);
+            } catch (e) {}
+          }
+        }
+
         const { data: sbEvents } = await sb.from('events').select('*');
         if (Array.isArray(sbEvents) && sbEvents.length > 0) {
           for (const ev of sbEvents) {
