@@ -2039,6 +2039,395 @@
     ],
     "usr1": [
       {
+        "id": "tp_1793785885952",
+        "user_id": "usr1",
+        "species": "Dog",
+        "breed": "German Shepherd",
+        "goal": "Agility, Muscle Strength & Joint Mobility",
+        "is_active": true,
+        "started_at": "2026-11-04T09:51:25.965Z",
+        "progress": {
+          "completed_exercises": [],
+          "current_week": 1,
+          "total_scans": 0,
+          "avg_score": 0,
+          "plan": {
+            "speciesName": "Dog",
+            "breedName": "German Shepherd",
+            "ageCategory": "Adult",
+            "weightClass": "Standard",
+            "age": 3,
+            "weight": 30,
+            "goal": "Agility, Muscle Strength & Joint Mobility",
+            "planDurationDays": 7,
+            "daysPlan": [
+              {
+                "dayNum": 1,
+                "title": "Day 1: Foundation & Biomechanical Form Setup 🔥",
+                "focus": "Targeted Agility, Muscle Strength & Joint Mobility progression (Agility)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_1_1",
+                    "name": "Directional Target Touch Sprints",
+                    "title": "Directional Target Touch Sprints",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  },
+                  {
+                    "id": "ml_1_2",
+                    "name": "Weave Pole Slalom Agility Navigation",
+                    "title": "Weave Pole Slalom Agility Navigation",
+                    "desc": "ML Model Optimized Secondary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Secondary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 260,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 2,
+                "title": "Day 2: Hypertrophy, Core & Postural Stability 🔥",
+                "focus": "Targeted Agility, Muscle Strength & Joint Mobility progression (Pull)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_2_1",
+                    "name": "Rear-Drive Backward Stepping",
+                    "title": "Rear-Drive Backward Stepping",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 260,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 3,
+                "title": "Day 3: High-Drive Endurance & Cardiovascular Stamina 🔥",
+                "focus": "Targeted Agility, Muscle Strength & Joint Mobility progression (Push)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_3_1",
+                    "name": "Front-Leg Balance Cushion Touches",
+                    "title": "Front-Leg Balance Cushion Touches",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 261,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 4,
+                "title": "Day 4: Active Recovery & Hydration 💤",
+                "focus": "Neurological recovery & joint decompression",
+                "isRestDay": true,
+                "isRest": true,
+                "drills": [],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 0,
+                "diet": {
+                  "recommendation": "Hydration and joint supplements (Glucosamine/Chondroitin).",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 5,
+                "title": "Day 5: Explosive Agility & Kinetic Power 🔥",
+                "focus": "Targeted Agility, Muscle Strength & Joint Mobility progression (Agility)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_5_1",
+                    "name": "Directional Target Touch Sprints",
+                    "title": "Directional Target Touch Sprints",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  },
+                  {
+                    "id": "ml_5_2",
+                    "name": "Weave Pole Slalom Agility Navigation",
+                    "title": "Weave Pole Slalom Agility Navigation",
+                    "desc": "ML Model Optimized Secondary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Secondary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 260,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 6,
+                "title": "Day 6: Cognitive Focus & Impulse Control 🔥",
+                "focus": "Targeted Agility, Muscle Strength & Joint Mobility progression (Pull)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_6_1",
+                    "name": "Rear-Drive Backward Stepping",
+                    "title": "Rear-Drive Backward Stepping",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 260,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 7,
+                "title": "Day 7: Milestone Performance Review & Peak Mastery 🔥",
+                "focus": "Targeted Agility, Muscle Strength & Joint Mobility progression (Push)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_7_1",
+                    "name": "Chest-Elevated Step-Ups",
+                    "title": "Chest-Elevated Step-Ups",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  },
+                  {
+                    "id": "ml_7_2",
+                    "name": "Front-Leg Balance Cushion Touches",
+                    "title": "Front-Leg Balance Cushion Touches",
+                    "desc": "ML Model Optimized Secondary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Secondary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 261,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              }
+            ],
+            "dailySchedule": [
+              {
+                "time": "08:00 AM",
+                "activity": "Morning Vitals & Feed",
+                "duration": "20m",
+                "notes": "Check posture"
+              },
+              {
+                "time": "10:30 AM",
+                "activity": "AI Training Session",
+                "duration": "30m",
+                "notes": "Use scanner"
+              },
+              {
+                "time": "01:00 PM",
+                "activity": "Nutritional Recovery",
+                "duration": "30m",
+                "notes": "Protein rich"
+              }
+            ],
+            "dietaryPlan": [
+              {
+                "meal": "Day 1 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 2 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 3 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 4 Protocol",
+                "recommendation": "Hydration and joint supplements (Glucosamine/Chondroitin).",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 5 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 6 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 7 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              }
+            ],
+            "exercises": [
+              {
+                "id": "sit_stay",
+                "name": "Sit & Stay Hold",
+                "reps": "3 x 12",
+                "intensity": "Moderate",
+                "instructions": "Develop impulse control, focus, and sustained positional awareness."
+              },
+              {
+                "id": "heel_walk",
+                "name": "Heel Pace Walk",
+                "reps": "3 x 12",
+                "intensity": "Moderate",
+                "instructions": "Teach precise heel position with attention to handler."
+              },
+              {
+                "id": "recall_sprint",
+                "name": "Recall Sprint",
+                "reps": "3 x 12",
+                "intensity": "Moderate",
+                "instructions": "Build reliable recall under increasing distraction and distance."
+              },
+              {
+                "id": "down_stay",
+                "name": "Down-Stay Control",
+                "reps": "3 x 12",
+                "intensity": "Moderate",
+                "instructions": "Build prolonged down position with handler out of sight."
+              }
+            ],
+            "milestones": [
+              "Baseline Assessment",
+              "3-Day Streak",
+              "Form Mastery"
+            ],
+            "metrics": [
+              {
+                "label": "Symmetry",
+                "value": 78,
+                "description": "Bilateral balance"
+              },
+              {
+                "label": "Stability",
+                "value": 74,
+                "description": "Core control"
+              }
+            ],
+            "safetyWarnings": [
+              "Ensure non-slip surface.",
+              "Stop if animal shows distress or panting."
+            ],
+            "adaptationExplanation": "Initial baseline plan."
+          }
+        }
+      },
+      {
         "id": "tp_1793593808203",
         "user_id": "usr1",
         "species": "Dog",
