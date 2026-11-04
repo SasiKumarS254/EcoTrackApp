@@ -65,6 +65,7 @@ coverage.xml
 **/*.sqlite-shm
 **/*.sqlite-wal
 **/*.pdf
+!EcoTrack_Architecture_Guide.pdf
 **/*.tmp
 **/*.mp4
 scratch/
