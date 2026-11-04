@@ -17,24 +17,28 @@ const resolveBackendUrl = () => {
   }
 
   // Detect Expo host URI across all Expo SDK versions & platforms (Expo Go, custom client, dev builds)
-  const hostUri =
-    Constants.expoConfig?.hostUri ||
-    (Constants as any).expoGoConfig?.debuggerHost ||
-    (Constants as any).__expoHostUri ||
-    (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
-    (Constants as any).manifest?.debuggerHost ||
-    (Constants as any).experienceUrl;
+  const candidateHosts = [
+    Constants.expoConfig?.hostUri,
+    (Constants as any).expoGoConfig?.debuggerHost,
+    (Constants as any).__expoHostUri,
+    (Constants as any).manifest2?.extra?.expoGo?.debuggerHost,
+    (Constants as any).manifest?.debuggerHost,
+    (Constants as any).experienceUrl,
+    Constants.linkingUri,
+  ];
 
-  if (hostUri && typeof hostUri === 'string') {
-    const cleanHost = hostUri.replace(/^[a-zA-Z]+:\/\//, '');
-    const ip = cleanHost.split(':')[0];
-    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
-      return `http://${ip}:5000/api`;
+  for (const raw of candidateHosts) {
+    if (raw && typeof raw === 'string') {
+      const clean = raw.replace(/^[a-zA-Z0-9+.-]+:\/\//, '').split('/')[0];
+      const ip = clean.split(':')[0];
+      if (ip && ip !== 'localhost' && ip !== '127.0.0.1' && !ip.startsWith('169.254')) {
+        return `http://${ip}:5000/api`;
+      }
     }
   }
 
-  // Fallback to Development Machine LAN IP (accessible by physical Android/iOS devices on Wi-Fi)
-  return "http://172.25.16.172:5000/api";
+  // Active Hotspot IP (192.168.137.1) and Wi-Fi IP (172.25.86.92)
+  return "http://192.168.137.1:5000/api";
 };
 
 export const API_BASE_URL = resolveBackendUrl();
