@@ -9,8 +9,8 @@ const AUTH_CONFIG = {
   // Resilient API base detection
   apiBase: (function() {
     try {
-      const h = window.location.hostname || '';
-      const p = window.location.port || '';
+      const h = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+      const p = (typeof window !== 'undefined' && window.location && window.location.port) || '';
       if (h === '127.0.0.1' || h === 'localhost' || h === '' || p === '5000' || p === '3000' || p === '8080' || h.startsWith('192.168.') || h.startsWith('10.')) {
         return "http://127.0.0.1:5000/api";
       }
@@ -42,9 +42,26 @@ function getSession() {
       }
     }
   } catch (e) {
-    console.warn("Auth session parsing warning:", e.message);
+    // Non-fatal session parse warning
   }
   return null;
+}
+
+/**
+ * Universal Authorization and Content-Type Headers Helper
+ */
+function getAuthHeaders(extraHeaders = {}) {
+  const headers = { 'Content-Type': 'application/json', ...extraHeaders };
+  try {
+    const session = getSession();
+    if (session && session.token) {
+      headers['Authorization'] = `Bearer ${session.token}`;
+    }
+    if (session && session.id) {
+      headers['x-user-id'] = session.id;
+    }
+  } catch (e) {}
+  return headers;
 }
 
 /**
@@ -114,88 +131,9 @@ function performLogout() {
   } catch (e) {}
 })();
 
-// Global fetch interceptor to inject Authorization header across all pages safely
-(function() {
-  if (window.__ecotrackFetchInterceptorInstalled) return;
-  window.__ecotrackFetchInterceptorInstalled = true;
-
-  const originalFetch = window.fetch;
-  if (typeof originalFetch !== 'function') return;
-
-  window.fetch = function(input, init) {
-    try {
-      let url = '';
-      if (typeof input === 'string') {
-        url = input;
-      } else if (input && typeof input.url === 'string') {
-        url = input.url;
-      } else if (input && typeof input.href === 'string') {
-        url = input.href;
-      } else if (input && typeof input.toString === 'function') {
-        url = input.toString();
-      }
-
-      const isEcoTrackApi = url && (
-        url.includes(':5000/api') ||
-        url.includes('127.0.0.1:5000') ||
-        url.includes('localhost:5000') ||
-        url.startsWith('/api') ||
-        url.includes('/api/') ||
-        (typeof AUTH_CONFIG !== 'undefined' && AUTH_CONFIG.apiBase && url.includes(AUTH_CONFIG.apiBase))
-      );
-
-      if (isEcoTrackApi) {
-        const session = (typeof getSession === 'function' ? getSession() : null);
-        const token = session && session.token;
-        if (token) {
-          if (typeof Request !== 'undefined' && input instanceof Request) {
-            try {
-              input.headers.set('Authorization', `Bearer ${token}`);
-            } catch (e) {
-              init = init ? { ...init } : {};
-              init.headers = init.headers || {};
-              if (typeof Headers !== 'undefined' && init.headers instanceof Headers) {
-                if (!init.headers.has('Authorization')) init.headers.set('Authorization', `Bearer ${token}`);
-              } else if (Array.isArray(init.headers)) {
-                if (!init.headers.some(h => h[0].toLowerCase() === 'authorization')) {
-                  init.headers.push(['Authorization', `Bearer ${token}`]);
-                }
-              } else {
-                if (!init.headers['Authorization'] && !init.headers['authorization']) {
-                  init.headers['Authorization'] = `Bearer ${token}`;
-                }
-              }
-            }
-          } else {
-            init = init ? { ...init } : {};
-            if (typeof Headers !== 'undefined' && init.headers instanceof Headers) {
-              if (!init.headers.has('Authorization')) init.headers.set('Authorization', `Bearer ${token}`);
-            } else if (Array.isArray(init.headers)) {
-              if (!init.headers.some(h => h[0].toLowerCase() === 'authorization')) {
-                init.headers.push(['Authorization', `Bearer ${token}`]);
-              }
-            } else {
-              init.headers = { ...(init.headers || {}) };
-              if (!init.headers['Authorization'] && !init.headers['authorization']) {
-                init.headers['Authorization'] = `Bearer ${token}`;
-              }
-            }
-          }
-        }
-      }
-    } catch (interceptorErr) {
-      console.warn('[EcoTrack/Auth] Fetch interceptor non-fatal notice:', interceptorErr.message);
-    }
-
-    if (init !== undefined) {
-      return originalFetch.call(window, input, init);
-    }
-    return originalFetch.call(window, input);
-  };
-})();
-
-// Attach globally for universal script access
+// Attach globally for universal script access across all website pages
 window.AUTH_CONFIG = AUTH_CONFIG;
 window.getSession = getSession;
+window.getAuthHeaders = getAuthHeaders;
 window.syncUserInterface = syncUserInterface;
 window.performLogout = performLogout;
