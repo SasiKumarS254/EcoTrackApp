@@ -147,6 +147,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="auth" />
         <Stack.Screen name="modal" />
+        <Stack.Screen name="admin" options={{ presentation: 'card' }} />
         <Stack.Screen name="scanReport" options={{ presentation: 'card' }} />
         <Stack.Screen name="motionGenerator" options={{ presentation: 'fullScreenModal' }} />
       </Stack>

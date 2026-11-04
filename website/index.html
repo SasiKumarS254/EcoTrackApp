@@ -62,6 +62,7 @@
           <div class="login-tabs" id="authTabsNav">
             <button class="login-tab active" id="tab-signin" onclick="switchLoginTab('signin')">Sign In</button>
             <button class="login-tab" id="tab-signup" onclick="switchLoginTab('signup')">Create Account</button>
+            <button class="login-tab" id="tab-admin" onclick="switchLoginTab('admin')"><i class="fas fa-shield-halved"></i> Admin Portal</button>
           </div>
 
           <!-- 1. SIGN IN FORM -->
@@ -123,6 +124,50 @@
               <span id="signUpBtnText">Create Account</span>
               <i class="fas fa-leaf"></i>
             </button>
+          </form>
+
+          <!-- 2B. ADMIN SIGN IN FORM -->
+          <form class="login-form hidden" id="adminForm" onsubmit="handleAdminSignIn(event)">
+            <div class="form-header-box" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px;">
+              <h3 class="auth-subhead" style="margin: 0; color: #059669; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-shield-halved"></i> Administrator Access
+              </h3>
+              <p class="auth-desc" style="margin: 4px 0 0 0; font-size: 0.8rem; color: #64748b;">
+                Platform governance, user role controls, moderation & telemetry.
+              </p>
+            </div>
+            <div class="login-field">
+              <label class="login-label">Admin Email Address</label>
+              <div class="login-input-wrap">
+                <i class="fas fa-user-shield login-input-icon"></i>
+                <input type="email" id="adminEmail" class="login-input" placeholder="admin@ecotrack.org" required
+                  autocomplete="email" value="admin@ecotrack.org">
+              </div>
+            </div>
+            <div class="login-field">
+              <label class="login-label">Admin Security Password</label>
+              <div class="login-input-wrap">
+                <i class="fas fa-lock login-input-icon"></i>
+                <input type="password" id="adminPassword" class="login-input" placeholder="••••••••" required
+                  autocomplete="current-password" value="admin123">
+                <i class="fas fa-eye-slash toggle-pass-icon" id="toggleAdminPass"
+                  onclick="togglePasswordVisibility('adminPassword', 'toggleAdminPass')"></i>
+              </div>
+            </div>
+            <button type="submit" class="login-btn" id="adminSignInBtn" style="background: linear-gradient(135deg, #059669, #047857);">
+              <span id="adminSignInBtnText"><i class="fas fa-shield-check"></i> Sign In to Admin Center</span>
+              <i class="fas fa-arrow-right"></i>
+            </button>
+            <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 6px; text-align: center;">
+              <button type="button" onclick="fillAdminCredentials('admin@ecotrack.org', 'admin123')"
+                style="background:none; border:none; color:#059669; font-size:0.8rem; cursor:pointer; text-decoration:underline; font-weight:600;">
+                Quick Fill: admin@ecotrack.org (admin123)
+              </button>
+              <button type="button" onclick="fillAdminCredentials('user@ecotrack.org', 'demo')"
+                style="background:none; border:none; color:#64748b; font-size:0.78rem; cursor:pointer; text-decoration:underline;">
+                Or Demo Admin: user@ecotrack.org (demo)
+              </button>
+            </div>
           </form>
 
           <!-- 3. FORGOT PASSWORD (STEP 1: EMAIL) -->
@@ -271,6 +316,16 @@
           <i class="fas fa-user-circle"></i> <span>My Profile</span>
         </li>
       </ul>
+
+
+      <div id="adminNavSection" style="display: none; margin-top: 10px;">
+        <span class="nav-section-label" style="color: #059669; font-weight: 700; letter-spacing: 0.5px;">Governance</span>
+        <ul class="nav-list">
+          <li class="nav-item" id="adminNavTab" data-tab="admin" onclick="switchTab('admin')">
+            <i class="fas fa-shield-halved" style="color: #059669;"></i> <span>Admin Center</span>
+          </li>
+        </ul>
+      </div>
 
       <div class="sidebar-footer">
         <button class="theme-toggle-btn" onclick="toggleTheme()">
@@ -1017,6 +1072,190 @@
             <div class="tab-loader"><i class="fas fa-spinner fa-spin"></i> Loading Dashboard...</div>
           </div>
 
+        </div>
+      </section>
+
+      <!-- 🛡️ 10. ADMINISTRATOR CONTROL CENTER & GOVERNANCE 🛡️ -->
+      <section id="admin" class="tab-section">
+        <div class="admin-header-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(6,78,59,0.15)); border: 1px solid rgba(16,185,129,0.25); border-radius: 16px; padding: 24px; margin-bottom: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <span style="background: #059669; color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+                  <i class="fas fa-shield-halved"></i> SUPER ADMIN
+                </span>
+                <span id="adminEngineBadge" style="background: rgba(16,185,129,0.18); color: #047857; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                  <i class="fas fa-cloud-bolt"></i> Supabase Synchronized
+                </span>
+              </div>
+              <h2 style="margin: 0; font-size: 1.6rem; font-weight: 800; color: var(--text-primary, #0f172a);">
+                EcoTrack System Administration & Governance
+              </h2>
+              <p style="margin: 6px 0 0 0; color: var(--text-muted, #64748b); font-size: 0.9rem;">
+                Platform telemetry, user role provisioning, content moderation & database diagnostics.
+              </p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-secondary" onclick="loadAdminDashboard()" style="padding: 8px 16px; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px;">
+                <i class="fas fa-rotate"></i> Refresh Telemetry
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI Metrics Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+          <div class="stat-card" style="padding: 18px; border-radius: 14px; background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0); box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted, #64748b);">TOTAL USERS</span>
+              <i class="fas fa-users" style="color: #10b981; font-size: 1.1rem;"></i>
+            </div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary, #0f172a);" id="adminKpiUsers">--</div>
+            <div style="font-size: 0.75rem; color: #059669; margin-top: 4px;" id="adminKpiUsersBreakdown">Loading roles...</div>
+          </div>
+
+          <div class="stat-card" style="padding: 18px; border-radius: 14px; background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0); box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted, #64748b);">MARKETPLACE ITEMS</span>
+              <i class="fas fa-store" style="color: #0284c7; font-size: 1.1rem;"></i>
+            </div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary, #0f172a);" id="adminKpiListings">--</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted, #64748b); margin-top: 4px;">Active Supplies & Adoptions</div>
+          </div>
+
+          <div class="stat-card" style="padding: 18px; border-radius: 14px; background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0); box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted, #64748b);">COMMUNITY POSTS</span>
+              <i class="fas fa-comments" style="color: #8b5cf6; font-size: 1.1rem;"></i>
+            </div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary, #0f172a);" id="adminKpiPosts">--</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted, #64748b); margin-top: 4px;">Feed discussions & tips</div>
+          </div>
+
+          <div class="stat-card" style="padding: 18px; border-radius: 14px; background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0); box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted, #64748b);">AI SCANS LOGGED</span>
+              <i class="fas fa-dna" style="color: #f59e0b; font-size: 1.1rem;"></i>
+            </div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary, #0f172a);" id="adminKpiScans">--</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted, #64748b); margin-top: 4px;">Verified Species Analyses</div>
+          </div>
+        </div>
+
+        <!-- Admin View Tabs -->
+        <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--border, #e2e8f0); margin-bottom: 20px; overflow-x: auto;">
+          <button class="btn-tab active" id="adminSubtabUsers" onclick="switchAdminSubtab('users')" style="padding: 10px 18px; border: none; background: none; font-weight: 700; color: #10b981; border-bottom: 3px solid #10b981; cursor: pointer;">
+            <i class="fas fa-users-gear"></i> User Management & Roles
+          </button>
+          <button class="btn-tab" id="adminSubtabListings" onclick="switchAdminSubtab('listings')" style="padding: 10px 18px; border: none; background: none; font-weight: 600; color: var(--text-muted, #64748b); cursor: pointer;">
+            <i class="fas fa-store-slash"></i> Marketplace Moderation
+          </button>
+          <button class="btn-tab" id="adminSubtabPosts" onclick="switchAdminSubtab('posts')" style="padding: 10px 18px; border: none; background: none; font-weight: 600; color: var(--text-muted, #64748b); cursor: pointer;">
+            <i class="fas fa-comment-slash"></i> Feed Post Moderation
+          </button>
+          <button class="btn-tab" id="adminSubtabDiagnostics" onclick="switchAdminSubtab('diagnostics')" style="padding: 10px 18px; border: none; background: none; font-weight: 600; color: var(--text-muted, #64748b); cursor: pointer;">
+            <i class="fas fa-server"></i> System Diagnostics
+          </button>
+        </div>
+
+        <!-- TAB 1: USER ROSTER & ROLE MANAGEMENT -->
+        <div id="adminPanelUsers" class="admin-panel">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; gap: 10px; align-items: center; flex: 1; max-width: 480px;">
+              <div style="position: relative; width: 100%;">
+                <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted, #94a3b8);"></i>
+                <input type="text" id="adminUserSearchInput" oninput="filterAdminUserTable()" placeholder="Search users by name, email, or role..." style="width: 100%; padding: 9px 12px 9px 36px; border-radius: 8px; border: 1px solid var(--border, #cbd5e1); background: var(--bg-card, #fff); color: var(--text-primary, #0f172a); font-size: 0.9rem;">
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <select id="adminRoleFilterSelect" onchange="filterAdminUserTable()" style="padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border, #cbd5e1); background: var(--bg-card, #fff); color: var(--text-primary, #0f172a); font-size: 0.88rem;">
+                <option value="ALL">All Roles</option>
+                <option value="ADMIN">Admins</option>
+                <option value="SELLER">Sellers</option>
+                <option value="USER">Members</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Users Table Container -->
+          <div style="overflow-x: auto; background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+              <thead>
+                <tr style="background: rgba(16,185,129,0.06); border-bottom: 1px solid var(--border, #e2e8f0);">
+                  <th style="padding: 12px 16px; font-weight: 700; color: var(--text-secondary, #475569);">USER</th>
+                  <th style="padding: 12px 16px; font-weight: 700; color: var(--text-secondary, #475569);">EMAIL</th>
+                  <th style="padding: 12px 16px; font-weight: 700; color: var(--text-secondary, #475569);">CURRENT ROLE</th>
+                  <th style="padding: 12px 16px; font-weight: 700; color: var(--text-secondary, #475569);">ACTIVITY</th>
+                  <th style="padding: 12px 16px; font-weight: 700; color: var(--text-secondary, #475569);">CHANGE ROLE</th>
+                  <th style="padding: 12px 16px; font-weight: 700; color: var(--text-secondary, #475569); text-align: right;">ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersTableBody">
+                <tr><td colspan="6" style="padding: 30px; text-align: center; color: var(--text-muted, #94a3b8);"><i class="fas fa-circle-notch fa-spin"></i> Loading registered users...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 2: MARKETPLACE MODERATION -->
+        <div id="adminPanelListings" class="admin-panel" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <p style="margin: 0; color: var(--text-muted, #64748b); font-size: 0.9rem;">
+              Inspect and remove spam, unverified animals, or inappropriate marketplace listings.
+            </p>
+            <button class="btn btn-secondary" onclick="fetchAdminListings()" style="padding: 6px 12px; font-size: 0.85rem;">
+              <i class="fas fa-rotate"></i> Refresh Listings
+            </button>
+          </div>
+          <div id="adminListingsContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+            <div style="padding: 30px; text-align: center; color: var(--text-muted, #94a3b8); grid-column: 1/-1;">
+              <i class="fas fa-circle-notch fa-spin"></i> Loading marketplace items...
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: COMMUNITY FEED POST MODERATION -->
+        <div id="adminPanelPosts" class="admin-panel" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <p style="margin: 0; color: var(--text-muted, #64748b); font-size: 0.9rem;">
+              Review and moderate community posts across the platform.
+            </p>
+            <button class="btn btn-secondary" onclick="fetchAdminPosts()" style="padding: 6px 12px; font-size: 0.85rem;">
+              <i class="fas fa-rotate"></i> Refresh Posts
+            </button>
+          </div>
+          <div id="adminPostsContainer" style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="padding: 30px; text-align: center; color: var(--text-muted, #94a3b8);">
+              <i class="fas fa-circle-notch fa-spin"></i> Loading community posts...
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: SYSTEM DIAGNOSTICS -->
+        <div id="adminPanelDiagnostics" class="admin-panel" style="display: none;">
+          <div style="background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 14px; padding: 22px; max-width: 700px;">
+            <h3 style="margin-top: 0; font-size: 1.15rem; color: var(--text-primary, #0f172a); display: flex; align-items: center; gap: 8px;">
+              <i class="fas fa-server" style="color: #10b981;"></i> EcoTrack Server & Database Telemetry
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
+              <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(0,0,0,0.02); border-radius: 8px;">
+                <span style="font-weight: 600; color: var(--text-secondary, #475569);">Database Architecture:</span>
+                <span style="font-family: monospace; color: #059669; font-weight: 700;" id="diagDbEngine">Supabase Cloud / SQLite Dual-Engine</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(0,0,0,0.02); border-radius: 8px;">
+                <span style="font-weight: 600; color: var(--text-secondary, #475569);">Server Uptime:</span>
+                <span style="font-family: monospace;" id="diagUptime">--</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(0,0,0,0.02); border-radius: 8px;">
+                <span style="font-weight: 600; color: var(--text-secondary, #475569);">Active Admin Accounts:</span>
+                <span style="font-family: monospace; color: #0284c7;">admin@ecotrack.org, user@ecotrack.org</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(0,0,0,0.02); border-radius: 8px;">
+                <span style="font-weight: 600; color: var(--text-secondary, #475569);">Restricted Root Accounts:</span>
+                <span style="font-family: monospace; color: #dc2626;">usr_admin, usr1 (Protected)</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

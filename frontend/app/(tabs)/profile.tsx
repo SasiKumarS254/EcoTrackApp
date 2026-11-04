@@ -4,6 +4,7 @@ import {
   Image, TextInput, Alert, StatusBar, Modal, Dimensions, Share
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -471,6 +472,45 @@ export default function ProfileScreen() {
               <Text style={styles.switchAccountBtnText}>Switch / Web Login</Text>
             </TouchableOpacity>
           </View>
+
+
+          {/* Admin Control Center Access Card */}
+          {(user?.role === 'admin' || (typeof role === 'string' && role.includes('Admin'))) && (
+            <TouchableOpacity
+              style={{
+                marginTop: 10,
+                borderRadius: 12,
+                overflow: "hidden",
+              }}
+              onPress={() => router.push("/admin" as any)}
+            >
+              <LinearGradient
+                colors={["#059669", "#047857"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Ionicons name="shield-checkmark" size={18} color="#ffffff" />
+                  <View>
+                    <Text style={{ color: "#ffffff", fontWeight: "800", fontSize: 13 }}>
+                      Admin Control Center
+                    </Text>
+                    <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 11 }}>
+                      Manage users, roles & moderate content
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#ffffff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
           {/* Glass Stats Bar */}
           <View style={styles.statsBar}>

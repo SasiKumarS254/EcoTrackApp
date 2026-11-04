@@ -5134,3 +5134,325 @@ window.closeAiScannerModal = function () {
   const modal = document.getElementById('aiScannerModal');
   if (modal) modal.style.display = 'none';
 };
+
+
+// ══════════════════════════════════════════════════
+// 🛡️ ADMINISTRATOR CENTER & GOVERNANCE MODULE
+// ══════════════════════════════════════════════════
+
+let adminAllUsers = [];
+
+async function loadAdminDashboard() {
+  await Promise.all([
+    fetchAdminStats(),
+    fetchAdminUsers(),
+    fetchAdminListings(),
+    fetchAdminPosts()
+  ]);
+}
+
+async function fetchAdminStats() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/stats`);
+    if (!res.ok) throw new Error("Failed to load telemetry");
+    const data = await res.json();
+    if (data.success && data.stats) {
+      const s = data.stats;
+      setEl("adminKpiUsers", s.total_users || 0);
+      setEl("adminKpiUsersBreakdown", `${s.total_members || 0} Members • ${s.total_sellers || 0} Sellers • ${s.total_admins || 0} Admins`);
+      setEl("adminKpiListings", s.total_listings || 0);
+      setEl("adminKpiPosts", s.total_posts || 0);
+      setEl("adminKpiScans", s.total_scans || 0);
+      setEl("diagDbEngine", s.database_engine || "Dual-Mode Engine");
+
+      const hours = Math.floor(s.system_uptime / 3600);
+      const minutes = Math.floor((s.system_uptime % 3600) / 60);
+      setEl("diagUptime", `${hours}h ${minutes}m (${s.system_uptime}s)`);
+    }
+  } catch (err) {
+    console.error("fetchAdminStats error:", err);
+  }
+}
+
+async function fetchAdminUsers() {
+  const tbody = document.getElementById("adminUsersTableBody");
+  if (!tbody) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/users`);
+    if (!res.ok) throw new Error("Failed to load users roster");
+    const data = await res.json();
+    adminAllUsers = data.users || [];
+    renderAdminUsersTable(adminAllUsers);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding: 24px; text-align: center; color: #ef4444;"><i class="fas fa-triangle-exclamation"></i> ${err.message}</td></tr>`;
+  }
+}
+
+function renderAdminUsersTable(users) {
+  const tbody = document.getElementById("adminUsersTableBody");
+  if (!tbody) return;
+
+  if (users.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding: 30px; text-align: center; color: var(--text-muted, #94a3b8);">No users match this filter.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = users.map(u => {
+    const role = (u.role || "user").toLowerCase();
+    const roleColors = {
+      admin: { bg: "rgba(16,185,129,0.18)", color: "#047857", icon: "shield-halved" },
+      seller: { bg: "rgba(2,132,199,0.16)", color: "#0284c7", icon: "store" },
+      user: { bg: "rgba(100,116,139,0.12)", color: "#475569", icon: "user" }
+    };
+    const c = roleColors[role] || roleColors.user;
+    const isRoot = (u.id === 'usr1' || u.id === 'usr_admin');
+
+    return `
+      <tr style="border-bottom: 1px solid var(--border, #f1f5f9); transition: background 0.15s ease;">
+        <td style="padding: 12px 16px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 34px; height: 34px; border-radius: 50%; background: ${c.bg}; color: ${c.color}; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; overflow: hidden;">
+              ${u.avatar_url ? `<img src="${u.avatar_url}" style="width: 100%; height: 100%; object-fit: cover;">` : (u.name ? u.name.charAt(0).toUpperCase() : 'U')}
+            </div>
+            <div>
+              <div style="font-weight: 700; color: var(--text-primary, #0f172a);">${u.name || "Anonymous Member"}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted, #94a3b8);">ID: ${u.ecotrack_id || u.id}</div>
+            </div>
+          </div>
+        </td>
+        <td style="padding: 12px 16px; color: var(--text-secondary, #334155); font-family: monospace; font-size: 0.82rem;">
+          ${u.email}
+        </td>
+        <td style="padding: 12px 16px;">
+          <span style="background: ${c.bg}; color: ${c.color}; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+            <i class="fas fa-${c.icon}"></i> ${role.toUpperCase()}
+          </span>
+        </td>
+        <td style="padding: 12px 16px; font-size: 0.8rem; color: var(--text-muted, #64748b);">
+          ${u.post_count || 0} posts • ${u.listing_count || 0} listings
+        </td>
+        <td style="padding: 12px 16px;">
+          <select onchange="handleRoleChange('${u.id}', this.value)" style="padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border, #cbd5e1); font-size: 0.82rem; background: var(--bg-card, #fff); color: var(--text-primary, #0f172a);">
+            <option value="user" ${role === 'user' ? 'selected' : ''}>Member</option>
+            <option value="seller" ${role === 'seller' ? 'selected' : ''}>Verified Seller</option>
+            <option value="admin" ${role === 'admin' ? 'selected' : ''}>Administrator</option>
+          </select>
+        </td>
+        <td style="padding: 12px 16px; text-align: right;">
+          ${isRoot ? `
+            <span style="font-size: 0.72rem; color: #94a3b8; font-style: italic;">Protected</span>
+          ` : `
+            <button class="btn btn-sm" onclick="handleDeleteUser('${u.id}', '${(u.name || u.email).replace(/'/g, "\\'")}')" style="background: rgba(239,68,68,0.1); color: #dc2626; border: 1px solid rgba(239,68,68,0.25); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.78rem;">
+              <i class="fas fa-trash-can"></i> Delete
+            </button>
+          `}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterAdminUserTable() {
+  const query = (document.getElementById("adminUserSearchInput")?.value || "").toLowerCase().trim();
+  const roleFilter = document.getElementById("adminRoleFilterSelect")?.value || "ALL";
+
+  let filtered = adminAllUsers;
+  if (roleFilter !== "ALL") {
+    filtered = filtered.filter(u => (u.role || "user").toUpperCase() === roleFilter);
+  }
+  if (query) {
+    filtered = filtered.filter(u => 
+      (u.name || "").toLowerCase().includes(query) ||
+      (u.email || "").toLowerCase().includes(query) ||
+      (u.ecotrack_id || "").toLowerCase().includes(query)
+    );
+  }
+  renderAdminUsersTable(filtered);
+}
+
+async function handleRoleChange(userId, newRole) {
+  try {
+    const res = await fetch(`${API_BASE}/admin/users/${userId}/role`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: newRole })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to update role");
+
+    showToast(`Role updated to ${newRole.toUpperCase()} for ${userId}`, "success");
+    const target = adminAllUsers.find(u => u.id === userId);
+    if (target) target.role = newRole;
+    filterAdminUserTable();
+    fetchAdminStats();
+  } catch (err) {
+    showToast(err.message, "error");
+    fetchAdminUsers();
+  }
+}
+
+async function handleDeleteUser(userId, userName) {
+  if (!confirm(`Are you sure you want to permanently delete user "${userName}" and all associated records?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+      method: "DELETE"
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to delete user");
+
+    showToast(`User account ${userName} has been deleted.`, "success");
+    adminAllUsers = adminAllUsers.filter(u => u.id !== userId);
+    filterAdminUserTable();
+    fetchAdminStats();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function fetchAdminListings() {
+  const container = document.getElementById("adminListingsContainer");
+  if (!container) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/listings`);
+    if (!res.ok) throw new Error("Failed to load listings");
+    const data = await res.json();
+    const listings = data.listings || [];
+
+    if (listings.length === 0) {
+      container.innerHTML = `<div style="padding: 30px; text-align: center; color: var(--text-muted, #94a3b8); grid-column: 1/-1;">No marketplace listings found.</div>`;
+      return;
+    }
+
+    container.innerHTML = listings.map(item => `
+      <div style="background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;">
+        <div style="height: 140px; background: #e2e8f0; position: relative;">
+          ${item.image ? `<img src="${item.image}" style="width: 100%; height: 100%; object-fit: cover;">` : `<div style="height: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8;"><i class="fas fa-box-open fa-2x"></i></div>`}
+          <span style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: #fff; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 600;">
+            ${item.category || "General"}
+          </span>
+        </div>
+        <div style="padding: 14px; flex: 1; display: flex; flex-direction: column;">
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary, #0f172a); margin-bottom: 4px;">${item.title || item.name}</div>
+          <div style="font-weight: 800; color: #059669; font-size: 1.1rem; margin-bottom: 8px;">₹${item.price}</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted, #64748b); margin-bottom: 12px;">
+            Seller: ${item.seller_name || item.seller_email || item.user_id || "Unknown"}
+          </div>
+          <div style="margin-top: auto;">
+            <button class="btn btn-sm" onclick="handleDeleteListingAdmin(${item.id}, '${(item.title || item.name).replace(/'/g, "\\'")}')" style="width: 100%; background: rgba(239,68,68,0.1); color: #dc2626; border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; padding: 6px; font-size: 0.8rem; cursor: pointer;">
+              <i class="fas fa-trash-can"></i> Remove Listing
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = `<div style="padding: 24px; text-align: center; color: #ef4444; grid-column: 1/-1;">${err.message}</div>`;
+  }
+}
+
+async function handleDeleteListingAdmin(id, title) {
+  if (!confirm(`Are you sure you want to remove marketplace listing "${title}"?`)) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/listings/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to remove listing");
+
+    showToast("Listing removed by administrator.", "success");
+    fetchAdminListings();
+    fetchAdminStats();
+    if (typeof fetchMarketplaceListings === 'function') fetchMarketplaceListings();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function fetchAdminPosts() {
+  const container = document.getElementById("adminPostsContainer");
+  if (!container) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/posts`);
+    if (!res.ok) throw new Error("Failed to load posts");
+    const data = await res.json();
+    const posts = data.posts || [];
+
+    if (posts.length === 0) {
+      container.innerHTML = `<div style="padding: 30px; text-align: center; color: var(--text-muted, #94a3b8);">No community posts found.</div>`;
+      return;
+    }
+
+    container.innerHTML = posts.map(p => `
+      <div style="background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 12px; padding: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <strong style="color: var(--text-primary, #0f172a); font-size: 0.92rem;">${p.author_name || "Community Member"}</strong>
+            <span style="font-size: 0.75rem; color: var(--text-muted, #94a3b8);">(${p.author_email || p.user_id})</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted, #94a3b8);">• ${p.created_at ? new Date(p.created_at).toLocaleDateString() : ""}</span>
+          </div>
+          <p style="margin: 0 0 8px 0; font-size: 0.88rem; color: var(--text-secondary, #334155); line-height: 1.4;">
+            ${p.content || p.text || "No text content"}
+          </p>
+          <div style="display: flex; gap: 12px; font-size: 0.75rem; color: var(--text-muted, #64748b);">
+            <span><i class="fas fa-heart" style="color: #ef4444;"></i> ${p.likes_count || 0} likes</span>
+            <span><i class="fas fa-comment" style="color: #0284c7;"></i> ${p.comments_count || 0} comments</span>
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-sm" onclick="handleDeletePostAdmin(${p.id}, '${(p.author_name || 'Member').replace(/'/g, "\\'")}')" style="background: rgba(239,68,68,0.1); color: #dc2626; border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; padding: 6px 12px; font-size: 0.78rem; cursor: pointer; white-space: nowrap;">
+            <i class="fas fa-trash-can"></i> Remove Post
+          </button>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = `<div style="padding: 24px; text-align: center; color: #ef4444;">${err.message}</div>`;
+  }
+}
+
+async function handleDeletePostAdmin(postId, author) {
+  if (!confirm(`Are you sure you want to remove this community post by ${author}?`)) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/posts/${postId}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to remove post");
+
+    showToast("Community post removed by administrator.", "success");
+    fetchAdminPosts();
+    fetchAdminStats();
+    if (typeof loadCommunityPosts === 'function') loadCommunityPosts();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+function switchAdminSubtab(subtab) {
+  const panels = ["users", "listings", "posts", "diagnostics"];
+  panels.forEach(p => {
+    const el = document.getElementById("adminPanel" + p.charAt(0).toUpperCase() + p.slice(1));
+    const btn = document.getElementById("adminSubtab" + p.charAt(0).toUpperCase() + p.slice(1));
+    if (el) el.style.display = (p === subtab) ? "block" : "none";
+    if (btn) {
+      btn.style.color = (p === subtab) ? "#10b981" : "var(--text-muted, #64748b)";
+      btn.style.fontWeight = (p === subtab) ? "700" : "600";
+      btn.style.borderBottom = (p === subtab) ? "3px solid #10b981" : "none";
+    }
+  });
+}
+
+// Window registrations
+window.loadAdminDashboard = loadAdminDashboard;
+window.switchAdminSubtab = switchAdminSubtab;
+window.handleRoleChange = handleRoleChange;
+window.handleDeleteUser = handleDeleteUser;
+window.filterAdminUserTable = filterAdminUserTable;
+window.fetchAdminListings = fetchAdminListings;
+window.handleDeleteListingAdmin = handleDeleteListingAdmin;
+window.fetchAdminPosts = fetchAdminPosts;
+window.handleDeletePostAdmin = handleDeletePostAdmin;

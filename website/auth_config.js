@@ -70,6 +70,12 @@ function syncUserInterface(user) {
   });
 
   // Global window variable for other scripts
+  // Toggle Admin Center in navigation based on role
+  const adminNav = document.getElementById("adminNavSection");
+  if (adminNav) {
+    adminNav.style.display = (user && user.role === 'admin') ? "block" : "none";
+  }
+
   window.currentUser = user;
 }
 

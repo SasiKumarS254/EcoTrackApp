@@ -874,6 +874,15 @@ function initDB() {
   // Ensure the target users exist without resetting their passwords if already present
   const targetUsers = [
     {
+      id: "usr_admin",
+      ecotrack_id: "ECO-ADMIN-01",
+      email: "admin@ecotrack.org",
+      name: "System Administrator",
+      role: "admin",
+      password_hash: "admin123",
+      created_at: new Date().toISOString()
+    },
+    {
       id: "usr1",
       ecotrack_id: "ECO-948123",
       email: "user@ecotrack.org",

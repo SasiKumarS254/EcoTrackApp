@@ -953,7 +953,36 @@ async function seedInitialData() {
   console.log('âœ… EcoTrack Social PostgreSQL Database successfully seeded.');
 }
 
+
+async function ensureAdminAccounts() {
+  try {
+    const adminCheck = await dbQuery("SELECT id FROM Users WHERE email = 'admin@ecotrack.org'");
+    if (!adminCheck.rows || adminCheck.rows.length === 0) {
+      await dbQuery(`
+        INSERT INTO Users (id, ecotrack_id, email, name, password_hash, role)
+        VALUES ('usr_admin', 'ECO-ADMIN-01', 'admin@ecotrack.org', 'System Administrator', 'admin123', 'admin')
+        ON CONFLICT (id) DO UPDATE SET role = 'admin', password_hash = 'admin123'
+      `);
+      await dbQuery(`
+        INSERT INTO Profiles (user_id, display_name, ecotrack_id, avatar_url, bio, country, city, reputation_score)
+        VALUES ('usr_admin', 'System Administrator', 'ECO-ADMIN-01', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400', 'EcoTrack System Administrator • Platform Governance & Security Operations', 'Global', 'Headquarters', 999)
+        ON CONFLICT (user_id) DO UPDATE SET display_name = 'System Administrator'
+      `);
+      await dbQuery(`INSERT INTO UserSettings (user_id) VALUES ('usr_admin') ON CONFLICT (user_id) DO NOTHING`);
+    } else {
+      await dbQuery("UPDATE Users SET role = 'admin', password_hash = 'admin123' WHERE email = 'admin@ecotrack.org'");
+    }
+
+    // Ensure usr1 (user@ecotrack.org) has role 'admin'
+    await dbQuery("UPDATE Users SET role = 'admin' WHERE email = 'user@ecotrack.org'");
+    console.log("🛡️  Admin accounts verified (admin@ecotrack.org & user@ecotrack.org).");
+  } catch (e) {
+    console.warn("⚠️  Admin accounts verification warning:", e.message);
+  }
+}
+
 async function syncOfflineDatabase() {
+  await ensureAdminAccounts();
   const userFile = path.join(__dirname, 'ecotrack_userdata.json');
   if (!fs.existsSync(userFile)) return;
 

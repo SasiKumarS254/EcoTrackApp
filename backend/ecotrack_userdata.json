@@ -523,6 +523,15 @@
         "scans": 0,
         "streak": 0
       }
+    },
+    {
+      "id": "usr_admin",
+      "ecotrack_id": "ECO-ADMIN-01",
+      "email": "admin@ecotrack.org",
+      "name": "System Administrator",
+      "role": "admin",
+      "password_hash": "admin123",
+      "created_at": "2026-11-04T07:22:11.388Z"
     }
   ],
   "profiles": {
@@ -1923,6 +1932,15 @@
       "organization": null,
       "emergency_helper": 0,
       "emergency_phone": null
+    },
+    "usr_admin": {
+      "id": "usr_admin",
+      "ecotrack_id": "ECO-ADMIN-01",
+      "email": "admin@ecotrack.org",
+      "name": "System Administrator",
+      "role": "admin",
+      "password_hash": "admin123",
+      "created_at": "2026-11-04T07:22:11.388Z"
     }
   },
   "scans": [
@@ -5557,7 +5575,8 @@
     ],
     "usr_dea95f74135fabd0": [],
     "usr_e820ab251d7eb4eb": [],
-    "usr_e7192fa7c160fb5d": []
+    "usr_e7192fa7c160fb5d": [],
+    "usr_admin": []
   },
   "marketplace_items": [
     {
@@ -5641,7 +5660,8 @@
     "usr_cef118e82cf2444d": [],
     "usr_dea95f74135fabd0": [],
     "usr_e820ab251d7eb4eb": [],
-    "usr_e7192fa7c160fb5d": []
+    "usr_e7192fa7c160fb5d": [],
+    "usr_admin": []
   },
   "community_posts": [
     {
@@ -5921,7 +5941,8 @@
     "usr_cef118e82cf2444d": [],
     "usr_dea95f74135fabd0": [],
     "usr_e820ab251d7eb4eb": [],
-    "usr_e7192fa7c160fb5d": []
+    "usr_e7192fa7c160fb5d": [],
+    "usr_admin": []
   },
   "saved_encyclopedia": {
     "usr_7dc0c89e47f94f0f": [],
@@ -5952,7 +5973,8 @@
     "usr_cef118e82cf2444d": [],
     "usr_dea95f74135fabd0": [],
     "usr_e820ab251d7eb4eb": [],
-    "usr_e7192fa7c160fb5d": []
+    "usr_e7192fa7c160fb5d": [],
+    "usr_admin": []
   },
   "favorites": {
     "user_101": [
