@@ -11,8 +11,8 @@ if (Platform.OS === "web") {
       const isSuccess = title && (title.includes('Success') || title.includes('Confirmed') || title.includes('Shared') || title.includes('🎉') || title.includes('✅'));
       Toast.show({
         type: isErr ? 'error' : (isSuccess ? 'success' : 'info'),
-        text1: title,
-        text2: message,
+        text1: title ?? undefined,
+        text2: message ?? undefined,
         position: 'top',
         topOffset: 50
       });

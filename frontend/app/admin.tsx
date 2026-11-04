@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,14 +13,13 @@ import {
   RefreshControl,
   Platform,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { API_BASE_URL } from "@/services/api";
 import { useTheme } from "@/context/ThemeContext";
-import { Shadow, Radius, FontSize } from "@/constants/theme";
+import { FontSize } from "@/constants/theme";
 
 export default function AdminScreen() {
   const insets = useSafeAreaInsets();
@@ -40,44 +39,7 @@ export default function AdminScreen() {
   const [userSearch, setUserSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("ALL");
 
-  useEffect(() => {
-    verifyAdminAuth();
-  }, []);
-
-  const verifyAdminAuth = async () => {
-    try {
-      const sessionRaw = await AsyncStorage.getItem("@ecotrack_user_session");
-      if (sessionRaw) {
-        const session = JSON.parse(sessionRaw);
-        if (session.role !== "admin") {
-          Alert.alert("Permission Denied", "You must be an administrator to access the Control Center.", [
-            { text: "OK", onPress: () => router.back() }
-          ]);
-          return;
-        }
-      }
-    } catch (e) {}
-    loadAllData();
-  };
-
-  const loadAllData = async () => {
-    setLoading(true);
-    await Promise.all([
-      fetchStats(),
-      fetchUsers(),
-      fetchListings(),
-      fetchPosts(),
-    ]);
-    setLoading(false);
-    setRefreshing(false);
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadAllData();
-  };
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/admin/stats`);
       if (res.ok) {
@@ -89,9 +51,9 @@ export default function AdminScreen() {
     } catch (err) {
       console.warn("fetchStats error:", err);
     }
-  };
+  }, []);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/admin/users`);
       if (res.ok) {
@@ -101,9 +63,9 @@ export default function AdminScreen() {
     } catch (err) {
       console.warn("fetchUsers error:", err);
     }
-  };
+  }, []);
 
-  const fetchListings = async () => {
+  const fetchListings = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/admin/listings`);
       if (res.ok) {
@@ -113,9 +75,9 @@ export default function AdminScreen() {
     } catch (err) {
       console.warn("fetchListings error:", err);
     }
-  };
+  }, []);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/admin/posts`);
       if (res.ok) {
@@ -125,6 +87,50 @@ export default function AdminScreen() {
     } catch (err) {
       console.warn("fetchPosts error:", err);
     }
+  }, []);
+
+  const loadAllData = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchStats(),
+      fetchUsers(),
+      fetchListings(),
+      fetchPosts(),
+    ]);
+    setLoading(false);
+    setRefreshing(false);
+  }, [fetchStats, fetchUsers, fetchListings, fetchPosts]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const verifyAndLoad = async () => {
+      try {
+        const sessionRaw = await AsyncStorage.getItem("@ecotrack_user_session");
+        if (sessionRaw) {
+          const session = JSON.parse(sessionRaw);
+          if (session.role !== "admin") {
+            Alert.alert("Permission Denied", "You must be an administrator to access the Control Center.", [
+              { text: "OK", onPress: () => router.back() }
+            ]);
+            return;
+          }
+        }
+      } catch {
+        // Ignore storage read errors
+      }
+      if (isMounted) {
+        await loadAllData();
+      }
+    };
+    verifyAndLoad();
+    return () => {
+      isMounted = false;
+    };
+  }, [loadAllData]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadAllData();
   };
 
   const handleRoleChange = async (userId: string, currentRole: string) => {
@@ -265,15 +271,30 @@ export default function AdminScreen() {
             <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
 
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Admin Control Center</Text>
-              <View style={styles.adminBadge}>
-                <Ionicons name="shield-checkmark" size={12} color="#ffffff" />
-                <Text style={styles.adminBadgeText}>SUPER ADMIN</Text>
+          <View style={{ flex: 1, marginLeft: 10, flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View style={[styles.adminLogoBox, {
+              backgroundColor: isDark ? "rgba(16,185,129,0.18)" : "#ffffff",
+              borderColor: isDark ? "rgba(16,185,129,0.4)" : "rgba(16,185,129,0.3)",
+            }]}>
+              <Image
+                source={require("@/assets/images/logo.png")}
+                style={styles.adminLogoImg}
+                resizeMode="contain"
+              />
+              <View style={styles.adminLogoBadge}>
+                <Ionicons name="shield-checkmark" size={10} color="#ffffff" />
               </View>
             </View>
-            <Text style={[styles.headerSub, { color: colors.textMuted }]}>Governance, telemetry & moderation</Text>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>Admin Control</Text>
+                <View style={styles.adminBadge}>
+                  <Ionicons name="shield-checkmark" size={11} color="#ffffff" />
+                  <Text style={styles.adminBadgeText}>SUPER ADMIN</Text>
+                </View>
+              </View>
+              <Text style={[styles.headerSub, { color: colors.textMuted }]} numberOfLines={1}>Governance, telemetry & moderation</Text>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -680,6 +701,33 @@ const styles = StyleSheet.create({
   headerSub: {
     fontSize: FontSize.xs,
     marginTop: 2,
+  },
+  adminLogoBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  adminLogoImg: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+  },
+  adminLogoBadge: {
+    position: "absolute",
+    bottom: -3,
+    right: -3,
+    backgroundColor: "#059669",
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#ffffff",
   },
   adminBadge: {
     backgroundColor: "#059669",

@@ -143,7 +143,7 @@ export default function TabLayout() {
         options={{
           title: "Dashboard",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "speedometer" : "speedometer-outline"} size={21} color={color} />
+            <Ionicons name={focused ? "speedometer" : "speedometer-outline"} size={21} color={color as string} />
           ),
         }}
       />
@@ -154,7 +154,7 @@ export default function TabLayout() {
         options={{
           title: "Trainer",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "barbell" : "barbell-outline"} size={21} color={color} />
+            <Ionicons name={focused ? "barbell" : "barbell-outline"} size={21} color={color as string} />
           ),
         }}
       />
@@ -174,7 +174,7 @@ export default function TabLayout() {
         options={{
           title: "Community",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "people" : "people-outline"} size={21} color={color} />
+            <Ionicons name={focused ? "people" : "people-outline"} size={21} color={color as string} />
           ),
         }}
       />
@@ -185,7 +185,7 @@ export default function TabLayout() {
         options={{
           title: "Explore",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "grid" : "grid-outline"} size={21} color={color} />
+            <Ionicons name={focused ? "grid" : "grid-outline"} size={21} color={color as string} />
           ),
         }}
       />

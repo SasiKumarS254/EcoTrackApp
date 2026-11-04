@@ -84,6 +84,12 @@ export default function LoginScreen() {
       });
       const data = await res.json();
 
+      if (!res.ok || !data?.user) {
+        Alert.alert("Authentication Error", data?.error || "Login failed. Please verify your credentials.");
+        setIsLoading(false);
+        return;
+      }
+
       if (!res.ok) {
         Alert.alert("Authentication Error", data.error || "Invalid credentials.");
         setIsLoading(false);
@@ -120,7 +126,11 @@ export default function LoginScreen() {
       await AsyncStorage.removeItem("@ecotrack_logged_out");
       router.replace("/(tabs)");
     } catch (err: any) {
-      Alert.alert("Authentication Failed", "EcoTrack server is offline or unreachable. Please verify the backend is running, or tap 'Quick Demo Sign-In' below.");
+      console.warn("Login Error:", err);
+      Alert.alert(
+        "Authentication Failed",
+        err?.message ? "Connection error: " + err.message : "EcoTrack server is offline or unreachable. Please verify the backend is running, or tap 'Quick Demo Sign-In' below."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -169,17 +179,36 @@ export default function LoginScreen() {
           {/* Header with Official Logo */}
           <View style={styles.header}>
             <View style={[styles.logoBox, {
-              backgroundColor: isDark ? "rgba(16,185,129,0.16)" : "#ffffff",
-              borderColor: isDark ? "rgba(16,185,129,0.35)" : "rgba(16,185,129,0.25)",
+              backgroundColor: loginMode === "admin"
+                ? (isDark ? "rgba(5,150,105,0.22)" : "#ecfdf5")
+                : (isDark ? "rgba(16,185,129,0.16)" : "#ffffff"),
+              borderColor: loginMode === "admin"
+                ? "#059669"
+                : (isDark ? "rgba(16,185,129,0.35)" : "rgba(16,185,129,0.25)"),
             }]}>
               <Image
                 source={require("@/assets/images/logo.png")}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
+              {loginMode === "admin" && (
+                <View style={styles.adminLogoBadge}>
+                  <Ionicons name="shield-checkmark" size={12} color="#ffffff" />
+                </View>
+              )}
             </View>
-            <Text style={[styles.brandName, { color: colors.textPrimary }]}>EcoTrack</Text>
-            <Text style={[styles.brandTagline, { color: colors.textMuted }]}>Universal Animal Welfare & AI Ecosystem</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={[styles.brandName, { color: colors.textPrimary }]}>EcoTrack</Text>
+              {loginMode === "admin" && (
+                <View style={styles.adminHeaderPill}>
+                  <Ionicons name="shield-checkmark" size={10} color="#ffffff" />
+                  <Text style={styles.adminHeaderPillText}>ADMIN</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.brandTagline, { color: colors.textMuted }]}>
+              {loginMode === "admin" ? "Super Administrator Governance & Operations Portal" : "Universal Animal Welfare & AI Ecosystem"}
+            </Text>
           </View>
 
           {/* Mode Switcher: Member vs Admin */}
@@ -467,9 +496,37 @@ const styles = StyleSheet.create({
     ...Shadow.md,
   },
   logoImage: {
-    width: 62,
-    height: 62,
-    borderRadius: 16,
+    width: 58,
+    height: 58,
+    borderRadius: 14,
+  },
+  adminLogoBadge: {
+    position: "absolute",
+    bottom: -4,
+    right: -4,
+    backgroundColor: "#059669",
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#ffffff",
+  },
+  adminHeaderPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#059669",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  adminHeaderPillText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   brandName: {
     fontSize: 34, fontWeight: "900",

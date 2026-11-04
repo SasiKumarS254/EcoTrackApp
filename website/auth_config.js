@@ -21,8 +21,18 @@ function getSession() {
     const raw = localStorage.getItem(AUTH_CONFIG.sessionKey);
     if (!raw) return null;
     const session = JSON.parse(raw);
-    if (session && session.id && session.token) {
-      return session;
+    if (session) {
+      const user = session.user || session;
+      const token = session.token || (session.session && session.session.token) || session.jwt;
+      const id = session.id || user.id || user.user_id || user.ecotrack_id;
+      if (id || token) {
+        return {
+          ...user,
+          ...session,
+          id: id || user.id,
+          token: token
+        };
+      }
     }
   } catch (e) {
     console.error("Auth session parsing error:", e);
@@ -73,7 +83,7 @@ function syncUserInterface(user) {
   // Toggle Admin Center in navigation based on role
   const adminNav = document.getElementById("adminNavSection");
   if (adminNav) {
-    adminNav.style.display = (user && user.role === 'admin') ? "block" : "none";
+    adminNav.style.display = (user && (user.role === 'admin' || user.role === 'superadmin' || user.role === 'staff')) ? "block" : "none";
   }
 
   window.currentUser = user;
@@ -93,6 +103,7 @@ function performLogout() {
   const theme = localStorage.getItem(AUTH_CONFIG.themeKey) || "light";
   document.documentElement.setAttribute("data-theme", theme);
 })();
+
 // Global fetch interceptor to inject Authorization header across all pages
 (function() {
   const originalFetch = window.fetch;
@@ -112,7 +123,7 @@ function performLogout() {
       const sessionObj = getSession();
       if (sessionObj && sessionObj.token) {
         options.headers = options.headers || {};
-        if (options.headers instanceof Headers) {
+        if (typeof Headers !== 'undefined' && options.headers instanceof Headers) {
           if (!options.headers.has('Authorization')) {
             options.headers.set('Authorization', `Bearer ${sessionObj.token}`);
           }
@@ -128,6 +139,12 @@ function performLogout() {
         }
       }
     }
-    return originalFetch(resource, options);
+    return originalFetch.call(window, resource, options);
   };
 })();
+
+// Attach globally for universal script access
+window.AUTH_CONFIG = AUTH_CONFIG;
+window.getSession = getSession;
+window.syncUserInterface = syncUserInterface;
+window.performLogout = performLogout;

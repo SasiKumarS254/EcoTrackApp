@@ -1,3 +1,7 @@
+// Immediate early exports
+window.loadProfileTab = (...args) => (typeof loadProfileTab === 'function' ? loadProfileTab(...args) : Promise.resolve());
+window.switchProfileTabSection = (...args) => (typeof switchProfileTabSection === 'function' ? switchProfileTabSection(...args) : undefined);
+
 /**
  * EcoTrack Redesigned Profile Engine v3.1
  * Functional Account Dashboard with Real-Time Data Sync
@@ -265,13 +269,13 @@ async function renderProfileSubTab(section) {
   if (section === 'pets') {
     renderPetsGrid(data.pets || [], container, isOwner);
   } else if (section === 'scans') {
-    renderScansList(data.metrics.scans || [], container);
+    renderScansList((data.metrics && Array.isArray(data.metrics.scans) ? data.metrics.scans : []), container);
   } else if (section === 'posts') {
     container.innerHTML = `<div class="tab-loader" style="text-align:center; padding:2rem;"><i class="fas fa-spinner fa-spin"></i><span>Fetching activity feed...</span></div>`;
     const posts = await window.EcoSocialDB.fetchPosts({ user_id: p.id });
     renderPostsGrid(posts || [], container);
   } else if (section === 'training') {
-    renderTrainingGrid(data.metrics.programs || [], container);
+    renderTrainingGrid((data.metrics && Array.isArray(data.metrics.programs) ? data.metrics.programs : []), container);
   } else if (section === 'achievements') {
     renderAchievementsList(data.achievements || [], container);
   } else if (section === 'connections') {

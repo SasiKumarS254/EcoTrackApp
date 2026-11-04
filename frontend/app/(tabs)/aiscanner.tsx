@@ -216,7 +216,7 @@ export default function AIScannerTabScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.bgLight} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       <View style={styles.topHeader}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>

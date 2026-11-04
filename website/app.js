@@ -209,23 +209,83 @@ function updateRegisteredPassword(email, newPassword) {
 function switchLoginTab(tab) {
   document.getElementById("signinForm")?.classList.toggle("hidden", tab !== "signin");
   document.getElementById("signupForm")?.classList.toggle("hidden", tab !== "signup");
+  document.getElementById("adminForm")?.classList.toggle("hidden", tab !== "admin");
   document.getElementById("forgotForm")?.classList.toggle("hidden", tab !== "forgot");
   document.getElementById("otpForm")?.classList.toggle("hidden", tab !== "otp");
   document.getElementById("resetForm")?.classList.toggle("hidden", tab !== "reset");
 
   const tabsNav = document.querySelector(".login-tabs");
   if (tabsNav) {
-    tabsNav.style.display = (tab === "signin" || tab === "signup") ? "flex" : "none";
+    tabsNav.style.display = (tab === "signin" || tab === "signup" || tab === "admin") ? "flex" : "none";
   }
 
   document.getElementById("tab-signin")?.classList.toggle("active", tab === "signin");
   document.getElementById("tab-signup")?.classList.toggle("active", tab === "signup");
+  document.getElementById("tab-admin")?.classList.toggle("active", tab === "admin");
+
+  const adminBadge = document.getElementById("loginAdminHeroBadge");
+  if (adminBadge) {
+    adminBadge.style.display = tab === "admin" ? "inline-flex" : "none";
+  }
 
   if (tab !== "otp" && otpTimerInterval) {
     clearInterval(otpTimerInterval);
     otpTimerInterval = null;
   }
 }
+
+function fillAdminCredentials(email, password) {
+  const eInput = document.getElementById("adminEmail");
+  const pInput = document.getElementById("adminPassword");
+  if (eInput) eInput.value = email;
+  if (pInput) pInput.value = password;
+}
+window.fillAdminCredentials = fillAdminCredentials;
+
+async function handleAdminSignIn(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const email = document.getElementById("adminEmail")?.value.trim();
+  const password = document.getElementById("adminPassword")?.value;
+  if (!email || !password) {
+    showToast("Please enter admin credentials.", "error");
+    return;
+  }
+
+  const btn = document.getElementById("adminSignInBtn");
+  const btnText = document.getElementById("adminSignInBtnText");
+  setLoadingState(btn, btnText, true, "Verifying Admin Privileges...");
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Admin authentication failed.");
+    }
+
+    if (data.user.role !== 'admin' && data.user.role !== 'superadmin' && data.user.role !== 'staff') {
+      throw new Error("Access denied: Account lacks administrative privileges.");
+    }
+
+    completeLogin(data.user, data.token);
+    showToast(`🛡️ Welcome Administrator, ${data.user.name}!`, "success");
+
+    setTimeout(() => {
+      if (typeof switchTab === 'function') {
+        switchTab('admin');
+      }
+    }, 250);
+  } catch (err) {
+    showToast(err.message, "error");
+  } finally {
+    setLoadingState(btn, btnText, false, '<i class="fas fa-shield-halved"></i> Sign In to Admin Center');
+  }
+}
+window.handleAdminSignIn = handleAdminSignIn;
 
 /**
  * EcoTrack Premium Login & Authentication System v3.0
@@ -676,11 +736,16 @@ function switchTab(tabId) {
     events: ["Events & Rescue", "Join vaccination drives & training workshops"],
     community: ["Community Feed", "Share training tips, health advice & updates"],
     maps: ["Find Services", "Locate veterinary clinics & animal care centers"],
-    profile: ["My Profile", "Manage your account, pets & achievements"]
+    profile: ["My Profile", "Manage your account, pets & achievements"],
+    admin: ["Admin Control Center", "Platform telemetry, user governance & content moderation"]
   };
 
   if (tabId === "profile") {
     if (window.loadProfileTab) window.loadProfileTab();
+  }
+
+  if (tabId === "admin") {
+    if (typeof loadAdminDashboard === "function") loadAdminDashboard();
   }
 
   const h = TITLES[tabId];

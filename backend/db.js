@@ -1158,10 +1158,10 @@ module.exports = {
     }));
     
     // Aggregate counts from real tables to ensure accuracy
-    const totalScans = await sdb.prepare(`SELECT COUNT(*) as count FROM FullScans WHERE user_id = ?`).get(userId).count;
-    const totalPlans = await sdb.prepare(`SELECT COUNT(*) as count FROM AITrainerPrograms WHERE user_id = ?`).get(userId).count;
-    const followingCount = await sdb.prepare(`SELECT COUNT(*) as count FROM Followers WHERE follower_id = ? AND status = 'Approved'`).get(userId).count;
-    const postsCount = await sdb.prepare(`SELECT COUNT(*) as count FROM Posts WHERE user_id = ?`).get(userId).count;
+    const totalScans = (await sdb.prepare(`SELECT COUNT(*) as count FROM FullScans WHERE user_id = ?`).get(userId))?.count || 0;
+    const totalPlans = (await sdb.prepare(`SELECT COUNT(*) as count FROM AITrainerPrograms WHERE user_id = ?`).get(userId))?.count || 0;
+    const followingCount = (await sdb.prepare(`SELECT COUNT(*) as count FROM Followers WHERE follower_id = ? AND status = 'Approved'`).get(userId))?.count || 0;
+    const postsCount = (await sdb.prepare(`SELECT COUNT(*) as count FROM Posts WHERE user_id = ?`).get(userId))?.count || 0;
 
     // Auto-unlock achievements based on actual stats
     try {

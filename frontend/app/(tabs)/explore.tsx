@@ -60,7 +60,7 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.bgLight} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* TOP HEADER */}
       <View style={styles.topHeader}>

@@ -269,7 +269,7 @@ export default function ChatScreen() {
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.bgCard} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* CHAT HEADER */}
       <View style={styles.header}>
