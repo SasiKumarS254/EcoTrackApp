@@ -11,7 +11,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
 import { Radius, Shadow, FontSize } from "@/constants/theme";
 import { API_BASE_URL } from "../../services/api";
-import { Video, ResizeMode } from "expo-av";
+import { useVideoPlayer, VideoView } from "expo-video";
 
 const COMMON_SPECIES = ["Dog", "Human", "Cat", "Horse", "Bird", "Cow"];
 const EXERCISES = [
@@ -21,6 +21,21 @@ const EXERCISES = [
   "Spine Flexion & Hip Kinematics",
   "Weight-Bearing Leg Symmetry",
 ];
+
+function VideoPlayerPreview({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+  });
+
+  return (
+    <VideoView
+      style={{ width: "100%", height: 240, borderRadius: 12, backgroundColor: "#000" }}
+      player={player}
+      nativeControls
+      contentFit="contain"
+    />
+  );
+}
 
 export default function AIScannerTabScreen() {
   const { colors, isDark } = useTheme();
@@ -338,17 +353,7 @@ export default function AIScannerTabScreen() {
                   style={{ width: '100%', height: 240, borderRadius: 12, backgroundColor: '#000', objectFit: 'contain' }}
                 />
               ) : (
-                <Video
-                  source={{ uri: videoAsset.uri }}
-                  rate={1.0}
-                  volume={1.0}
-                  isMuted={false}
-                  resizeMode={ResizeMode.CONTAIN}
-                  shouldPlay={false}
-                  isLooping
-                  useNativeControls
-                  style={{ width: '100%', height: 240, borderRadius: 12, backgroundColor: '#000' }}
-                />
+                <VideoPlayerPreview uri={videoAsset.uri} />
               )}
             </View>
           ) : (
