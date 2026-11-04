@@ -1,14 +1,20 @@
-import React, { useState, useMemo } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import { useMemo, useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Alert, StatusBar
+  ActivityIndicator, Alert,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { FontSize, Radius, Shadow } from "../../constants/theme";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize } from "../../constants/theme";
 import { API_BASE_URL } from "../../services/api";
 
 const PRESET_SPECIES = [
@@ -113,36 +119,36 @@ export default function SpeciesTrainerScreen() {
         },
         drills: isRest
           ? [
-              {
-                id: `rest_${i}`,
-                name: "Passive Muscle Recovery & Joint Stretching",
-                desc: "Gentle low-impact mobility movements to relieve synovial friction and promote recovery.",
-                difficulty: "Gentle",
-                reps: "15 mins",
-                intensity: "Low",
-                targetMuscles: "Joint Ligaments & Connective Tissue",
-              },
-            ]
+            {
+              id: `rest_${i}`,
+              name: "Passive Muscle Recovery & Joint Stretching",
+              desc: "Gentle low-impact mobility movements to relieve synovial friction and promote recovery.",
+              difficulty: "Gentle",
+              reps: "15 mins",
+              intensity: "Low",
+              targetMuscles: "Joint Ligaments & Connective Tissue",
+            },
+          ]
           : [
-              {
-                id: `drill_${i}_1`,
-                name: `${species} Dynamic Agility & Stride Coordination`,
-                desc: `Form-controlled pacing focused on quadruped/bipedal gait mechanics for ${breed || species}.`,
-                difficulty: "Intermediate",
-                reps: "3 sets × 8 reps",
-                intensity: "Moderate",
-                targetMuscles: "Core, Quadriceps, Spinal Extensors",
-              },
-              {
-                id: `drill_${i}_2`,
-                name: "Postural Stability & Hind-Limb Drive",
-                desc: "Isometric holds and resistance intervals to enhance balance and posture alignment.",
-                difficulty: "Advanced",
-                reps: "4 sets × 10 reps",
-                intensity: "High",
-                targetMuscles: "Hamstrings, Gluteals, Scapular Stabilizers",
-              },
-            ],
+            {
+              id: `drill_${i}_1`,
+              name: `${species} Dynamic Agility & Stride Coordination`,
+              desc: `Form-controlled pacing focused on quadruped/bipedal gait mechanics for ${breed || species}.`,
+              difficulty: "Intermediate",
+              reps: "3 sets × 8 reps",
+              intensity: "Moderate",
+              targetMuscles: "Core, Quadriceps, Spinal Extensors",
+            },
+            {
+              id: `drill_${i}_2`,
+              name: "Postural Stability & Hind-Limb Drive",
+              desc: "Isometric holds and resistance intervals to enhance balance and posture alignment.",
+              difficulty: "Advanced",
+              reps: "4 sets × 10 reps",
+              intensity: "High",
+              targetMuscles: "Hamstrings, Gluteals, Scapular Stabilizers",
+            },
+          ],
       });
     }
 

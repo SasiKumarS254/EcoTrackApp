@@ -196,7 +196,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="marketplace"
         options={{
-          href: null,
+          tabBarItemStyle: { display: "none" },
+          tabBarButton: () => null,
         }}
       />
 
@@ -204,7 +205,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="events"
         options={{
-          href: null,
+          tabBarItemStyle: { display: "none" },
+          tabBarButton: () => null,
         }}
       />
 
@@ -212,7 +214,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="maps"
         options={{
-          href: null,
+          tabBarItemStyle: { display: "none" },
+          tabBarButton: () => null,
         }}
       />
 
@@ -220,7 +223,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          href: null,
+          tabBarItemStyle: { display: "none" },
+          tabBarButton: () => null,
         }}
       />
 
@@ -228,7 +232,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="encyclopedia"
         options={{
-          href: null,
+          tabBarItemStyle: { display: "none" },
+          tabBarButton: () => null,
         }}
       />
     </Tabs>

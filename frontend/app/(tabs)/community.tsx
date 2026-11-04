@@ -1,16 +1,24 @@
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, TextInput, Alert, StatusBar, Dimensions, ActivityIndicator, Share
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Image,
+  ScrollView,
+  Share,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { FontSize, Radius, Shadow } from "../../constants/theme";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize } from "../../constants/theme";
-import { fetchCommunityPosts, createCommunityPost, likeCommunityPost, commentCommunityPost, API_BASE_URL } from "../../services/api";
+import { commentCommunityPost, createCommunityPost, fetchCommunityPosts, likeCommunityPost } from "../../services/api";
 
 
 
