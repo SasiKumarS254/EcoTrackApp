@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Image, TextInput, Modal, Alert, StatusBar
@@ -332,7 +332,7 @@ export default function MarketplaceScreen() {
       if (!res.canceled && res.assets && res.assets.length > 0) {
         setNewListingImage(res.assets[0].uri);
       }
-    } catch (e) {
+    } catch {
       Alert.alert("Camera Error", "Could not open camera.");
     }
   };
@@ -395,7 +395,7 @@ export default function MarketplaceScreen() {
           });
           setProductsList(formatted);
         }
-      } catch (e) {
+      } catch {
         console.warn("Using offline marketplace catalog");
       }
     })();

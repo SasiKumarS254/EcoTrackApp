@@ -5,12 +5,12 @@
     "jsx": "react-jsx",
     "strict": true,
     "moduleResolution": "bundler",
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./frontend/*"]
     },
     "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noEmit": true
   },
   "include": [
     "frontend/**/*.ts",
@@ -18,4 +18,3 @@
     "frontend/.expo/types/**/*.ts"
   ]
 }
-

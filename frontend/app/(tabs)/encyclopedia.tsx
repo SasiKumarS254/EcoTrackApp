@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Image, Alert, StatusBar, Dimensions, ActivityIndicator,
+  TextInput, Image, StatusBar, Dimensions, ActivityIndicator,
   FlatList, Modal
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";

@@ -4,12 +4,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
 import React, { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 // Elevated Center AI Scan Floating Action Button
 function CenterScanButton(props: any) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const isSelected = props.accessibilityState?.selected;
 
   return (
@@ -70,7 +70,7 @@ function CenterScanButton(props: any) {
 }
 
 export default function TabLayout() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [checkingAuth, setCheckingAuth] = useState(true);
 
@@ -99,7 +99,7 @@ export default function TabLayout() {
           await AsyncStorage.setItem("@ecotrack_user_id", "usr1");
         }
         setCheckingAuth(false);
-      } catch (e) {
+      } catch {
         setCheckingAuth(false);
       }
     };

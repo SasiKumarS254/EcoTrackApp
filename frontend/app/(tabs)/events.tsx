@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Image, TextInput, Modal, Alert, StatusBar
@@ -169,7 +169,7 @@ export default function EventsScreen() {
       if (!res.canceled && res.assets && res.assets.length > 0) {
         setHostImage(res.assets[0].uri);
       }
-    } catch (e) {
+    } catch {
       Alert.alert("Camera Error", "Could not open camera.");
     }
   };
@@ -215,7 +215,7 @@ export default function EventsScreen() {
         if (regData && Array.isArray(regData)) {
           setRegisteredEventIds(regData.map((r: any) => String(r.id || r.event_id || r)));
         }
-      } catch (e) {
+      } catch {
         console.warn("Using default verified events list");
       }
     })();

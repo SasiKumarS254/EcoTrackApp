@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, StatusBar, Linking, Modal
@@ -9,7 +9,7 @@ import { useNavigation } from "expo-router";
 
 import { useTheme } from "../../context/ThemeContext";
 import { Radius, Shadow, FontSize } from "../../constants/theme";
-import { fetchCareServices, API_BASE_URL } from "../../services/api";
+import { fetchCareServices } from "../../services/api";
 
 
 

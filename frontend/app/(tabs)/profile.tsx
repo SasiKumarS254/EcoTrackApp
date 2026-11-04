@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, TextInput, Alert, StatusBar, Modal, Dimensions, Share
+  Image, TextInput, Alert, StatusBar, Modal, Share
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -119,7 +119,7 @@ export default function ProfileScreen() {
       if (!res.canceled && res.assets && res.assets.length > 0) {
         setAvatarUri(res.assets[0].uri);
       }
-    } catch (e) {
+    } catch {
       Alert.alert("Camera Error", "Could not open camera.");
     }
   };
@@ -342,13 +342,13 @@ export default function ProfileScreen() {
           caption: text,
           post_type: "achievement",
         });
-      } catch (e) {}
+      } catch {}
 
       await Share.share({
         message: text,
         title: `EcoTrack Achievement: ${badgeName}`,
       });
-    } catch (err: any) {
+    } catch {
       Alert.alert("Achievement Unlocked! 🏆", `Shared "${badgeName}" achievement.`);
     }
   };

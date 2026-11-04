@@ -155,7 +155,7 @@ export default function CommunityScreen() {
       if (!res.canceled && res.assets && res.assets.length > 0) {
         setNewPostMedia(res.assets[0].uri);
       }
-    } catch (e) {
+    } catch {
       Alert.alert("Picker Error", "Could not pick image.");
     }
   };
@@ -177,7 +177,7 @@ export default function CommunityScreen() {
       if (!res.canceled && res.assets && res.assets.length > 0) {
         setNewPostMedia(res.assets[0].uri);
       }
-    } catch (e) {
+    } catch {
       Alert.alert("Camera Error", "Could not take photo with camera.");
     }
   };
@@ -192,7 +192,7 @@ export default function CommunityScreen() {
         message: shareMsg,
         title: `${authorName}'s Post on EcoTrack`,
       });
-    } catch (error) {
+    } catch {
       Alert.alert("Share", "Post link copied to clipboard.");
     }
   };
