@@ -1,12 +1,13 @@
 name: EcoTrack CI/CD & Automated Quality Assurance
 run-name: EcoTrack Quality Gate - Build #${{ github.run_number }} on ${{ github.ref_name }}
 
+# GITHUB ACTIONS FULLY PAUSED BY USER REQUEST
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
+  # push:
+  #   branches: [ main ]
+  # pull_request:
+  #   branches: [ main ]
 
 permissions:
   contents: write
@@ -21,6 +22,7 @@ env:
 
 jobs:
   build-and-deploy:
+    if: false # PAUSED UNTIL USER SAYS START
     runs-on: ubuntu-latest
     # The environment must be manually created/configured in GitHub Settings -> Environments
     # AND GitHub Pages must be set to "GitHub Actions" under Settings -> Pages

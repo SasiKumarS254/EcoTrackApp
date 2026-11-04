@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "customConditions": ["react-native"],
+    "jsx": "react-jsx",
+    "lib": ["DOM", "ESNext"],
+    "esModuleInterop": true,
+    "allowJs": true,
+    "strict": true,
+    "typeRoots": [
+      "./frontend/node_modules/@types"
+    ],
+    "paths": {
+      "@/*": ["./frontend/*"]
+    },
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "frontend/**/*.ts",
+    "frontend/**/*.tsx",
+    "frontend/.expo/types/**/*.ts",
+    "frontend/expo-env.d.ts"
+  ],
+  "exclude": [
+    "frontend/node_modules"
+  ]
+}
