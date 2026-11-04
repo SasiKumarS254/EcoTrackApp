@@ -1,15 +1,14 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, TextInput, Modal, Alert, StatusBar, Dimensions
+  Image, TextInput, Modal, Alert, StatusBar
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
+import { router, useNavigation } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize } from "@/constants/theme";
+import { Radius, Shadow, FontSize } from "../../constants/theme";
 import { fetchMarketplaceAnimals, fetchMarketplaceProducts, createListing } from "../../services/api";
 
 
@@ -273,6 +272,7 @@ const BASE_PRODUCTS = [
 export default function MarketplaceScreen() {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
+  const navigation = useNavigation<any>();
 
   // Tab: 'animals' | 'products' | 'saved'
   const [activeTab, setActiveTab] = useState<"animals" | "products" | "saved">("animals");
@@ -551,10 +551,10 @@ export default function MarketplaceScreen() {
           <TouchableOpacity
             style={styles.backBtn}
             onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
+              if (navigation.canGoBack()) {
+                navigation.goBack();
               } else {
-                router.navigate("/(tabs)/explore" as any);
+                navigation.navigate("explore");
               }
             }}
             activeOpacity={0.7}
@@ -588,7 +588,7 @@ export default function MarketplaceScreen() {
 
           <TouchableOpacity
             style={styles.profileHeaderBtn}
-            onPress={() => router.navigate("/(tabs)/profile" as any)}
+            onPress={() => navigation.navigate("profile")}
             activeOpacity={0.8}
           >
             <Ionicons name="person-circle" size={26} color={colors.primary} />

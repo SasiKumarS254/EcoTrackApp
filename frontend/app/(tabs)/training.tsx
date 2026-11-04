@@ -8,7 +8,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize } from "@/constants/theme";
+import { Radius, Shadow, FontSize } from "../../constants/theme";
 import { API_BASE_URL } from "../../services/api";
 
 const PRESET_SPECIES = [
@@ -193,7 +193,7 @@ export default function SpeciesTrainerScreen() {
 
         <TouchableOpacity
           style={styles.profileHeaderBtn}
-          onPress={() => router.navigate("/(tabs)/profile" as any)}
+          onPress={() => router.push("/(tabs)/profile")}
           activeOpacity={0.8}
         >
           <Ionicons name="person-circle" size={28} color={colors.primary} />

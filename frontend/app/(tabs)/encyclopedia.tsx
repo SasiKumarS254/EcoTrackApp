@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow } from "@/constants/theme";
+import { Radius, Shadow } from "../../constants/theme";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { fetchTaxonomySpecies } from "../../services/api";
 import { fetchWikipediaSpeciesData } from "../../services/wikipedia";

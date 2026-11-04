@@ -9,7 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize } from "@/constants/theme";
+import { Radius, Shadow, FontSize } from "../../constants/theme";
 import { API_BASE_URL } from "../../services/api";
 import { useVideoPlayer, VideoView } from "expo-video";
 
@@ -251,7 +251,7 @@ export default function AIScannerTabScreen() {
           </View>
           <TouchableOpacity
             style={styles.profileHeaderBtn}
-            onPress={() => router.navigate("/(tabs)/profile" as any)}
+            onPress={() => router.push("/(tabs)/profile")}
             activeOpacity={0.8}
           >
             <Ionicons name="person-circle" size={28} color={colors.primary} />

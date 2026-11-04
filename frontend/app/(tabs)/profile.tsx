@@ -10,7 +10,7 @@ import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize } from "@/constants/theme";
+import { Radius, Shadow, FontSize } from "../../constants/theme";
 import {
   fetchRegisteredEvents,
   fetchCommunityPosts,

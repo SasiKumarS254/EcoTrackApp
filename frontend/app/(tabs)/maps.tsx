@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, StatusBar, Linking, Modal, Dimensions
+  TextInput, Alert, StatusBar, Linking, Modal
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
+import { useNavigation } from "expo-router";
 
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize } from "@/constants/theme";
+import { Radius, Shadow, FontSize } from "../../constants/theme";
 import { fetchCareServices, API_BASE_URL } from "../../services/api";
 
 
@@ -115,6 +115,7 @@ const BASE_SERVICES = [
 export default function MapsScreen() {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
+  const navigation = useNavigation<any>();
 
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -253,10 +254,10 @@ export default function MapsScreen() {
           <TouchableOpacity
             style={styles.backBtn}
             onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
+              if (navigation.canGoBack()) {
+                navigation.goBack();
               } else {
-                router.navigate("/(tabs)/explore" as any);
+                navigation.navigate("explore");
               }
             }}
             activeOpacity={0.7}
@@ -284,7 +285,7 @@ export default function MapsScreen() {
 
           <TouchableOpacity
             style={styles.profileHeaderBtn}
-            onPress={() => router.navigate("/(tabs)/profile" as any)}
+            onPress={() => navigation.navigate("profile")}
             activeOpacity={0.8}
           >
             <Ionicons name="person-circle" size={26} color={colors.primary} />

@@ -1,29 +1,28 @@
 import React, { useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  StatusBar, Dimensions, Alert
+  StatusBar
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
+import { router, useNavigation } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow } from "@/constants/theme";
-
-
+import { Radius, Shadow } from "../../constants/theme";
 
 export default function ExploreScreen() {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
+  const navigation = useNavigation<any>();
 
-  const navigateTo = (path: string) => {
+  const navigateTo = (screenName: string, path: string) => {
     try {
-      router.navigate(path as any);
+      navigation.navigate(screenName);
     } catch {
       try {
-        router.push(path as any);
+        router.navigate(path as any);
       } catch {
-        router.replace(path as any);
+        router.push(path as any);
       }
     }
   };
@@ -39,7 +38,8 @@ export default function ExploreScreen() {
       badge: "Verified Listings",
       badgeColor: "#ffedd5",
       badgeTextColor: "#c2410c",
-      route: "/(tabs)/marketplace",
+      screen: "marketplace",
+      route: "/marketplace",
       highlights: ["🐾 Adoption Profiles", "🥣 Specialized Nutrition", "🛒 In-App Cart"],
     },
     {
@@ -52,7 +52,8 @@ export default function ExploreScreen() {
       badge: "Digital Pass Vault",
       badgeColor: "#e0f2fe",
       badgeTextColor: "#0369a1",
-      route: "/(tabs)/events",
+      screen: "events",
+      route: "/events",
       highlights: ["🎟️ QR Entry Passes", "🦁 Rescue Drives", "👥 Host New Event"],
     },
     {
@@ -65,7 +66,8 @@ export default function ExploreScreen() {
       badge: "Verified Facilities",
       badgeColor: "#dcfce7",
       badgeTextColor: "#15803d",
-      route: "/(tabs)/maps",
+      screen: "maps",
+      route: "/maps",
       highlights: ["🚑 24/7 ER Helplines", "🏥 Verified Clinics", "📍 GPS Navigation"],
     },
   ];
@@ -88,7 +90,7 @@ export default function ExploreScreen() {
 
         <TouchableOpacity
           style={styles.profileHeaderBtn}
-          onPress={() => navigateTo("/(tabs)/profile")}
+          onPress={() => navigateTo("profile", "/profile")}
           activeOpacity={0.8}
         >
           <Ionicons name="person-circle" size={28} color={colors.primary} />
@@ -124,7 +126,7 @@ export default function ExploreScreen() {
           <TouchableOpacity
             key={`explore-hub-${hub.id}-${idx}`}
             style={styles.hubCard}
-            onPress={() => navigateTo(hub.route)}
+            onPress={() => navigateTo(hub.screen, hub.route)}
             activeOpacity={0.88}
           >
             <View style={styles.hubHeaderRow}>
@@ -172,7 +174,7 @@ export default function ExploreScreen() {
         <View style={styles.shortcutsGrid}>
           <TouchableOpacity
             style={styles.shortcutBtn}
-            onPress={() => navigateTo("/(tabs)/marketplace")}
+            onPress={() => navigateTo("marketplace", "/marketplace")}
           >
             <Ionicons name="paw" size={18} color="#f97316" />
             <Text style={styles.shortcutBtnText}>Adopt Animal</Text>
@@ -180,7 +182,7 @@ export default function ExploreScreen() {
 
           <TouchableOpacity
             style={styles.shortcutBtn}
-            onPress={() => navigateTo("/(tabs)/events")}
+            onPress={() => navigateTo("events", "/events")}
           >
             <Ionicons name="qr-code" size={18} color="#0284c7" />
             <Text style={styles.shortcutBtnText}>My Pass Vault</Text>
@@ -188,7 +190,7 @@ export default function ExploreScreen() {
 
           <TouchableOpacity
             style={styles.shortcutBtn}
-            onPress={() => navigateTo("/(tabs)/maps")}
+            onPress={() => navigateTo("maps", "/maps")}
           >
             <Ionicons name="medkit" size={18} color="#10b981" />
             <Text style={styles.shortcutBtnText}>24/7 ER Vet</Text>

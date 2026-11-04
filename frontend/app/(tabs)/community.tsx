@@ -9,7 +9,7 @@ import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { useTheme } from "../../context/ThemeContext";
-import { Radius, Shadow, FontSize } from "@/constants/theme";
+import { Radius, Shadow, FontSize } from "../../constants/theme";
 import { fetchCommunityPosts, createCommunityPost, likeCommunityPost, commentCommunityPost, API_BASE_URL } from "../../services/api";
 
 
@@ -302,7 +302,7 @@ export default function CommunityScreen() {
 
         <TouchableOpacity
           style={styles.profileHeaderBtn}
-          onPress={() => router.navigate("/(tabs)/profile" as any)}
+          onPress={() => router.push("/(tabs)/profile")}
           activeOpacity={0.8}
         >
           <Ionicons name="person-circle" size={28} color={colors.primary} />
