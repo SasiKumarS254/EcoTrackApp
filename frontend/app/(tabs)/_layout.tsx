@@ -227,15 +227,6 @@ export default function TabLayout() {
           tabBarButton: () => null,
         }}
       />
-
-      {/* Legacy Encyclopedia Hidden */}
-      <Tabs.Screen
-        name="encyclopedia"
-        options={{
-          tabBarItemStyle: { display: "none" },
-          tabBarButton: () => null,
-        }}
-      />
     </Tabs>
   );
 }
