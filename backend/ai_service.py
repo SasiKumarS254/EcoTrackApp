@@ -2606,19 +2606,122 @@ def process_video():
                 }
             ]
 
-            identified_deficits = []
-            if final_form < 85:
-                identified_deficits.append("Minor joint trajectory deviation detected under dynamic kinetic load.")
+            # Enhanced Biomechanical Fault Diagnostic Engine
+            canonical_id = EXERCISE_ALIASES.get(exercise_id, exercise_id)
+            template = EXERCISE_TEMPLATES.get(canonical_id) or EXERCISE_TEMPLATES.get(exercise_id)
+            rules = template.get('joint_rules', {}) if template else {}
+
+            detected_faults = []
+            # Check individual joint angle deviations against physiological templates
+            for js in joint_summaries:
+                raw_k = js.get('rawKey')
+                r = rules.get(raw_k)
+                if r:
+                    ideal_ang = r.get('ideal', 120)
+                    tolerance = r.get('tolerance', 15)
+                    obs_ang = js.get('avg', js.get('mean_angle', ideal_ang))
+                    dev = round(float(obs_ang - ideal_ang), 1)
+
+                    if abs(dev) > tolerance:
+                        is_hyper = dev > 0
+                        joint_lbl = r.get('label', js.get('name', 'Joint'))
+                        severity = "Critical" if abs(dev) > tolerance * 2 else ("Warning" if abs(dev) > tolerance * 1.3 else "Minor")
+
+                        if is_human:
+                            if 'knee' in raw_k:
+                                why_fault = "Excessive knee shear under load places abnormal tension on the anterior cruciate ligament (ACL) and meniscal cartilage."
+                                how_correct = "Drive knees outward in line with your 2nd toe; sit your hips back and down to distribute load to the posterior chain."
+                                how_improve = "3 sets of 10 Spanish squats + gluteus medius banded lateral monster walks (3 sets of 15 paces)."
+                            elif 'hip' in raw_k:
+                                why_fault = "Inadequate hip hinge shifts compressive spinal load directly onto the lumbar vertebrae."
+                                how_correct = "Push your hips back as if closing a car door behind you while keeping your sternum proud."
+                                how_improve = "3 sets of 12 Romanian deadlifts with light resistance to master the posterior hinge pattern."
+                            elif 'elbow' in raw_k:
+                                why_fault = "Elbow flaring beyond 70° from the torso creates impingement on the subacromial bursa and rotator cuff."
+                                how_correct = "Tuck elbows inward to a 45° angle relative to your ribs throughout the entire movement."
+                                how_improve = "Incorporate tempo push-ups (3s descent, 1s pause at bottom) and face-pulls for scapular retractor strength."
+                            else:
+                                why_fault = f"Joint excursion deviates {abs(dev)}° from optimal kinematic alignment, compromising kinetic force transfer."
+                                how_correct = f"Focus on stabilizing {joint_lbl}; maintain neutral posture throughout rep execution."
+                                how_improve = f"Progressive mobility drills targeting {joint_lbl} range of motion (2 sets of 30s dynamic stretches)."
+                        else:
+                            if 'Knee' in raw_k or 'stifle' in raw_k.lower():
+                                why_fault = f"Stifle angle deviation ({dev:+.1f}°) increases patellar tendon strain and restricts hind-limb propulsive power."
+                                how_correct = "Ensure the animal's hind paws are firmly planted squarely beneath the pelvis before loading."
+                                how_improve = "Incorporate low-impact sit-to-stand repetitions on textured balance pads (3 sets of 6 reps with positive reward)."
+                            elif 'Hip' in raw_k:
+                                why_fault = f"Pelvic angle deviation ({dev:+.1f}°) alters coxofemoral loading and can lead to compensatory thoracic over-reaching."
+                                how_correct = "Keep movement path linear; prevent the subject from tilting or swaying hindquarters laterally."
+                                how_improve = "Gentle hill walking or slow cavaletti rail steps (height set at wrist/hock height) 3 times weekly."
+                            elif 'Elbow' in raw_k or 'Shoulder' in raw_k:
+                                why_fault = f"Thoracic limb deviation ({dev:+.1f}°) creates asymmetric shock absorption upon paw ground impact."
+                                how_correct = "Guide the animal at a steady cadence; ensure head and neck remain forward and balanced."
+                                how_improve = "Front-limb targeting drills and standing weight-shift holds on non-slip surfaces."
+                            else:
+                                why_fault = f"Kinematic deviation of {abs(dev)}° from safe anatomical range ({r.get('min')}°-{r.get('max')}°)."
+                                how_correct = f"Maintain steady gait velocity; keep body aligned along the longitudinal axis."
+                                how_improve = f"Controlled leash walking and balance work to improve neuromuscular coordination for {joint_lbl}."
+
+                        detected_faults.append({
+                            'faultName': f"{joint_lbl} {'Hyper-extension' if is_hyper else 'Hypo-flexion'}",
+                            'severity': severity,
+                            'joint': joint_lbl,
+                            'rawKey': raw_k,
+                            'detectedAngle': round(float(obs_ang), 1),
+                            'idealAngle': ideal_ang,
+                            'deviationDeg': dev,
+                            'whatIsFault': f"Observed angle is {obs_ang}° (ideal target: {ideal_ang}°, deviation: {dev:+.1f}°).",
+                            'whyFault': why_fault,
+                            'howToCorrect': how_correct,
+                            'howToImprove': how_improve
+                        })
+
+            # Check bilateral symmetry deficit
             if bilateral_symmetry_index < 88:
-                identified_deficits.append("Asymmetric limb load distribution observed between contralateral pairs.")
+                sym_sev = "Critical" if bilateral_symmetry_index < 78 else "Warning"
+                detected_faults.append({
+                    'faultName': f"Contralateral Limb Asymmetry ({100 - bilateral_symmetry_index:.0f}% Deficit)",
+                    'severity': sym_sev,
+                    'joint': "Contralateral Limb Pair",
+                    'rawKey': "bilateral_symmetry",
+                    'detectedAngle': bilateral_symmetry_index,
+                    'idealAngle': 100,
+                    'deviationDeg': round(float(bilateral_symmetry_index - 100), 1),
+                    'whatIsFault': f"Bilateral symmetry index scored {bilateral_symmetry_index}%, indicating significant unequal weight distribution between left and right sides.",
+                    'whyFault': "Asymmetrical loading forces the favored limb to absorb compensatory impact shock, accelerating unilateral degenerative joint wear.",
+                    'howToCorrect': "Guide the subject along straight paths on flat terrain; monitor for leaning or reluctance to bear weight on the non-dominant limb.",
+                    'howToImprove': "Cross-lateral coordination drills, figure-8 walking around cones, and gentle weight-shifting exercises 3 days per week."
+                })
+
+            # Check spinal topline stability deficit
+            if final_posture < 78:
+                detected_faults.append({
+                    'faultName': "Spinal Column Instability & Kyphosis/Lordosis",
+                    'severity': "Warning",
+                    'joint': "Vertebral Column / Topline",
+                    'rawKey': "topline_spine",
+                    'detectedAngle': final_posture,
+                    'idealAngle': 90,
+                    'deviationDeg': round(float(final_posture - 90), 1),
+                    'whatIsFault': f"Topline postural stability scored {final_posture}%, exhibiting axial sagging or abnormal spinal arching during movement.",
+                    'whyFault': "A compromised vertebral topline prevents efficient power transfer between the pelvis and thoracic limbs, stressing intervertebral discs.",
+                    'howToCorrect': "Keep the movement controlled and unhurried; maintain head and neck in a neutral natural alignment.",
+                    'howToImprove': "Isometric core bracing holds (plank / stand-stay) and gentle backing-up steps to recruit deep spinal stabilizers."
+                })
+
+            identified_deficits = [f['whatIsFault'] for f in detected_faults]
             if not identified_deficits:
                 identified_deficits.append("No biomechanical pathologies or hazardous joint deviations detected.")
 
-            corrective_prescription = (
-                "Maintain steady pacing through the concentric and eccentric phases. Focus on controlled footfall placement and core bracing to lock in optimal joint alignment."
-                if final_form < 85 else
-                "Current kinetic mechanics are exceptional. Continue training progression with gradual volume load while maintaining this precision."
-            )
+            if not detected_faults:
+                corrective_prescription = (
+                    "Current kinetic mechanics are exceptional and within physiological safety margins. Continue training progression with gradual volume load while maintaining this precision."
+                )
+            else:
+                top_fault = detected_faults[0]
+                corrective_prescription = (
+                    f"Identified {len(detected_faults)} kinetic fault(s). Priority: {top_fault['faultName']}. Action: {top_fault['howToCorrect']} Improvement Drill: {top_fault['howToImprove']}"
+                )
 
             # Compile Target Report
             scan_id = f"scan_{int(time.time())}_target_{track_id}"
@@ -2638,6 +2741,7 @@ def process_video():
                 'keypoints': last_kps,
                 'jointAngles': angles_history[-1]['angles'] if angles_history else {},
                 'jointSummaries': joint_summaries,
+                'detectedFaults': detected_faults,
                 'formScore': final_form,
                 'postureScore': final_posture,
                 'balanceScore': final_balance,
