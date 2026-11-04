@@ -250,6 +250,20 @@ export default function MapsScreen() {
       {/* TOP HEADER */}
       <View style={styles.topHeader}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.navigate("/(tabs)/explore" as any);
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={18} color={colors.textPrimary} />
+          </TouchableOpacity>
+
           <View style={styles.topIconWrap}>
             <Ionicons name="location" size={20} color="#fff" />
           </View>
@@ -270,7 +284,7 @@ export default function MapsScreen() {
 
           <TouchableOpacity
             style={styles.profileHeaderBtn}
-            onPress={() => router.push("/(tabs)/profile")}
+            onPress={() => router.navigate("/(tabs)/profile" as any)}
             activeOpacity={0.8}
           >
             <Ionicons name="person-circle" size={26} color={colors.primary} />
@@ -534,6 +548,17 @@ function getStyles(colors: any, isDark: boolean) {
       maxWidth: 1000,
       width: "100%",
       alignSelf: "center",
+    },
+    backBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: Radius.md,
+      backgroundColor: isDark ? "#1e293b" : "#f1f5f9",
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginRight: 2,
     },
     profileHeaderBtn: {
       padding: 2,

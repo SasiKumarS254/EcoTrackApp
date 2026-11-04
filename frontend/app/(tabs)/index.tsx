@@ -69,7 +69,7 @@ export default function DashboardScreen() {
             <Ionicons name={isDark ? "sunny" : "moon"} size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.userPill} onPress={() => router.push("/(tabs)/profile")}>
+          <TouchableOpacity style={styles.userPill} onPress={() => router.navigate("/(tabs)/profile" as any)}>
             <View style={styles.userAvatar}>
               <Text style={styles.userAvatarText}>
                 {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
@@ -107,7 +107,7 @@ export default function DashboardScreen() {
             <View style={styles.heroBtnRow}>
               <TouchableOpacity
                 style={styles.heroPrimaryBtn}
-                onPress={() => router.push("/training")}
+                onPress={() => router.navigate("/training" as any)}
                 activeOpacity={0.88}
               >
                 <Text style={styles.heroPrimaryBtnText}>🚀 Species Trainer</Text>
@@ -115,7 +115,7 @@ export default function DashboardScreen() {
 
               <TouchableOpacity
                 style={styles.heroSecondaryBtn}
-                onPress={() => router.push("/marketplace")}
+                onPress={() => router.navigate("/marketplace" as any)}
                 activeOpacity={0.88}
               >
                 <Text style={styles.heroSecondaryBtnText}>🛍️ Marketplace</Text>
@@ -147,7 +147,7 @@ export default function DashboardScreen() {
             </View>
             <TouchableOpacity
               style={styles.activityBtn}
-              onPress={() => router.push("/events")}
+              onPress={() => router.navigate("/events" as any)}
             >
               <Ionicons name="ticket" size={14} color="#fff" />
               <Text style={styles.activityBtnText}>View Entry Pass in Vault</Text>
@@ -173,7 +173,7 @@ export default function DashboardScreen() {
         {/* Hero Bento: AI Scanner */}
         <TouchableOpacity
           style={styles.heroBentoCard}
-          onPress={() => router.push("/aiscanner")}
+          onPress={() => router.navigate("/aiscanner" as any)}
           activeOpacity={0.88}
         >
           <View style={styles.heroBentoGlow} />
@@ -201,7 +201,7 @@ export default function DashboardScreen() {
           {/* Species Trainer */}
           <TouchableOpacity
             style={styles.bentoCard}
-            onPress={() => router.push("/training")}
+            onPress={() => router.navigate("/training" as any)}
             activeOpacity={0.85}
           >
             <View style={[styles.bentoIconCircle, { backgroundColor: "rgba(139, 92, 246, 0.12)" }]}>
@@ -218,7 +218,7 @@ export default function DashboardScreen() {
           {/* Explore Hub */}
           <TouchableOpacity
             style={styles.bentoCard}
-            onPress={() => router.push("/explore")}
+            onPress={() => router.navigate("/explore" as any)}
             activeOpacity={0.85}
           >
             <View style={[styles.bentoIconCircle, { backgroundColor: "rgba(6, 182, 212, 0.12)" }]}>
@@ -235,7 +235,7 @@ export default function DashboardScreen() {
           {/* Adoption & Market */}
           <TouchableOpacity
             style={styles.bentoCard}
-            onPress={() => router.push("/marketplace")}
+            onPress={() => router.navigate("/marketplace" as any)}
             activeOpacity={0.85}
           >
             <View style={[styles.bentoIconCircle, { backgroundColor: "rgba(249, 115, 22, 0.12)" }]}>
@@ -252,7 +252,7 @@ export default function DashboardScreen() {
           {/* Events & Pass Vault */}
           <TouchableOpacity
             style={styles.bentoCard}
-            onPress={() => router.push("/events")}
+            onPress={() => router.navigate("/events" as any)}
             activeOpacity={0.85}
           >
             <View style={[styles.bentoIconCircle, { backgroundColor: "rgba(245, 158, 11, 0.12)" }]}>
@@ -269,7 +269,7 @@ export default function DashboardScreen() {
           {/* 24/7 Vet & ER Care */}
           <TouchableOpacity
             style={styles.bentoCard}
-            onPress={() => router.push("/maps")}
+            onPress={() => router.navigate("/maps" as any)}
             activeOpacity={0.85}
           >
             <View style={[styles.bentoIconCircle, { backgroundColor: "rgba(239, 68, 68, 0.12)" }]}>
@@ -286,7 +286,7 @@ export default function DashboardScreen() {
           {/* Community Hub */}
           <TouchableOpacity
             style={styles.bentoCard}
-            onPress={() => router.push("/community")}
+            onPress={() => router.navigate("/community" as any)}
             activeOpacity={0.85}
           >
             <View style={[styles.bentoIconCircle, { backgroundColor: "rgba(99, 102, 241, 0.12)" }]}>
@@ -309,7 +309,7 @@ export default function DashboardScreen() {
             <Text style={styles.sanctuaryDesc}>Emergency ambulance & veterinary hospital locator active across all partner zones.</Text>
             <TouchableOpacity
               style={styles.sanctuaryBtn}
-              onPress={() => router.push("/maps")}
+              onPress={() => router.navigate("/maps" as any)}
             >
               <Text style={styles.sanctuaryBtnText}>Emergency Helpline</Text>
               <Ionicons name="arrow-forward" size={14} color="#fff" />

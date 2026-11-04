@@ -16,6 +16,18 @@ export default function ExploreScreen() {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
 
+  const navigateTo = (path: string) => {
+    try {
+      router.navigate(path as any);
+    } catch {
+      try {
+        router.push(path as any);
+      } catch {
+        router.replace(path as any);
+      }
+    }
+  };
+
   const hubs = [
     {
       id: "market",
@@ -76,7 +88,7 @@ export default function ExploreScreen() {
 
         <TouchableOpacity
           style={styles.profileHeaderBtn}
-          onPress={() => router.push("/(tabs)/profile")}
+          onPress={() => navigateTo("/(tabs)/profile")}
           activeOpacity={0.8}
         >
           <Ionicons name="person-circle" size={28} color={colors.primary} />
@@ -112,7 +124,7 @@ export default function ExploreScreen() {
           <TouchableOpacity
             key={`explore-hub-${hub.id}-${idx}`}
             style={styles.hubCard}
-            onPress={() => router.push(hub.route as any)}
+            onPress={() => navigateTo(hub.route)}
             activeOpacity={0.88}
           >
             <View style={styles.hubHeaderRow}>
@@ -160,7 +172,7 @@ export default function ExploreScreen() {
         <View style={styles.shortcutsGrid}>
           <TouchableOpacity
             style={styles.shortcutBtn}
-            onPress={() => router.push("/(tabs)/marketplace")}
+            onPress={() => navigateTo("/(tabs)/marketplace")}
           >
             <Ionicons name="paw" size={18} color="#f97316" />
             <Text style={styles.shortcutBtnText}>Adopt Animal</Text>
@@ -168,7 +180,7 @@ export default function ExploreScreen() {
 
           <TouchableOpacity
             style={styles.shortcutBtn}
-            onPress={() => router.push("/(tabs)/events")}
+            onPress={() => navigateTo("/(tabs)/events")}
           >
             <Ionicons name="qr-code" size={18} color="#0284c7" />
             <Text style={styles.shortcutBtnText}>My Pass Vault</Text>
@@ -176,7 +188,7 @@ export default function ExploreScreen() {
 
           <TouchableOpacity
             style={styles.shortcutBtn}
-            onPress={() => router.push("/(tabs)/maps")}
+            onPress={() => navigateTo("/(tabs)/maps")}
           >
             <Ionicons name="medkit" size={18} color="#10b981" />
             <Text style={styles.shortcutBtnText}>24/7 ER Vet</Text>

@@ -302,7 +302,7 @@ export default function CommunityScreen() {
 
         <TouchableOpacity
           style={styles.profileHeaderBtn}
-          onPress={() => router.push("/(tabs)/profile")}
+          onPress={() => router.navigate("/(tabs)/profile" as any)}
           activeOpacity={0.8}
         >
           <Ionicons name="person-circle" size={28} color={colors.primary} />
