@@ -6,14 +6,21 @@
 const AUTH_CONFIG = {
   sessionKey: "@ecotrack_web_session",
   themeKey: "@ecotrack_theme",
-  // Use 127.0.0.1 for CI stability
-  apiBase: (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' || window.location.hostname === '' || window.location.port === '3000' || window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.'))
-           ? "http://127.0.0.1:5000/api"
-           : "https://SasiKumarS254.github.io/EcoTrackApp/api"
+  // Resilient API base detection
+  apiBase: (function() {
+    try {
+      const h = window.location.hostname || '';
+      const p = window.location.port || '';
+      if (h === '127.0.0.1' || h === 'localhost' || h === '' || p === '5000' || p === '3000' || p === '8080' || h.startsWith('192.168.') || h.startsWith('10.')) {
+        return "http://127.0.0.1:5000/api";
+      }
+    } catch (e) {}
+    return "https://SasiKumarS254.github.io/EcoTrackApp/api";
+  })()
 };
 
 /**
- * Restore session from localStorage.
+ * Restore session from localStorage safely.
  * Returns null if no valid session exists.
  */
 function getSession() {
@@ -35,7 +42,7 @@ function getSession() {
       }
     }
   } catch (e) {
-    console.error("Auth session parsing error:", e);
+    console.warn("Auth session parsing warning:", e.message);
   }
   return null;
 }
@@ -79,7 +86,6 @@ function syncUserInterface(user) {
     }
   });
 
-  // Global window variable for other scripts
   // Toggle Admin Center in navigation based on role
   const adminNav = document.getElementById("adminNavSection");
   if (adminNav) {
@@ -93,53 +99,98 @@ function syncUserInterface(user) {
  * Global logout handler
  */
 function performLogout() {
-  localStorage.removeItem(AUTH_CONFIG.sessionKey);
+  try {
+    localStorage.removeItem(AUTH_CONFIG.sessionKey);
+  } catch (e) {}
   window.location.href = 'index.html';
   window.location.reload();
 }
 
 // Auto-sync theme on load
 (function() {
-  const theme = localStorage.getItem(AUTH_CONFIG.themeKey) || "light";
-  document.documentElement.setAttribute("data-theme", theme);
+  try {
+    const theme = localStorage.getItem(AUTH_CONFIG.themeKey) || "light";
+    document.documentElement.setAttribute("data-theme", theme);
+  } catch (e) {}
 })();
 
-// Global fetch interceptor to inject Authorization header across all pages
+// Global fetch interceptor to inject Authorization header across all pages safely
 (function() {
-  const originalFetch = window.fetch;
-  window.fetch = async function(resource, options = {}) {
-    const urlStr = typeof resource === 'string' ? resource : (resource ? resource.url : '');
-    // Intercept EcoTrack API calls
-    const isEcoTrackApi = urlStr && (
-      urlStr.includes('localhost:5000') ||
-      urlStr.includes('127.0.0.1:5000') ||
-      urlStr.includes(':5000/api') ||
-      urlStr.startsWith('/api') ||
-      urlStr.includes('/api/') ||
-      (typeof AUTH_CONFIG !== 'undefined' && AUTH_CONFIG.apiBase && urlStr.includes(AUTH_CONFIG.apiBase))
-    );
+  if (window.__ecotrackFetchInterceptorInstalled) return;
+  window.__ecotrackFetchInterceptorInstalled = true;
 
-    if (isEcoTrackApi) {
-      const sessionObj = getSession();
-      if (sessionObj && sessionObj.token) {
-        options.headers = options.headers || {};
-        if (typeof Headers !== 'undefined' && options.headers instanceof Headers) {
-          if (!options.headers.has('Authorization')) {
-            options.headers.set('Authorization', `Bearer ${sessionObj.token}`);
-          }
-        } else if (Array.isArray(options.headers)) {
-          const existingIndex = options.headers.findIndex(h => h[0].toLowerCase() === 'authorization');
-          if (existingIndex === -1) {
-            options.headers.push(['Authorization', `Bearer ${sessionObj.token}`]);
-          }
-        } else {
-          if (!options.headers['Authorization'] && !options.headers['authorization']) {
-            options.headers['Authorization'] = `Bearer ${sessionObj.token}`;
+  const originalFetch = window.fetch;
+  if (typeof originalFetch !== 'function') return;
+
+  window.fetch = function(input, init) {
+    try {
+      let url = '';
+      if (typeof input === 'string') {
+        url = input;
+      } else if (input && typeof input.url === 'string') {
+        url = input.url;
+      } else if (input && typeof input.href === 'string') {
+        url = input.href;
+      } else if (input && typeof input.toString === 'function') {
+        url = input.toString();
+      }
+
+      const isEcoTrackApi = url && (
+        url.includes(':5000/api') ||
+        url.includes('127.0.0.1:5000') ||
+        url.includes('localhost:5000') ||
+        url.startsWith('/api') ||
+        url.includes('/api/') ||
+        (typeof AUTH_CONFIG !== 'undefined' && AUTH_CONFIG.apiBase && url.includes(AUTH_CONFIG.apiBase))
+      );
+
+      if (isEcoTrackApi) {
+        const session = (typeof getSession === 'function' ? getSession() : null);
+        const token = session && session.token;
+        if (token) {
+          if (typeof Request !== 'undefined' && input instanceof Request) {
+            try {
+              input.headers.set('Authorization', `Bearer ${token}`);
+            } catch (e) {
+              init = init ? { ...init } : {};
+              init.headers = init.headers || {};
+              if (typeof Headers !== 'undefined' && init.headers instanceof Headers) {
+                if (!init.headers.has('Authorization')) init.headers.set('Authorization', `Bearer ${token}`);
+              } else if (Array.isArray(init.headers)) {
+                if (!init.headers.some(h => h[0].toLowerCase() === 'authorization')) {
+                  init.headers.push(['Authorization', `Bearer ${token}`]);
+                }
+              } else {
+                if (!init.headers['Authorization'] && !init.headers['authorization']) {
+                  init.headers['Authorization'] = `Bearer ${token}`;
+                }
+              }
+            }
+          } else {
+            init = init ? { ...init } : {};
+            if (typeof Headers !== 'undefined' && init.headers instanceof Headers) {
+              if (!init.headers.has('Authorization')) init.headers.set('Authorization', `Bearer ${token}`);
+            } else if (Array.isArray(init.headers)) {
+              if (!init.headers.some(h => h[0].toLowerCase() === 'authorization')) {
+                init.headers.push(['Authorization', `Bearer ${token}`]);
+              }
+            } else {
+              init.headers = { ...(init.headers || {}) };
+              if (!init.headers['Authorization'] && !init.headers['authorization']) {
+                init.headers['Authorization'] = `Bearer ${token}`;
+              }
+            }
           }
         }
       }
+    } catch (interceptorErr) {
+      console.warn('[EcoTrack/Auth] Fetch interceptor non-fatal notice:', interceptorErr.message);
     }
-    return originalFetch.call(window, resource, options);
+
+    if (init !== undefined) {
+      return originalFetch.call(window, input, init);
+    }
+    return originalFetch.call(window, input);
   };
 })();
 

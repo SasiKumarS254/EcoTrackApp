@@ -4151,7 +4151,7 @@ let SERVICES_DATA = [
 
 async function loadServicesFromBackend() {
   try {
-    const res = await fetch("http://localhost:5000/api/services");
+    const res = await fetch(`${API_BASE}/services`);
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {

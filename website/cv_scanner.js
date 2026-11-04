@@ -346,7 +346,7 @@
     select.appendChild(otherOpt);
 
     // Try to restore old value or default to first
-    const hasOldVal = Array.from(select.options).some(opt => opt.value === oldVal);
+    const hasOldVal = select.options ? Array.from(select.options).some(opt => opt.value === oldVal) : false;
     if (hasOldVal) {
       select.value = oldVal;
     } else {

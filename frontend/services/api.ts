@@ -19,6 +19,7 @@ const resolveBackendUrl = () => {
   // Detect Expo host URI across all Expo SDK versions & platforms (Expo Go, custom client, dev builds)
   const hostUri =
     Constants.expoConfig?.hostUri ||
+    (Constants as any).expoGoConfig?.debuggerHost ||
     (Constants as any).__expoHostUri ||
     (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
     (Constants as any).manifest?.debuggerHost ||
@@ -33,7 +34,7 @@ const resolveBackendUrl = () => {
   }
 
   // Fallback to Development Machine LAN IP (accessible by physical Android/iOS devices on Wi-Fi)
-  return "http://172.25.25.176:5000/api";
+  return "http://172.25.16.172:5000/api";
 };
 
 export const API_BASE_URL = resolveBackendUrl();
