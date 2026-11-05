@@ -4848,6 +4848,387 @@
     "usr_456a7785b7bc6c7e": [],
     "usr_cef118e82cf2444d": [
       {
+        "id": "tp_1793811971470",
+        "user_id": "usr_cef118e82cf2444d",
+        "species": "Dolphin",
+        "breed": null,
+        "goal": "Adapted sit (Form Score: 0%)",
+        "is_active": true,
+        "started_at": "2026-11-04T17:06:11.638Z",
+        "progress": {
+          "completed_exercises": [],
+          "current_week": 1,
+          "total_scans": 0,
+          "avg_score": 0,
+          "plan": {
+            "speciesName": "Dolphin",
+            "breedName": "Standard",
+            "ageCategory": "Senior",
+            "weightClass": "Heavyweight",
+            "goal": "Adapted sit (Form Score: 0%)",
+            "planDurationDays": 7,
+            "daysPlan": [
+              {
+                "dayNum": 1,
+                "title": "Day 1: Foundation & Biomechanical Form Setup 🔥",
+                "focus": "Targeted Adapted sit (Form Score: 0%) progression (Agility)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_1_1",
+                    "name": "Directional Pivot Sprints",
+                    "title": "Directional Pivot Sprints",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  },
+                  {
+                    "id": "ml_1_2",
+                    "name": "Slalom Obstacle Navigation",
+                    "title": "Slalom Obstacle Navigation",
+                    "desc": "ML Model Optimized Secondary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Secondary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 260,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 2,
+                "title": "Day 2: Hypertrophy, Core & Postural Stability 🔥",
+                "focus": "Targeted Adapted sit (Form Score: 0%) progression (Pull)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_2_1",
+                    "name": "Hindlimb Traction Trot",
+                    "title": "Hindlimb Traction Trot",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  },
+                  {
+                    "id": "ml_2_2",
+                    "name": "Backward Harness Resistance Line",
+                    "title": "Backward Harness Resistance Line",
+                    "desc": "ML Model Optimized Secondary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Secondary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 260,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 3,
+                "title": "Day 3: High-Drive Endurance & Cardiovascular Stamina 🔥",
+                "focus": "Targeted Adapted sit (Form Score: 0%) progression (Push)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_3_1",
+                    "name": "Chest Slope Push Steps",
+                    "title": "Chest Slope Push Steps",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  },
+                  {
+                    "id": "ml_3_2",
+                    "name": "Forelimb Ramp Incline Press",
+                    "title": "Forelimb Ramp Incline Press",
+                    "desc": "ML Model Optimized Secondary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Secondary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 261,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 4,
+                "title": "Day 4: Active Recovery & Hydration 💤",
+                "focus": "Neurological recovery & joint decompression",
+                "isRestDay": true,
+                "isRest": true,
+                "drills": [],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 0,
+                "diet": {
+                  "recommendation": "Hydration and joint supplements (Glucosamine/Chondroitin).",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 5,
+                "title": "Day 5: Explosive Agility & Kinetic Power 🔥",
+                "focus": "Targeted Adapted sit (Form Score: 0%) progression (Agility)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_5_1",
+                    "name": "Directional Pivot Sprints",
+                    "title": "Directional Pivot Sprints",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  },
+                  {
+                    "id": "ml_5_2",
+                    "name": "Slalom Obstacle Navigation",
+                    "title": "Slalom Obstacle Navigation",
+                    "desc": "ML Model Optimized Secondary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Secondary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 260,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 6,
+                "title": "Day 6: Cognitive Focus & Impulse Control 🔥",
+                "focus": "Targeted Adapted sit (Form Score: 0%) progression (Pull)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_6_1",
+                    "name": "Hindlimb Traction Trot",
+                    "title": "Hindlimb Traction Trot",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 260,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              },
+              {
+                "dayNum": 7,
+                "title": "Day 7: Milestone Performance Review & Peak Mastery 🔥",
+                "focus": "Targeted Adapted sit (Form Score: 0%) progression (Push)",
+                "isRestDay": false,
+                "isRest": false,
+                "drills": [
+                  {
+                    "id": "ml_7_1",
+                    "name": "Chest Slope Push Steps",
+                    "title": "Chest Slope Push Steps",
+                    "desc": "ML Model Optimized Primary Movement",
+                    "reps": "3 sets × 10 reps (Rest: 60s)",
+                    "sets_reps": "3 sets × 10 reps",
+                    "rest": "60 seconds",
+                    "intensity": "Light",
+                    "difficulty": "Beginner",
+                    "instructions": "ML Model Optimized Primary Movement",
+                    "targetMuscles": "Core stabilizers & Prime movers",
+                    "safety": "Maintain clean posture.",
+                    "mlModelVerified": true
+                  }
+                ],
+                "safety": "Maintain clean posture and look straight ahead.",
+                "targetCalories": 261,
+                "diet": {
+                  "recommendation": "High protein recovery meal after training session.",
+                  "hydration": "1500 mL",
+                  "macros": "Standard Maintenance portion"
+                }
+              }
+            ],
+            "dailySchedule": [
+              {
+                "time": "08:00 AM",
+                "activity": "Morning Vitals & Feed",
+                "duration": "20m",
+                "notes": "Check posture"
+              },
+              {
+                "time": "10:30 AM",
+                "activity": "AI Training Session",
+                "duration": "30m",
+                "notes": "Use scanner"
+              },
+              {
+                "time": "01:00 PM",
+                "activity": "Nutritional Recovery",
+                "duration": "30m",
+                "notes": "Protein rich"
+              }
+            ],
+            "dietaryPlan": [
+              {
+                "meal": "Day 1 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 2 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 3 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 4 Protocol",
+                "recommendation": "Hydration and joint supplements (Glucosamine/Chondroitin).",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 5 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 6 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              },
+              {
+                "meal": "Day 7 Protocol",
+                "recommendation": "High protein recovery meal after training session.",
+                "portion": "Maintenance",
+                "timing": "1500 mL"
+              }
+            ],
+            "exercises": [
+              {
+                "id": "gait_analysis",
+                "name": "General Gait & Pacing Analysis",
+                "reps": "3 x 12",
+                "intensity": "Moderate",
+                "instructions": "Evaluate baseline symmetry, stride length, cadence, and lameness indicators."
+              }
+            ],
+            "milestones": [
+              "Baseline Assessment",
+              "3-Day Streak",
+              "Form Mastery"
+            ],
+            "metrics": [
+              {
+                "label": "Symmetry",
+                "value": 78,
+                "description": "Bilateral balance"
+              },
+              {
+                "label": "Stability",
+                "value": 74,
+                "description": "Core control"
+              }
+            ],
+            "safetyWarnings": [
+              "Ensure non-slip surface.",
+              "Stop if animal shows distress or panting."
+            ],
+            "adaptationExplanation": "Initial baseline plan."
+          }
+        }
+      },
+      {
         "id": "tp_1792071493309",
         "user_id": "usr_cef118e82cf2444d",
         "species": "Dog",

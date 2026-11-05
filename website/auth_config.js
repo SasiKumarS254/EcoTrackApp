@@ -25,7 +25,9 @@ const AUTH_CONFIG = {
  */
 function getSession() {
   try {
-    const raw = localStorage.getItem(AUTH_CONFIG.sessionKey);
+    const raw = localStorage.getItem(AUTH_CONFIG.sessionKey) || 
+                localStorage.getItem("@ecotrack_user_session") || 
+                localStorage.getItem("@ecotrack_session");
     if (!raw) return null;
     const session = JSON.parse(raw);
     if (session) {
@@ -69,7 +71,23 @@ function getAuthHeaders(extraHeaders = {}) {
  * Ensures consistency across index.html and aiscanner.html.
  */
 function syncUserInterface(user) {
-  if (!user) return;
+  if (!user) {
+    const fallbackName = "Eco Explorer";
+    const elements = {
+      "sidebarUserName": fallbackName,
+      "sidebarUserEmail": "Guest Member",
+      "topUserName": fallbackName,
+      "profileHeroName": fallbackName,
+      "profileHeroBio": "Digital welfare architect & wildlife enthusiast."
+    };
+    Object.entries(elements).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el && (el.textContent === "Loading..." || el.textContent === "Loading Profile...")) {
+        el.textContent = val;
+      }
+    });
+    return;
+  }
 
   const name = user.display_name || user.name || (user.email ? user.email.split('@')[0] : 'User');
   const initial = name.charAt(0).toUpperCase();
